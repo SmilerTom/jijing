@@ -18,6 +18,10 @@ const recovery = calculateRecovery({ currentNav: 3.2743, lossPct: 40 });
 assert.ok(Math.abs(recovery.recoveryNav - 5.4571666667) < 0.0001);
 assert.ok(Math.abs(recovery.requiredRise - 0.6666666667) < 0.0001);
 
-const exitRows = calculateExitRows({ targetCapital: 10000, baseNav: 3.2743, exits: [{ label: '上涨 10%', rebound: 10, sellRatio: 10 }] });
+const exitRows = calculateExitRows({
+  targetCapital: 10000,
+  baseNav: 3.2743,
+  exits: [{ label: '上涨 10%', rebound: 10, sellRatio: 10 }]
+});
 assert.equal(exitRows[0].soldShares, exitRows[0].targetShares * 0.1);
 assert.ok(Math.abs(exitRows[0].cash + exitRows[0].holdingValue - exitRows[0].totalAssets) < 0.0001);

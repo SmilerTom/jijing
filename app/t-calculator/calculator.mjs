@@ -12,7 +12,7 @@ export const DEFAULT_EXITS = [
   { id: 'up-30', label: '上涨 30%', rebound: 30, sellRatio: 10 }
 ];
 
-const numberOr = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+const numberOr = (value, fallback = 0) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
 
 const navForEntry = (entry, baseNav) => {
   const explicitNav = numberOr(entry?.nav);
@@ -37,17 +37,50 @@ export function calculateEntryRows({ capital = 0, baseNav = 0, entries = [] } = 
     const holdingValue = shares * nav;
     const totalAssets = cash + holdingValue;
     const averageCost = shares > 0 ? cumulativeInvested / shares : 0;
-    return { ...entry, index, nav, amount: buyAmount, requestedAmount: amount, cumulativeInvested, cash, shares, holdingValue, totalAssets, averageCost, breakEvenNav: averageCost };
+    return {
+      ...entry,
+      index,
+      nav,
+      amount: buyAmount,
+      requestedAmount: amount,
+      cumulativeInvested,
+      cash,
+      shares,
+      holdingValue,
+      totalAssets,
+      averageCost,
+      breakEvenNav: averageCost
+    };
   });
 }
 
 export function summarizeEntryPosition({ rows = [], scenarioNav = 0, redemptionFeePct = 0 } = {}) {
   const last = rows.at(-1);
   const nav = numberOr(scenarioNav);
-  if (!last || !(nav > 0)) return { cash: last?.cash || 0, shares: last?.shares || 0, cumulativeInvested: last?.cumulativeInvested || 0, holdingValue: 0, totalAssets: last?.cash || 0, averageCost: last?.averageCost || 0, breakEvenNav: 0, requiredRise: 0, error: '模拟净值必须大于 0' };
+  if (!last || !(nav > 0))
+    return {
+      cash: last?.cash || 0,
+      shares: last?.shares || 0,
+      cumulativeInvested: last?.cumulativeInvested || 0,
+      holdingValue: 0,
+      totalAssets: last?.cash || 0,
+      averageCost: last?.averageCost || 0,
+      breakEvenNav: 0,
+      requiredRise: 0,
+      error: '模拟净值必须大于 0'
+    };
   const fee = Math.min(99.99, Math.max(0, numberOr(redemptionFeePct))) / 100;
   const breakEvenNav = last.averageCost > 0 ? last.averageCost / (1 - fee) : 0;
-  return { cash: last.cash, shares: last.shares, cumulativeInvested: last.cumulativeInvested, holdingValue: last.shares * nav, totalAssets: last.cash + last.shares * nav, averageCost: last.averageCost, breakEvenNav, requiredRise: nav > 0 ? breakEvenNav / nav - 1 : 0 };
+  return {
+    cash: last.cash,
+    shares: last.shares,
+    cumulativeInvested: last.cumulativeInvested,
+    holdingValue: last.shares * nav,
+    totalAssets: last.cash + last.shares * nav,
+    averageCost: last.averageCost,
+    breakEvenNav,
+    requiredRise: nav > 0 ? breakEvenNav / nav - 1 : 0
+  };
 }
 
 export function calculateExitRows({ targetCapital = 0, baseNav = 0, exits = [], redemptionFeePct = 0 } = {}) {
@@ -60,7 +93,7 @@ export function calculateExitRows({ targetCapital = 0, baseNav = 0, exits = [], 
   let cash = 0;
   return exits.map((exit, index) => {
     const triggerNav = safeBaseNav * (1 + numberOr(exit?.rebound) / 100);
-    const requestedShares = targetShares * Math.max(0, numberOr(exit?.sellRatio)) / 100;
+    const requestedShares = (targetShares * Math.max(0, numberOr(exit?.sellRatio))) / 100;
     const soldShares = Math.min(remainingShares, requestedShares);
     const grossCash = soldShares * triggerNav;
     const feeAmount = grossCash * fee;
@@ -69,14 +102,35 @@ export function calculateExitRows({ targetCapital = 0, baseNav = 0, exits = [], 
     cash += netCash;
     const holdingValue = remainingShares * triggerNav;
     const totalAssets = cash + holdingValue;
-    return { ...exit, index, targetShares, triggerNav, soldShares, grossCash, feeAmount, netCash, cash, remainingShares, holdingValue, totalAssets, totalReturn: capital > 0 ? totalAssets / capital - 1 : 0 };
+    return {
+      ...exit,
+      index,
+      targetShares,
+      triggerNav,
+      soldShares,
+      grossCash,
+      feeAmount,
+      netCash,
+      cash,
+      remainingShares,
+      holdingValue,
+      totalAssets,
+      totalReturn: capital > 0 ? totalAssets / capital - 1 : 0
+    };
   });
 }
 
 export function calculateRecovery({ currentNav = 0, lossPct = 0 } = {}) {
   const nav = numberOr(currentNav);
   const loss = Math.min(99.99, Math.max(0, numberOr(lossPct))) / 100;
-  if (!(nav > 0) || !(loss < 1)) return { currentNav: nav, lossPct: loss * 100, recoveryNav: 0, requiredRise: 0, error: '净值必须大于 0，回撤必须小于 100%' };
+  if (!(nav > 0) || !(loss < 1))
+    return {
+      currentNav: nav,
+      lossPct: loss * 100,
+      recoveryNav: 0,
+      requiredRise: 0,
+      error: '净值必须大于 0，回撤必须小于 100%'
+    };
   const recoveryNav = nav / (1 - loss);
   return { currentNav: nav, lossPct: loss * 100, recoveryNav, requiredRise: recoveryNav / nav - 1 };
 }
