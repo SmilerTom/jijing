@@ -218,15 +218,15 @@ export default function TradingCalculatorPage() {
       </header>
 
       <div className={styles.workspace}>
-        <section className={styles.panel} aria-labelledby="parameters-title">
+        <section className={styles.panel} aria-labelledby="account-board-title">
+          <SectionTitle
+            id="account-board-title"
+            eyebrow="01 / ACCOUNT BOARD"
+            title="账户看板"
+            detail="账户金额、持有时间与实时资产合并展示。"
+          />
           <div className={styles.boardGrid}>
             <div className={styles.boardInputs}>
-              <SectionTitle
-                id="parameters-title"
-                eyebrow="01 / INPUTS"
-                title="账户详情"
-                detail="任何字段变化都会立即重算下方资金流水。"
-              />
               <div className={styles.fieldsGrid}>
                 <Field
                   id="capital"
@@ -287,13 +287,7 @@ export default function TradingCalculatorPage() {
               </div>
             </div>
 
-            <div className={styles.boardResults} aria-labelledby="results-title">
-              <SectionTitle
-                id="results-title"
-                eyebrow="02 / LIVE RESULT"
-                title="账户快照"
-                detail="按已配置的全部入仓计划估算。"
-              />
+            <div className={styles.boardResults} aria-label="实时账户指标">
               <div className={styles.metricsGrid}>
                 <Metric label="剩余现金" value={formatMoney(position.cash)} note="入仓后未使用资金" />
                 <Metric
@@ -311,7 +305,7 @@ export default function TradingCalculatorPage() {
                   label="账户总资产"
                   value={formatMoney(position.totalAssets)}
                   tone={position.totalAssets >= numericValue(form.capital) ? 'positive' : 'negative'}
-                  note={`相对本金 ${formatPercent(position.totalAssets / numericValue(form.capital) - 1)}`}
+                  note={`相对账户金额 ${formatPercent(position.totalAssets / numericValue(form.capital) - 1)}`}
                 />
                 <Metric label="平均成本" value={formatNav(position.averageCost)} note="累计投入 ÷ 累计份额" />
                 <Metric
