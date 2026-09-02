@@ -8,8 +8,8 @@ export const DEFAULT_ENTRIES = [
 
 export const DEFAULT_EXITS = [
   { id: 'up-10', label: '上涨 10%', rebound: 10, sellRatio: 10 },
-  { id: 'up-18', label: '上涨 18%', rebound: 18, sellRatio: 10 },
-  { id: 'up-30', label: '上涨 30%', rebound: 30, sellRatio: 10 }
+  { id: 'up-10-next', label: '再涨 10%', rebound: 10, sellRatio: 10 },
+  { id: 'up-10-third', label: '再涨 10%', rebound: 10, sellRatio: 10 }
 ];
 
 const numberOr = (value, fallback = 0) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
@@ -91,15 +91,17 @@ export function calculateExitRows({ targetCapital = 0, baseNav = 0, exits = [], 
   const fee = Math.min(99.99, Math.max(0, numberOr(redemptionFeePct))) / 100;
   let remainingShares = targetShares;
   let cash = 0;
+  let previousNav = safeBaseNav;
   return exits.map((exit, index) => {
-    const triggerNav = safeBaseNav * (1 + numberOr(exit?.rebound) / 100);
-    const requestedShares = (targetShares * Math.max(0, numberOr(exit?.sellRatio))) / 100;
+    const triggerNav = previousNav * (1 + numberOr(exit?.rebound) / 100);
+    const requestedShares = (remainingShares * Math.max(0, numberOr(exit?.sellRatio))) / 100;
     const soldShares = Math.min(remainingShares, requestedShares);
     const grossCash = soldShares * triggerNav;
     const feeAmount = grossCash * fee;
     const netCash = grossCash - feeAmount;
     remainingShares -= soldShares;
     cash += netCash;
+    previousNav = triggerNav;
     const holdingValue = remainingShares * triggerNav;
     const totalAssets = cash + holdingValue;
     return {

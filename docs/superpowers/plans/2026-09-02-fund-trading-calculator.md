@@ -19,7 +19,7 @@
 
 - [ ] **Step 1: Write the failing check**
 
-Create `calculator.check.mjs` importing `assert`, `calculateEntryRows`, `calculateExitRows`, and `calculateRecovery`. Assert the default entry plan reaches cumulative investment 7000, cash 3000, total assets within 0.01 of 9312.15, and average cost within 0.0001 of 2.9775. Assert a 40% drawdown from NAV 3.2743 returns recovery NAV within 0.0001 of 5.4572 and recovery rise within 0.0001 of 0.6666667. Assert the first exit row sells the fixed target-unit fraction and preserves cash plus holdings equal to total assets.
+Create `calculator.check.mjs` importing `assert`, `calculateEntryRows`, `calculateExitRows`, and `calculateRecovery`. Assert the default entry plan reaches cumulative investment 7000, cash 3000, total assets within 0.01 of 9312.15, and average cost within 0.0001 of 2.9775. Assert a 40% drawdown from NAV 3.2743 returns recovery NAV within 0.0001 of 5.4572 and recovery rise within 0.0001 of 0.6666667. Assert the first exit row sells 10% of the target shares, the second exit compounds the first trigger NAV by 10%, sells 10% of the remaining shares, and preserves cash plus holdings equal to total assets.
 
 - [ ] **Step 2: Run the check and verify it fails**
 
@@ -27,7 +27,7 @@ Run `node app/t-calculator/calculator.check.mjs` from the repository root. Expec
 
 - [ ] **Step 3: Implement the minimal pure functions**
 
-Export `DEFAULT_ENTRIES`, `DEFAULT_EXITS`, `calculateEntryRows`, `calculateExitRows`, and `calculateRecovery`. `calculateEntryRows` must subtract each purchase from cash, add `amount / nav` shares, and return cumulative investment, cash, shares, holding value, total assets, average cost, and break-even NAV. `calculateExitRows` must start from a full target position at the base NAV, sell a fixed fraction of original target shares at each `baseNav * (1 + reboundPct)` price, and return cash, remaining shares, remaining holding value, total assets, and total return. `calculateRecovery` must return current NAV, loss percentage, recovery NAV, and required rise; use `recoveryNav = currentNav / (1 - lossPct)` and reject non-positive inputs by returning an error field rather than throwing.
+Export `DEFAULT_ENTRIES`, `DEFAULT_EXITS`, `calculateEntryRows`, `calculateExitRows`, and `calculateRecovery`. `calculateEntryRows` must subtract each purchase from cash, add `amount / nav` shares, and return cumulative investment, cash, shares, holding value, total assets, average cost, and break-even NAV. `calculateExitRows` must start from a full target position at the base NAV, compound each rebound percentage from the previous trigger NAV, sell the configured fraction of current remaining shares, and return cash, remaining shares, remaining holding value, total assets, and total return. `calculateRecovery` must return current NAV, loss percentage, recovery NAV, and required rise; use `recoveryNav = currentNav / (1 - lossPct)` and reject non-positive inputs by returning an error field rather than throwing.
 
 - [ ] **Step 4: Run the check and verify it passes**
 

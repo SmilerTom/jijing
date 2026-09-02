@@ -25,3 +25,16 @@ const exitRows = calculateExitRows({
 });
 assert.equal(exitRows[0].soldShares, exitRows[0].targetShares * 0.1);
 assert.ok(Math.abs(exitRows[0].cash + exitRows[0].holdingValue - exitRows[0].totalAssets) < 0.0001);
+
+const rollingExitRows = calculateExitRows({
+  targetCapital: 10000,
+  baseNav: 3.2743,
+  exits: [
+    { label: '第一轮上涨 10%', rebound: 10, sellRatio: 10 },
+    { label: '第二轮再涨 10%', rebound: 10, sellRatio: 10 }
+  ]
+});
+assert.ok(Math.abs(rollingExitRows[1].triggerNav - rollingExitRows[0].triggerNav * 1.1) < 0.0001);
+assert.ok(Math.abs(rollingExitRows[1].netCash - 1089) < 0.01);
+assert.ok(Math.abs(rollingExitRows[1].holdingValue - 9801) < 0.01);
+assert.ok(Math.abs(rollingExitRows[1].totalAssets - 11990) < 0.01);

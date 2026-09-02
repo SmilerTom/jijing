@@ -394,7 +394,7 @@ export default function TradingCalculatorPage() {
           id="exit-title"
           eyebrow="04 / EXIT LADDER"
           title="出仓流水"
-          detail="按目标总份额固定比例卖出，避免把“卖出 10%”误算成固定现金。阶段低点使用 P0。"
+          detail="每轮涨幅作用于上一轮净值，每轮卖出当前剩余份额比例。"
         />
         <div id="exit-table-hint" className={styles.srOnly}>
           可编辑上涨幅度和卖出比例，数值变化会实时更新出仓资金。
