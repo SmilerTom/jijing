@@ -12,7 +12,7 @@ import styles from './calculator.module.css';
 
 const DEFAULT_FORM = {
   baseNav: '3.2743',
-  initialAccountValue: '',
+  holdingValue: '',
   profitRate: '',
   holdingDays: '30'
 };
@@ -88,12 +88,15 @@ function Metric({ label, value, note, tone = '' }) {
   );
 }
 
-function SectionTitle({ id, eyebrow, title, detail }) {
+function SectionTitle({ id, eyebrow, title, detail, action }) {
   return (
     <div className={styles.sectionTitle}>
-      {eyebrow && <span className={styles.eyebrow}>{eyebrow}</span>}
-      <h2 id={id}>{title}</h2>
-      {detail && <p>· {detail}</p>}
+      <div className={styles.sectionTitleContent}>
+        {eyebrow && <span className={styles.eyebrow}>{eyebrow}</span>}
+        <h2 id={id}>{title}</h2>
+        {detail && <p>· {detail}</p>}
+      </div>
+      {action && <div className={styles.sectionTitleAction}>{action}</div>}
     </div>
   );
 }
@@ -103,6 +106,7 @@ export default function TradingCalculatorPage() {
   const [form, setForm] = useState(defaults.form);
   const [entries, setEntries] = useState(defaults.entries);
   const [exits, setExits] = useState(defaults.exits);
+  const [isEditingSnapshot, setIsEditingSnapshot] = useState(false);
 
   const updateForm = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const updateEntry = (id, key, value) =>
@@ -113,6 +117,7 @@ export default function TradingCalculatorPage() {
     setForm(defaults.form);
     setEntries(defaults.entries.map((entry) => ({ ...entry })));
     setExits(defaults.exits.map((exit) => ({ ...exit })));
+    setIsEditingSnapshot(false);
   };
 
   const plannedCapital = useMemo(
@@ -123,20 +128,17 @@ export default function TradingCalculatorPage() {
       }, 0),
     [entries]
   );
-  const hasInitialAccountValue =
-    form.initialAccountValue !== '' &&
-    isValidNonNegative(form.initialAccountValue) &&
-    numericValue(form.initialAccountValue) > 0;
-  const initialAccountValue = hasInitialAccountValue ? numericValue(form.initialAccountValue) : 0;
   const errors = {
-    initialAccountValue: form.initialAccountValue === '' || hasInitialAccountValue ? '' : '初始账户市值必须大于 0',
+    holdingValue: form.holdingValue === '' || isValidNonNegative(form.holdingValue) ? '' : '持仓市值不能为负数',
     profitRate:
       form.profitRate === '' ||
       (Number.isFinite(numericValue(form.profitRate)) &&
         numericValue(form.profitRate) >= -100 &&
         numericValue(form.profitRate) <= 100)
         ? ''
-        : '盈利率需在 -100% 至 100% 之间'
+        : '盈利率需在 -100% 至 100% 之间',
+    holdingDays:
+      Number.isFinite(numericValue(form.holdingDays)) && numericValue(form.holdingDays) >= 0 ? '' : '持有时间不能为负数'
   };
   const entryRows = useMemo(
     () => calculateEntryRows({ capital: plannedCapital, baseNav: numericValue(form.baseNav), entries }),
@@ -151,14 +153,15 @@ export default function TradingCalculatorPage() {
       }),
     [entryRows, form.baseNav]
   );
-  const calculatedProfitRate = plannedCapital > 0 ? position.holdingValue / plannedCapital - 1 : 0;
+  const hasManualHoldingValue = isValidNonNegative(form.holdingValue);
+  const currentHoldingValue = hasManualHoldingValue ? numericValue(form.holdingValue) : position.holdingValue;
+  const calculatedProfitRate = plannedCapital > 0 ? currentHoldingValue / plannedCapital - 1 : 0;
   const hasManualProfitRate =
     form.profitRate !== '' &&
     Number.isFinite(numericValue(form.profitRate)) &&
     numericValue(form.profitRate) >= -100 &&
     numericValue(form.profitRate) <= 100;
   const profitRate = hasManualProfitRate ? numericValue(form.profitRate) / 100 : calculatedProfitRate;
-  const currentHoldingValue = hasInitialAccountValue ? initialAccountValue : position.holdingValue;
   const profitRateInput = form.profitRate === '' ? formatInputPercent(calculatedProfitRate) : asText(form.profitRate);
   const exitRows = useMemo(
     () =>
@@ -219,48 +222,65 @@ export default function TradingCalculatorPage() {
       </header>
 
       <div className={styles.workspace}>
-        <section className={styles.panel} aria-labelledby="results-title">
+        <section className={`${styles.panel} ${styles.snapshotPanel}`} aria-labelledby="results-title">
           <div>
             <SectionTitle
               id="results-title"
-              eyebrow="01 / LIVE RESULT"
               title="账户快照"
-              detail="单只基金持仓结果，可手动调整初始账户市值与盈利率，其余指标只读。"
+              detail="单只基金持仓结果。"
+              action={
+                <button
+                  type="button"
+                  className={styles.editButton}
+                  aria-pressed={isEditingSnapshot}
+                  onClick={() => setIsEditingSnapshot((current) => !current)}
+                >
+                  {isEditingSnapshot ? '完成' : '编辑'}
+                </button>
+              }
             />
             <div className={styles.metricsGrid}>
-              <div className={`${styles.metric} ${styles.metricField}`}>
-                <Field
-                  id="initialAccountValue"
-                  label="初始账户"
-                  value={hasInitialAccountValue ? form.initialAccountValue : formatInputAmount(position.holdingValue)}
-                  onChange={(value) => updateForm('initialAccountValue', value)}
-                  step="0.01"
-                  suffix="元"
-                  hint="按账户市值录入，用于计算下方看板。"
-                  error={errors.initialAccountValue}
-                />
-              </div>
-              <div
-                className={`${styles.metric} ${styles.metricField} ${profitRate >= 0 ? styles.positive : styles.negative}`}
-              >
-                <Field
-                  id="profitRate"
+              {isEditingSnapshot ? (
+                <div className={`${styles.metric} ${styles.metricField}`}>
+                  <Field
+                    id="holdingValue"
+                    label="持仓市值"
+                    value={hasManualHoldingValue ? form.holdingValue : formatInputAmount(position.holdingValue)}
+                    onChange={(value) => updateForm('holdingValue', value)}
+                    step="0.01"
+                    suffix="元"
+                    hint="只修改看板显示，不参与流水计算。"
+                    error={errors.holdingValue}
+                  />
+                </div>
+              ) : (
+                <Metric label="持仓市值" value={formatMoney(currentHoldingValue)} note="当前持仓市值" />
+              )}
+              {isEditingSnapshot ? (
+                <div
+                  className={`${styles.metric} ${styles.metricField} ${profitRate >= 0 ? styles.positive : styles.negative}`}
+                >
+                  <Field
+                    id="profitRate"
+                    label="盈利率"
+                    value={profitRateInput}
+                    onChange={(value) => updateForm('profitRate', value)}
+                    min="-100"
+                    max="100"
+                    step="0.01"
+                    suffix="%"
+                    hint="只修改看板显示，不参与流水计算。"
+                    error={errors.profitRate}
+                  />
+                </div>
+              ) : (
+                <Metric
                   label="盈利率"
-                  value={profitRateInput}
-                  onChange={(value) => updateForm('profitRate', value)}
-                  min="-100"
-                  max="100"
-                  step="0.01"
-                  suffix="%"
-                  hint="可手动输入，其他指标随之更新。"
-                  error={errors.profitRate}
+                  value={formatPercent(profitRate)}
+                  tone={profitRate >= 0 ? 'positive' : 'negative'}
+                  note="当前账户盈利率"
                 />
-              </div>
-              <Metric
-                label="持仓市值"
-                value={formatMoney(currentHoldingValue)}
-                note="账户市值直接展示，不参与流水计算"
-              />
+              )}
               <Metric label="持仓份额" value={formatNumber(latestEntry?.shares || 0)} note="当前持仓份额" />
               <Metric label="平均成本" value={formatNav(position.averageCost)} note="累计投入 ÷ 累计份额" />
               <Metric
@@ -269,7 +289,22 @@ export default function TradingCalculatorPage() {
                 tone="accent"
                 note={`当前还需 ${formatPercent(position.requiredRise)}`}
               />
-              <Metric label="持有时间" value={`${form.holdingDays} 天`} note="未清仓时每天自动增加 1 天" />
+              {isEditingSnapshot ? (
+                <div className={`${styles.metric} ${styles.metricField}`}>
+                  <Field
+                    id="holdingDays"
+                    label="持有时间"
+                    value={form.holdingDays}
+                    onChange={(value) => updateForm('holdingDays', value)}
+                    step="1"
+                    suffix="天"
+                    hint="只修改看板显示。"
+                    error={errors.holdingDays}
+                  />
+                </div>
+              ) : (
+                <Metric label="持有时间" value={`${form.holdingDays} 天`} note="未清仓时每天自动增加 1 天" />
+              )}
             </div>
           </div>
         </section>

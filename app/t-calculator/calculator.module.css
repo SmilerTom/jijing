@@ -168,8 +168,18 @@
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.08);
 }
 .sectionTitle {
-  display: block;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
   margin-bottom: 20px;
+}
+.sectionTitleContent {
+  min-width: 0;
+  flex: 1;
+}
+.sectionTitleAction {
+  flex: 0 0 auto;
 }
 .sectionTitle .eyebrow {
   display: inline-block;
@@ -187,8 +197,28 @@
   font-size: 26PX;
   letter-spacing: -0.03em;
 }
+.snapshotPanel h2 {
+  color: var(--accent);
+}
 .flowPanel h2 {
   color: var(--accent);
+}
+.editButton {
+  min-height: 36px;
+  padding: 0 12px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  border-radius: 6px;
+  font-size: 13PX;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.editButton:hover,
+.editButton:focus-visible,
+.editButton[aria-pressed='true'] {
+  color: var(--primary-foreground);
+  background: var(--accent);
 }
 .recoveryPanel h2 {
   margin: 0;
