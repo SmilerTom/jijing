@@ -1,5 +1,4 @@
 export const DEFAULT_ENTRIES = [
-  { id: 'initial', label: '初始账户', change: 0, amount: '' },
   { id: 'dip-6', label: '下跌 6% 补仓', change: -6, amount: '' },
   { id: 'dip-12', label: '下跌 12% 补仓', change: -12, amount: '' },
   { id: 'dip-18', label: '下跌 18% 补仓', change: -18, amount: '' },
@@ -98,7 +97,8 @@ export function calculateExitRows({ targetCapital = 0, baseNav = 0, exits = [], 
   let cash = 0;
   let previousNav = safeBaseNav;
   return exits.map((exit, index) => {
-    const triggerNav = previousNav * (1 + numberOr(exit?.rebound) / 100);
+    const explicitNav = numberOr(exit?.nav);
+    const triggerNav = explicitNav > 0 ? explicitNav : previousNav * (1 + numberOr(exit?.rebound) / 100);
     const beforeShares = remainingShares;
     const requestedShares = hasNumericValue(exit?.sellShares)
       ? Math.max(0, numberOr(exit?.sellShares))

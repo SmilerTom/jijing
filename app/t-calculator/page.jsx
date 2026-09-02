@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { isArray } from 'lodash';
 import {
   calculateEntryRows,
   calculateExitRows,
@@ -8,6 +9,7 @@ import {
   DEFAULT_EXITS,
   summarizeEntryPosition
 } from './calculator.mjs';
+import { storageStore } from '../stores/storageStore';
 import styles from './calculator.module.css';
 
 const DEFAULT_FORM = {
@@ -16,7 +18,8 @@ const DEFAULT_FORM = {
   profitRate: '',
   holdingDays: '30'
 };
-const PERCENT_OPTIONS = Array.from({ length: 46 }, (_, index) => index + 5);
+const PAGE_SIZE_OPTIONS = [5, 10];
+const PENDING_FLOW_KEY = 'fundTradingCalculatorPendingFlows';
 
 const asText = (value) => (value === null || value === undefined ? '' : String(value));
 const numericValue = (value) => Number(value);
@@ -33,15 +36,25 @@ const formatMoney = (value) =>
 const formatAmount = (value) =>
   Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--';
 const formatInputAmount = (value) => (Number.isFinite(value) ? value.toFixed(2) : '');
+const formatInputPercent = (value) => (Number.isFinite(value) ? (value * 100).toFixed(2) : '');
 const formatNav = (value) => (Number.isFinite(value) && value > 0 ? value.toFixed(4) : '--');
 const formatNumber = (value) =>
   Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '--';
 const formatPercent = (value, digits = 2) =>
   Number.isFinite(value) ? `${value >= 0 ? '+' : ''}${(value * 100).toFixed(digits)}%` : '--';
 const absolutePercent = (value) => (Number.isFinite(numericValue(value)) ? Math.abs(numericValue(value)) : '');
-const entryLabel = (entry) =>
-  entry.confirmation || entry.id === 'initial' ? entry.label : `下跌 ${absolutePercent(entry.change)}% 补仓`;
-const exitLabel = (exit, index) => `${index === 0 ? '上涨' : '再涨'} ${absolutePercent(exit.rebound)}%`;
+const entryLabel = (entry) => (entry.confirmation ? entry.label : `下跌 ${absolutePercent(entry.change)}% 补仓`);
+const exitLabel = (exit, index) =>
+  exit.manual ? exit.label : `${index === 0 ? '上涨' : '再涨'} ${absolutePercent(exit.rebound)}%`;
+const todayKey = () => {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+const tomorrowKey = () => {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
 const cloneDefaults = () => ({
   form: { ...DEFAULT_FORM },
   entries: DEFAULT_ENTRIES.map((entry) => ({ ...entry })),
@@ -100,12 +113,48 @@ function SectionTitle({ id, eyebrow, title, detail, action }) {
   );
 }
 
+function Pagination({ label, page, pageCount, pageSize, total, onPageChange, onPageSizeChange }) {
+  if (total === 0) return null;
+  return (
+    <div className={styles.pagination} aria-label={`${label}分页`}>
+      <label>
+        每页
+        <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))}>
+          {PAGE_SIZE_OPTIONS.map((size) => (
+            <option key={size} value={size}>
+              {size}条
+            </option>
+          ))}
+        </select>
+      </label>
+      <span>
+        第 {page} / {pageCount} 页，共 {total} 条
+      </span>
+      <button type="button" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
+        上一页
+      </button>
+      <button type="button" disabled={page >= pageCount} onClick={() => onPageChange(page + 1)}>
+        下一页
+      </button>
+    </div>
+  );
+}
+
 export default function TradingCalculatorPage() {
   const defaults = useMemo(() => cloneDefaults(), []);
   const [form, setForm] = useState(defaults.form);
   const [entries, setEntries] = useState(defaults.entries);
   const [exits, setExits] = useState(defaults.exits);
   const [isEditingSnapshot, setIsEditingSnapshot] = useState(false);
+  const [pendingFlows, setPendingFlows] = useState({ entries: [], exits: [] });
+  const [flowType, setFlowType] = useState(null);
+  const [flowDraft, setFlowDraft] = useState({ amount: '', nav: '' });
+  const [flowError, setFlowError] = useState('');
+  const [entryPage, setEntryPage] = useState(1);
+  const [exitPage, setExitPage] = useState(1);
+  const [entryPageSize, setEntryPageSize] = useState(5);
+  const [exitPageSize, setExitPageSize] = useState(5);
+  const flowsHydrated = useRef(false);
 
   const updateForm = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const updateEntry = (id, key, value) =>
@@ -117,7 +166,29 @@ export default function TradingCalculatorPage() {
     setEntries(defaults.entries.map((entry) => ({ ...entry })));
     setExits(defaults.exits.map((exit) => ({ ...exit })));
     setIsEditingSnapshot(false);
+    setPendingFlows({ entries: [], exits: [] });
   };
+
+  useEffect(() => {
+    if (flowsHydrated.current) return;
+    flowsHydrated.current = true;
+    const saved = storageStore.getItem(PENDING_FLOW_KEY, { entries: [], exits: [] });
+    const savedEntries = isArray(saved?.entries) ? saved.entries : [];
+    const savedExits = isArray(saved?.exits) ? saved.exits : [];
+    const today = todayKey();
+    const dueEntries = savedEntries.filter((flow) => flow?.availableOn && flow.availableOn <= today);
+    const dueExits = savedExits.filter((flow) => flow?.availableOn && flow.availableOn <= today);
+    setEntries((current) => [...current, ...dueEntries]);
+    setExits((current) => [...current, ...dueExits]);
+    setPendingFlows({
+      entries: savedEntries.filter((flow) => !dueEntries.includes(flow)),
+      exits: savedExits.filter((flow) => !dueExits.includes(flow))
+    });
+  }, [defaults]);
+
+  useEffect(() => {
+    if (flowsHydrated.current) storageStore.setItem(PENDING_FLOW_KEY, JSON.stringify(pendingFlows));
+  }, [pendingFlows]);
 
   const plannedCapital = useMemo(
     () =>
@@ -161,7 +232,7 @@ export default function TradingCalculatorPage() {
     numericValue(form.profitRate) >= -100 &&
     numericValue(form.profitRate) <= 100;
   const profitRate = hasManualProfitRate ? numericValue(form.profitRate) / 100 : calculatedProfitRate;
-  const profitRateInput = form.profitRate === '' ? '' : asText(form.profitRate);
+  const profitRateInput = form.profitRate === '' ? formatInputPercent(profitRate) : asText(form.profitRate);
   const exitRows = useMemo(
     () =>
       calculateExitRows({
@@ -172,6 +243,26 @@ export default function TradingCalculatorPage() {
     [plannedCapital, form.baseNav, exits]
   );
   const lastExit = exitRows.at(-1);
+  const entryItems = useMemo(
+    () => [
+      ...entries.map((entry, index) => ({ entry, row: entryRows[index], pending: false })),
+      ...pendingFlows.entries.map((entry) => ({ entry, row: null, pending: true }))
+    ],
+    [entries, entryRows, pendingFlows.entries]
+  );
+  const exitItems = useMemo(
+    () => [
+      ...exits.map((exit, index) => ({ exit, row: exitRows[index], pending: false })),
+      ...pendingFlows.exits.map((exit) => ({ exit, row: null, pending: true }))
+    ],
+    [exits, exitRows, pendingFlows.exits]
+  );
+  const entryPageCount = Math.max(1, Math.ceil(entryItems.length / entryPageSize));
+  const exitPageCount = Math.max(1, Math.ceil(exitItems.length / exitPageSize));
+  const safeEntryPage = Math.min(entryPage, entryPageCount);
+  const safeExitPage = Math.min(exitPage, exitPageCount);
+  const visibleEntryItems = entryItems.slice((safeEntryPage - 1) * entryPageSize, safeEntryPage * entryPageSize);
+  const visibleExitItems = exitItems.slice((safeExitPage - 1) * exitPageSize, safeExitPage * exitPageSize);
   const holdingActive = currentHoldingValue > 0 && (lastExit?.remainingShares ?? latestEntry?.shares ?? 0) > 0;
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -200,6 +291,39 @@ export default function TradingCalculatorPage() {
     setExits((current) =>
       current.map((exit) => (exit.id === id ? { ...exit, sellShares: nextShares, sellRatio: ratio } : exit))
     );
+  };
+  const openFlowDialog = (type) => {
+    setFlowType(type);
+    setFlowDraft(type === 'entry' ? { amount: '', nav: '' } : { shares: '', nav: '' });
+    setFlowError('');
+  };
+  const closeFlowDialog = () => {
+    setFlowType(null);
+    setFlowError('');
+  };
+  const submitFlow = (event) => {
+    event.preventDefault();
+    const nav = numericValue(flowDraft.nav);
+    const value = numericValue(flowType === 'entry' ? flowDraft.amount : flowDraft.shares);
+    if (!(value > 0) || !(nav > 0)) {
+      setFlowError(flowType === 'entry' ? '买入金额和净值都必须大于 0' : '卖出份额和净值都必须大于 0');
+      return;
+    }
+    const record = {
+      id: `manual-${flowType}-${Date.now()}`,
+      label: flowType === 'entry' ? '新增入仓' : '新增出仓',
+      manual: true,
+      availableOn: tomorrowKey(),
+      nav: String(nav),
+      ...(flowType === 'entry'
+        ? { amount: String(value), change: null, confirmation: true }
+        : { sellShares: String(value), sellRatio: '' })
+    };
+    setPendingFlows((current) => ({
+      ...current,
+      [flowType === 'entry' ? 'entries' : 'exits']: [...current[flowType === 'entry' ? 'entries' : 'exits'], record]
+    }));
+    closeFlowDialog();
   };
   return (
     <main className={styles.page}>
@@ -314,6 +438,16 @@ export default function TradingCalculatorPage() {
           id="entry-title"
           title="入仓流水"
           detail="下跌补仓与止跌确认加仓分开显示；最后一档净值可手工输入。"
+          action={
+            <button
+              type="button"
+              className={styles.addButton}
+              aria-label="新增入仓记录"
+              onClick={() => openFlowDialog('entry')}
+            >
+              +
+            </button>
+          }
         />
         <div id="entry-table-hint" className={styles.srOnly}>
           可编辑触发幅度、执行净值和买入金额，数值变化会实时更新流水。
@@ -346,33 +480,53 @@ export default function TradingCalculatorPage() {
               </tr>
             </thead>
             <tbody>
-              {entries.map((entry, index) => {
-                const row = entryRows[index] || {};
+              {visibleEntryItems.map(({ entry, row, pending }, visibleIndex) => {
+                const index = (safeEntryPage - 1) * entryPageSize + visibleIndex;
                 const label = entryLabel(entry);
+                if (pending) {
+                  return (
+                    <tr key={entry.id} className={styles.pendingRow}>
+                      <th scope="row">
+                        <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
+                        {label}
+                        <span className={styles.pendingBadge}>待次日计算</span>
+                      </th>
+                      <td>—</td>
+                      <td>
+                        <span className={`${styles.tableInput} ${styles.inInput}`}>
+                          <span className={styles.sign}>+</span>
+                          {formatAmount(numericValue(entry.amount))}
+                        </span>
+                      </td>
+                      <td colSpan="4">—</td>
+                      <td>{formatNav(numericValue(entry.nav))}</td>
+                      <td>待计算</td>
+                    </tr>
+                  );
+                }
                 return (
                   <tr key={entry.id}>
                     <th scope="row">
-                      <span className={styles.nodeIndex}>0{index + 1}</span>
+                      <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
                       {label}
                     </th>
                     <td>
-                      {entry.confirmation || entry.id === 'initial' ? (
-                        <span className={styles.confirmBadge}>{entry.confirmation ? '确认' : '基准'}</span>
+                      {entry.confirmation ? (
+                        <span className={styles.confirmBadge}>确认</span>
                       ) : (
                         <label className={styles.tableInput}>
-                          <select
+                          <input
                             aria-label={`${label}触发幅度`}
                             aria-describedby="entry-table-hint"
+                            type="number"
                             value={asText(absolutePercent(entry.change))}
-                            onChange={(event) => updateEntry(entry.id, 'change', `-${event.target.value}`)}
-                          >
-                            <option value="">选择</option>
-                            {PERCENT_OPTIONS.map((value) => (
-                              <option key={value} value={value}>
-                                {value}
-                              </option>
-                            ))}
-                          </select>
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            onChange={(event) =>
+                              updateEntry(entry.id, 'change', event.target.value === '' ? '' : `-${event.target.value}`)
+                            }
+                          />
                           <span>%</span>
                         </label>
                       )}
@@ -421,6 +575,18 @@ export default function TradingCalculatorPage() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          label="入仓流水"
+          page={safeEntryPage}
+          pageCount={entryPageCount}
+          pageSize={entryPageSize}
+          total={entryItems.length}
+          onPageChange={setEntryPage}
+          onPageSizeChange={(size) => {
+            setEntryPageSize(size);
+            setEntryPage(1);
+          }}
+        />
       </section>
 
       <section className={`${styles.panel} ${styles.flowPanel}`} aria-labelledby="exit-title">
@@ -428,6 +594,16 @@ export default function TradingCalculatorPage() {
           id="exit-title"
           title="出仓流水"
           detail="每轮涨幅作用于上一轮净值，每轮按当前持仓份额比例执行。"
+          action={
+            <button
+              type="button"
+              className={styles.addButton}
+              aria-label="新增出仓记录"
+              onClick={() => openFlowDialog('exit')}
+            >
+              +
+            </button>
+          }
         />
         <div id="exit-table-hint" className={styles.srOnly}>
           可编辑上涨幅度、卖出比例或卖出份额，数值变化会实时更新出仓资金。
@@ -462,30 +638,49 @@ export default function TradingCalculatorPage() {
               </tr>
             </thead>
             <tbody>
-              {exits.map((exit, index) => {
-                const row = exitRows[index] || {};
+              {visibleExitItems.map(({ exit, row, pending }, visibleIndex) => {
+                const index = (safeExitPage - 1) * exitPageSize + visibleIndex;
                 const label = exitLabel(exit, index);
+                if (pending) {
+                  return (
+                    <tr key={exit.id} className={styles.pendingRow}>
+                      <th scope="row">
+                        <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
+                        {label}
+                        <span className={styles.pendingBadge}>待次日计算</span>
+                      </th>
+                      <td>—</td>
+                      <td>—</td>
+                      <td>{formatNumber(numericValue(exit.sellShares))}</td>
+                      <td>
+                        <span className={`${styles.tableInput} ${styles.outAmount}`}>
+                          <span className={styles.outSign}>−</span>待计算
+                        </span>
+                      </td>
+                      <td colSpan="3">—</td>
+                      <td>{formatNav(numericValue(exit.nav))}</td>
+                      <td>待计算</td>
+                    </tr>
+                  );
+                }
                 return (
                   <tr key={exit.id}>
                     <th scope="row">
-                      <span className={styles.nodeIndex}>0{index + 1}</span>
+                      <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
                       {label}
                     </th>
                     <td>
                       <label className={styles.tableInput}>
-                        <select
+                        <input
                           aria-label={`${label}上涨幅度`}
                           aria-describedby="exit-table-hint"
+                          type="number"
                           value={asText(absolutePercent(exit.rebound))}
+                          min="0"
+                          max="100"
+                          step="0.01"
                           onChange={(event) => updateExit(exit.id, 'rebound', event.target.value)}
-                        >
-                          <option value="">涨</option>
-                          {PERCENT_OPTIONS.map((value) => (
-                            <option key={value} value={value}>
-                              {value}
-                            </option>
-                          ))}
-                        </select>
+                        />
                         <span>%</span>
                       </label>
                     </td>
@@ -546,7 +741,80 @@ export default function TradingCalculatorPage() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          label="出仓流水"
+          page={safeExitPage}
+          pageCount={exitPageCount}
+          pageSize={exitPageSize}
+          total={exitItems.length}
+          onPageChange={setExitPage}
+          onPageSizeChange={(size) => {
+            setExitPageSize(size);
+            setExitPage(1);
+          }}
+        />
       </section>
+
+      {flowType && (
+        <dialog
+          open
+          className={styles.flowDialog}
+          aria-modal="true"
+          aria-labelledby="flow-dialog-title"
+          onCancel={closeFlowDialog}
+          onClick={(event) => event.target === event.currentTarget && closeFlowDialog()}
+        >
+          <form className={styles.flowDialogCard} onSubmit={submitFlow}>
+            <div className={styles.flowDialogHeader}>
+              <div>
+                <span className={styles.eyebrow}>PENDING RECORD</span>
+                <h2 id="flow-dialog-title">新增{flowType === 'entry' ? '入仓' : '出仓'}记录</h2>
+              </div>
+              <button type="button" className={styles.textButton} onClick={closeFlowDialog}>
+                关闭
+              </button>
+            </div>
+            <p className={styles.flowDialogHint}>记录后当天不参与计算，第二天打开页面后才更新流水。</p>
+            <div className={styles.flowDialogFields}>
+              <label className={styles.dialogField}>
+                <span>{flowType === 'entry' ? '买入金额' : '卖出份额'}</span>
+                <input
+                  autoFocus
+                  type="number"
+                  min="0"
+                  step={flowType === 'entry' ? '0.01' : '0.0001'}
+                  value={flowType === 'entry' ? flowDraft.amount : flowDraft.shares}
+                  onChange={(event) =>
+                    setFlowDraft((current) => ({
+                      ...current,
+                      [flowType === 'entry' ? 'amount' : 'shares']: event.target.value
+                    }))
+                  }
+                />
+              </label>
+              <label className={styles.dialogField}>
+                <span>执行净值</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.0001"
+                  value={flowDraft.nav}
+                  onChange={(event) => setFlowDraft((current) => ({ ...current, nav: event.target.value }))}
+                />
+              </label>
+            </div>
+            {flowError && <p className={styles.dialogError}>{flowError}</p>}
+            <div className={styles.flowDialogActions}>
+              <button type="button" className={styles.textButton} onClick={closeFlowDialog}>
+                取消
+              </button>
+              <button type="submit" className={styles.secondaryButton}>
+                暂存，次日计算
+              </button>
+            </div>
+          </form>
+        </dialog>
+      )}
 
       <footer className={styles.footer}>
         <span>CALCULATION ONLY · 不构成投资建议</span>

@@ -55,3 +55,10 @@ const cappedShareExitRows = calculateExitRows({
 });
 assert.equal(cappedShareExitRows[0].soldShares, cappedShareExitRows[0].beforeShares);
 assert.equal(cappedShareExitRows[0].usedSellRatio, 100);
+
+const manualNavExitRows = calculateExitRows({
+  targetCapital: 10000,
+  baseNav: 3.2743,
+  exits: [{ nav: 3.6, sellShares: 100 }]
+});
+assert.equal(manualNavExitRows[0].triggerNav, 3.6);
