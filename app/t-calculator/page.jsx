@@ -12,7 +12,8 @@ import styles from './calculator.module.css';
 
 const DEFAULT_FORM = {
   baseNav: '3.2743',
-  holdingValue: '',
+  initialDeposit: '10000.00',
+  profitRate: '',
   holdingDays: '30'
 };
 const PERCENT_OPTIONS = Array.from({ length: 46 }, (_, index) => index + 5);
@@ -31,7 +32,7 @@ const formatMoney = (value) =>
     : '--';
 const formatAmount = (value) =>
   Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--';
-const formatInputAmount = (value) => (Number.isFinite(value) ? value.toFixed(2) : '');
+const formatInputPercent = (value) => (Number.isFinite(value) ? (value * 100).toFixed(2) : '');
 const formatNav = (value) => (Number.isFinite(value) && value > 0 ? value.toFixed(4) : '--');
 const formatNumber = (value) =>
   Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '--';
@@ -47,7 +48,7 @@ const cloneDefaults = () => ({
   exits: DEFAULT_EXITS.map((exit) => ({ ...exit }))
 });
 
-function Field({ id, label, value, onChange, min = '0', step = '0.01', suffix, hint, error }) {
+function Field({ id, label, value, onChange, min = '0', max, step = '0.01', suffix, hint, error }) {
   return (
     <div className={styles.field}>
       <label htmlFor={id}>{label}</label>
@@ -58,6 +59,7 @@ function Field({ id, label, value, onChange, min = '0', step = '0.01', suffix, h
           inputMode="decimal"
           value={value}
           min={min}
+          max={max}
           step={step}
           onChange={(event) => onChange(event.target.value)}
           aria-describedby={`${id}-hint ${id}-error`}
@@ -88,7 +90,7 @@ function Metric({ label, value, note, tone = '' }) {
 function SectionTitle({ id, eyebrow, title, detail }) {
   return (
     <div className={styles.sectionTitle}>
-      <span className={styles.eyebrow}>{eyebrow}</span>
+      {eyebrow && <span className={styles.eyebrow}>{eyebrow}</span>}
       <h2 id={id}>{title}</h2>
       {detail && <p>· {detail}</p>}
     </div>
@@ -112,27 +114,21 @@ export default function TradingCalculatorPage() {
     setExits(defaults.exits.map((exit) => ({ ...exit })));
   };
 
-  const errors = useMemo(
-    () => ({
-      holdingDays:
-        Number.isFinite(numericValue(form.holdingDays)) && numericValue(form.holdingDays) >= 0
-          ? ''
-          : '持有时间不能为负数'
-    }),
-    [form]
-  );
-
-  const plannedCapital = useMemo(
-    () =>
-      entries.reduce((sum, entry) => {
-        const amount = numericValue(entry.amount);
-        return sum + (Number.isFinite(amount) ? Math.max(0, amount) : 0);
-      }, 0),
-    [entries]
-  );
+  const hasInitialDeposit = isValidNonNegative(form.initialDeposit) && numericValue(form.initialDeposit) > 0;
+  const initialDeposit = hasInitialDeposit ? numericValue(form.initialDeposit) : 0;
+  const errors = {
+    initialDeposit: hasInitialDeposit ? '' : '初始入金必须大于 0',
+    profitRate:
+      form.profitRate === '' ||
+      (Number.isFinite(numericValue(form.profitRate)) &&
+        numericValue(form.profitRate) >= -100 &&
+        numericValue(form.profitRate) <= 100)
+        ? ''
+        : '盈利率需在 -100% 至 100% 之间'
+  };
   const entryRows = useMemo(
-    () => calculateEntryRows({ capital: plannedCapital, baseNav: numericValue(form.baseNav), entries }),
-    [plannedCapital, form.baseNav, entries]
+    () => calculateEntryRows({ capital: initialDeposit, baseNav: numericValue(form.baseNav), entries }),
+    [initialDeposit, form.baseNav, entries]
   );
   const latestEntry = entryRows.at(-1);
   const position = useMemo(
@@ -143,17 +139,24 @@ export default function TradingCalculatorPage() {
       }),
     [entryRows, form.baseNav]
   );
-  const hasHoldingValue = isValidNonNegative(form.holdingValue);
-  const currentHoldingValue = hasHoldingValue ? numericValue(form.holdingValue) : position.holdingValue;
-  const profitRate = latestEntry?.cumulativeInvested > 0 ? currentHoldingValue / latestEntry.cumulativeInvested - 1 : 0;
+  const calculatedProfitRate = initialDeposit > 0 ? position.totalAssets / initialDeposit - 1 : 0;
+  const hasManualProfitRate =
+    form.profitRate !== '' &&
+    Number.isFinite(numericValue(form.profitRate)) &&
+    numericValue(form.profitRate) >= -100 &&
+    numericValue(form.profitRate) <= 100;
+  const profitRate = hasManualProfitRate ? numericValue(form.profitRate) / 100 : calculatedProfitRate;
+  const currentTotalAssets = Math.max(0, initialDeposit * (1 + profitRate));
+  const currentHoldingValue = Math.max(0, currentTotalAssets - (position.cash || 0));
+  const profitRateInput = form.profitRate === '' ? formatInputPercent(calculatedProfitRate) : asText(form.profitRate);
   const exitRows = useMemo(
     () =>
       calculateExitRows({
-        targetCapital: plannedCapital,
+        targetCapital: initialDeposit,
         baseNav: numericValue(form.baseNav),
         exits
       }),
-    [plannedCapital, form.baseNav, exits]
+    [initialDeposit, form.baseNav, exits]
   );
   const lastExit = exitRows.at(-1);
   const holdingActive = currentHoldingValue > 0 && (lastExit?.remainingShares ?? latestEntry?.shares ?? 0) > 0;
@@ -211,26 +214,38 @@ export default function TradingCalculatorPage() {
               id="results-title"
               eyebrow="01 / LIVE RESULT"
               title="账户快照"
-              detail="单只基金持仓结果，可直接修改持仓市值。"
+              detail="单只基金持仓结果，可手动调整初始入金与盈利率，其余指标只读。"
             />
             <div className={styles.metricsGrid}>
               <div className={`${styles.metric} ${styles.metricField}`}>
                 <Field
-                  id="holdingValue"
-                  label="持仓市值"
-                  value={hasHoldingValue ? form.holdingValue : formatInputAmount(position.holdingValue)}
-                  onChange={(value) => updateForm('holdingValue', value)}
+                  id="initialDeposit"
+                  label="初始入金"
+                  value={form.initialDeposit}
+                  onChange={(value) => updateForm('initialDeposit', value)}
                   step="0.01"
                   suffix="元"
-                  hint="可手动修改；盈利率按累计投入实时计算。"
+                  hint="用于计算总资产与盈利率。"
+                  error={errors.initialDeposit}
                 />
               </div>
-              <Metric
-                label="盈利率"
-                value={formatPercent(profitRate)}
-                tone={profitRate >= 0 ? 'positive' : 'negative'}
-                note="持仓市值相对累计投入"
-              />
+              <div
+                className={`${styles.metric} ${styles.metricField} ${profitRate >= 0 ? styles.positive : styles.negative}`}
+              >
+                <Field
+                  id="profitRate"
+                  label="盈利率"
+                  value={profitRateInput}
+                  onChange={(value) => updateForm('profitRate', value)}
+                  min="-100"
+                  max="100"
+                  step="0.01"
+                  suffix="%"
+                  hint="可手动输入，其他指标随之更新。"
+                  error={errors.profitRate}
+                />
+              </div>
+              <Metric label="持仓市值" value={formatMoney(currentHoldingValue)} note="初始入金 × (1 + 盈利率) − 现金" />
               <Metric label="持仓份额" value={formatNumber(latestEntry?.shares || 0)} note="当前持仓份额" />
               <Metric label="平均成本" value={formatNav(position.averageCost)} note="累计投入 ÷ 累计份额" />
               <Metric
@@ -239,27 +254,15 @@ export default function TradingCalculatorPage() {
                 tone="accent"
                 note={`当前还需 ${formatPercent(position.requiredRise)}`}
               />
-              <div className={`${styles.metric} ${styles.metricField}`}>
-                <Field
-                  id="holdingDays"
-                  label="持有时间"
-                  value={form.holdingDays}
-                  onChange={(value) => updateForm('holdingDays', value)}
-                  step="1"
-                  suffix="天"
-                  hint="可手动输入；未清仓时每天自动增加 1 天。"
-                  error={errors.holdingDays}
-                />
-              </div>
+              <Metric label="持有时间" value={`${form.holdingDays} 天`} note="未清仓时每天自动增加 1 天" />
             </div>
           </div>
         </section>
       </div>
 
-      <section className={styles.panel} aria-labelledby="entry-title">
+      <section className={`${styles.panel} ${styles.flowPanel}`} aria-labelledby="entry-title">
         <SectionTitle
           id="entry-title"
-          eyebrow="02 / ENTRY LADDER"
           title="入仓流水"
           detail="下跌补仓与止跌确认加仓分开显示；最后一档净值可手工输入。"
         />
@@ -342,7 +345,7 @@ export default function TradingCalculatorPage() {
                     <td>{formatMoney(row.cumulativeInvested)}</td>
                     <td>{formatNumber(row.buyShares)}</td>
                     <td>{formatMoney(row.holdingValue)}</td>
-                    <td className={row.totalAssets < plannedCapital ? styles.down : styles.up}>
+                    <td className={row.totalAssets < initialDeposit ? styles.down : styles.up}>
                       {formatMoney(row.totalAssets)}
                     </td>
                     <td>
@@ -371,10 +374,9 @@ export default function TradingCalculatorPage() {
         </div>
       </section>
 
-      <section className={styles.panel} aria-labelledby="exit-title">
+      <section className={`${styles.panel} ${styles.flowPanel}`} aria-labelledby="exit-title">
         <SectionTitle
           id="exit-title"
-          eyebrow="03 / EXIT LADDER"
           title="出仓流水"
           detail="每轮涨幅作用于上一轮净值，每轮按当前持仓份额比例执行。"
         />
