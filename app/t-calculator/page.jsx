@@ -207,16 +207,16 @@ export default function TradingCalculatorPage() {
       </header>
 
       <div className={styles.workspace}>
-        <section className={styles.panel} aria-labelledby="account-board-title">
-          <SectionTitle
-            id="account-board-title"
-            eyebrow="01 / ACCOUNT BOARD"
-            title="账户看板"
-            detail="持仓市值可修改，盈利率按累计投入实时计算。"
-          />
-          <div className={styles.boardGrid}>
-            <div className={styles.boardInputs}>
-              <div className={styles.fieldsGrid}>
+        <section className={styles.panel} aria-labelledby="results-title">
+          <div>
+            <SectionTitle
+              id="results-title"
+              eyebrow="01 / LIVE RESULT"
+              title="账户快照"
+              detail="单只基金持仓结果，可直接修改持仓市值。"
+            />
+            <div className={styles.metricsGrid}>
+              <div className={`${styles.metric} ${styles.metricField}`}>
                 <Field
                   id="holdingValue"
                   label="持仓市值"
@@ -226,6 +226,22 @@ export default function TradingCalculatorPage() {
                   suffix="元"
                   hint="可手动修改；盈利率按累计投入实时计算。"
                 />
+              </div>
+              <Metric
+                label="盈利率"
+                value={formatPercent(profitRate)}
+                tone={profitRate >= 0 ? 'positive' : 'negative'}
+                note="持仓市值相对累计投入"
+              />
+              <Metric label="持仓份额" value={formatNumber(latestEntry?.shares || 0)} note="当前持仓份额" />
+              <Metric label="平均成本" value={formatNav(position.averageCost)} note="累计投入 ÷ 累计份额" />
+              <Metric
+                label="回本净值"
+                value={formatNav(position.breakEvenNav)}
+                tone="accent"
+                note={`当前还需 ${formatPercent(position.requiredRise)}`}
+              />
+              <div className={`${styles.metric} ${styles.metricField}`}>
                 <Field
                   id="holdingDays"
                   label="持有时间"
@@ -235,49 +251,6 @@ export default function TradingCalculatorPage() {
                   suffix="天"
                   hint="可手动输入；未清仓时每天自动增加 1 天。"
                   error={errors.holdingDays}
-                />
-              </div>
-              <div className={styles.assumption}>
-                <span>累计投入</span>
-                <strong>{formatAmount(latestEntry?.cumulativeInvested || 0)}</strong>
-                <em>元</em>
-                <span className={styles.assumptionDivider}>|</span>
-                <span>当前份额</span>
-                <strong>{formatNumber(latestEntry?.shares || 0)}</strong>
-              </div>
-            </div>
-
-            <div className={styles.boardResults} aria-labelledby="results-title">
-              <SectionTitle
-                id="results-title"
-                eyebrow="02 / LIVE RESULT"
-                title="账户快照"
-                detail="按当前持仓市值展示单只基金结果。"
-              />
-              <div className={styles.metricsGrid}>
-                <Metric
-                  label="持仓市值"
-                  value={formatMoney(currentHoldingValue)}
-                  note={`${formatNumber(latestEntry?.shares || 0)} 份`}
-                />
-                <Metric
-                  label="盈利率"
-                  value={formatPercent(profitRate)}
-                  tone={profitRate >= 0 ? 'positive' : 'negative'}
-                  note="持仓市值相对累计投入"
-                />
-                <Metric
-                  label="账户总资产"
-                  value={formatMoney(currentHoldingValue)}
-                  tone={profitRate >= 0 ? 'positive' : 'negative'}
-                  note="单只基金无现金项"
-                />
-                <Metric label="平均成本" value={formatNav(position.averageCost)} note="累计投入 ÷ 累计份额" />
-                <Metric
-                  label="回本净值"
-                  value={formatNav(position.breakEvenNav)}
-                  tone="accent"
-                  note={`当前还需 ${formatPercent(position.requiredRise)}`}
                 />
               </div>
             </div>

@@ -157,19 +157,6 @@
 .workspace {
   margin-bottom: 18px;
 }
-.boardGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-  gap: 28px;
-}
-.boardInputs,
-.boardResults {
-  min-width: 0;
-}
-.boardResults {
-  padding-left: 28px;
-  border-left: 1px solid var(--calc-line);
-}
 .panel {
   position: relative;
   z-index: 1;
@@ -304,6 +291,16 @@
   background: color-mix(in srgb, var(--background) 40%, transparent);
   border: 1px solid var(--calc-line);
   border-radius: 9px;
+}
+.metricField .field small {
+  min-height: 15px;
+}
+.metricField .inputWrap {
+  gap: 4px;
+  padding: 0 7px;
+}
+.metricField .inputWrap input {
+  font-size: 14px;
 }
 .metric span,
 .metric small {
@@ -562,20 +559,6 @@
 .page input:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
-}
-@media (max-width: 980px) {
-  .boardGrid {
-    grid-template-columns: 1fr;
-  }
-  .boardResults {
-    padding-top: 24px;
-    padding-left: 0;
-    border-top: 1px solid var(--calc-line);
-    border-left: 0;
-  }
-  .boardResults .sectionTitle p {
-    max-width: none;
-  }
 }
 @media (max-width: 640px) {
   .page {
