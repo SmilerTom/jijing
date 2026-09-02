@@ -247,13 +247,37 @@ export default function TradingCalculatorPage() {
               </div>
             </div>
 
-            <div className={styles.boardResults} aria-label="实时账户指标">
+            <div className={styles.boardResults} aria-labelledby="results-title">
+              <SectionTitle
+                id="results-title"
+                eyebrow="02 / LIVE RESULT"
+                title="账户快照"
+                detail="按当前持仓市值展示单只基金结果。"
+              />
               <div className={styles.metricsGrid}>
+                <Metric
+                  label="持仓市值"
+                  value={formatMoney(currentHoldingValue)}
+                  note={`${formatNumber(latestEntry?.shares || 0)} 份`}
+                />
                 <Metric
                   label="盈利率"
                   value={formatPercent(profitRate)}
                   tone={profitRate >= 0 ? 'positive' : 'negative'}
                   note="持仓市值相对累计投入"
+                />
+                <Metric
+                  label="账户总资产"
+                  value={formatMoney(currentHoldingValue)}
+                  tone={profitRate >= 0 ? 'positive' : 'negative'}
+                  note="单只基金无现金项"
+                />
+                <Metric label="平均成本" value={formatNav(position.averageCost)} note="累计投入 ÷ 累计份额" />
+                <Metric
+                  label="回本净值"
+                  value={formatNav(position.breakEvenNav)}
+                  tone="accent"
+                  note={`当前还需 ${formatPercent(position.requiredRise)}`}
                 />
               </div>
             </div>
@@ -280,7 +304,6 @@ export default function TradingCalculatorPage() {
                 <th>幅度</th>
                 <th>金额</th>
                 <th>累计</th>
-                <th>剩余</th>
                 <th>份额</th>
                 <th>持仓市值</th>
                 <th>总资产</th>
@@ -335,7 +358,6 @@ export default function TradingCalculatorPage() {
                       </label>
                     </td>
                     <td>{formatMoney(row.cumulativeInvested)}</td>
-                    <td>{formatMoney(row.cash)}</td>
                     <td>{formatNumber(row.buyShares)}</td>
                     <td>{formatMoney(row.holdingValue)}</td>
                     <td className={row.totalAssets < plannedCapital ? styles.down : styles.up}>
@@ -372,7 +394,7 @@ export default function TradingCalculatorPage() {
           id="exit-title"
           eyebrow="03 / EXIT LADDER"
           title="出仓流水"
-          detail="每轮涨幅作用于上一轮净值，每轮卖出当前剩余份额比例。"
+          detail="每轮涨幅作用于上一轮净值，每轮按当前持仓份额比例执行。"
         />
         <div id="exit-table-hint" className={styles.srOnly}>
           可编辑上涨幅度、卖出比例或卖出份额，数值变化会实时更新出仓资金。
@@ -387,7 +409,6 @@ export default function TradingCalculatorPage() {
                 <th>卖出份额</th>
                 <th>出仓金额</th>
                 <th>累计</th>
-                <th>剩余</th>
                 <th>持仓市值</th>
                 <th>总资产</th>
                 <th>净值</th>
@@ -465,7 +486,6 @@ export default function TradingCalculatorPage() {
                       </output>
                     </td>
                     <td>{formatMoney(row.cash)}</td>
-                    <td>{formatNumber(row.remainingShares)}</td>
                     <td>{formatMoney(row.holdingValue)}</td>
                     <td>{formatMoney(row.totalAssets)}</td>
                     <td>{formatNav(row.triggerNav)}</td>
