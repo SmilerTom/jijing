@@ -417,6 +417,34 @@
 .tableInput input::-webkit-outer-spin-button {
   opacity: 0.5;
 }
+.tableInput select {
+  width: 52px;
+  padding: 0;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font:
+    600 16px/1 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
+}
+.inInput input,
+.sign {
+  color: var(--success) !important;
+}
+.sign {
+  font:
+    700 14px/1 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
+}
 .confirmBadge {
   display: inline-block;
   padding: 5px 7px;
@@ -425,6 +453,10 @@
   border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
   border-radius: 5px;
   font-size: 10px;
+}
+.outAmount {
+  color: var(--danger);
+  font-weight: 700;
 }
 .recoveryPanel {
   display: flex;

@@ -49,7 +49,8 @@ export function calculateEntryRows({ capital = 0, baseNav = 0, entries = [] } = 
       holdingValue,
       totalAssets,
       averageCost,
-      breakEvenNav: averageCost
+      breakEvenNav: averageCost,
+      returnRate: startingCash > 0 ? totalAssets / startingCash - 1 : 0
     };
   });
 }

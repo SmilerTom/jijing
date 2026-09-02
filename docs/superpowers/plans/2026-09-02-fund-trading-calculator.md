@@ -50,7 +50,7 @@ Create a `'use client'` page with defaults for 10000 principal, 3.2743 base NAV,
 
 - [ ] **Step 2: Render live result cards and both tables**
 
-Use the pure functions on every render. Show cash, holding value, total assets, P/L, average cost, break-even NAV, and required rise. Render entry rows with the exact columns `节点 / 净值 / 本次买入 / 累计投入 / 剩余现金 / 持仓市值 / 总资产 / 平均成本`. Render exit rows with `节点 / 触发净值 / 卖出现金 / 累计现金 / 剩余持仓市值 / 总资产 / 总收益`. Add a separate recovery block showing current NAV, current assets at the selected scenario, recovery NAV, and recovery rise.
+Use the pure functions on every render. Show cash, holding value, total assets, P/L, average cost, break-even NAV, and required rise. Render entry rows with the exact columns `节点 / 净值 / 本次买入 / 累计投入 / 剩余现金 / 持仓市值 / 总资产 / 收益率 / 平均成本`; make decline and rebound controls native selects with 5%–50% integer options. Render exit rows with `节点 / 触发净值 / 卖出现金 / 累计现金 / 剩余持仓市值 / 总资产 / 总收益`. Add a separate recovery block showing current NAV, current assets at the selected scenario, recovery NAV, and recovery rise. Use green `+` for entry amounts, red `−` for exit amounts, and green/red semantic colors for positive/negative returns.
 
 - [ ] **Step 3: Add local styling**
 

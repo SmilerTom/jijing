@@ -18,6 +18,7 @@ const DEFAULT_FORM = {
   redemptionFee: '0',
   holdingDays: '30'
 };
+const PERCENT_OPTIONS = Array.from({ length: 46 }, (_, index) => index + 5);
 
 const asText = (value) => (value === null || value === undefined ? '' : String(value));
 const numericValue = (value) => Number(value);
@@ -31,6 +32,10 @@ const formatNumber = (value) =>
   Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '--';
 const formatPercent = (value, digits = 2) =>
   Number.isFinite(value) ? `${value >= 0 ? '+' : ''}${(value * 100).toFixed(digits)}%` : '--';
+const absolutePercent = (value) => (Number.isFinite(numericValue(value)) ? Math.abs(numericValue(value)) : '');
+const entryLabel = (entry) =>
+  entry.confirmation || entry.id === 'initial' ? entry.label : `下跌 ${absolutePercent(entry.change)}% 补仓`;
+const exitLabel = (exit, index) => `${index === 0 ? '上涨' : '再涨'} ${absolutePercent(exit.rebound)}%`;
 const cloneDefaults = () => ({
   form: { ...DEFAULT_FORM },
   entries: DEFAULT_ENTRIES.map((entry) => ({ ...entry })),
@@ -314,31 +319,38 @@ export default function TradingCalculatorPage() {
                 <th>剩余现金</th>
                 <th>持仓市值</th>
                 <th>账户总资产</th>
+                <th>收益率</th>
                 <th>平均成本</th>
               </tr>
             </thead>
             <tbody>
               {entries.map((entry, index) => {
                 const row = entryRows[index] || {};
+                const label = entryLabel(entry);
                 return (
                   <tr key={entry.id}>
                     <th scope="row">
                       <span className={styles.nodeIndex}>0{index + 1}</span>
-                      {entry.label}
+                      {label}
                     </th>
                     <td>
-                      {entry.confirmation ? (
-                        <span className={styles.confirmBadge}>确认</span>
+                      {entry.confirmation || entry.id === 'initial' ? (
+                        <span className={styles.confirmBadge}>{entry.confirmation ? '确认' : '基准'}</span>
                       ) : (
                         <label className={styles.tableInput}>
-                          <input
-                            aria-label={`${entry.label}触发幅度`}
+                          <select
+                            aria-label={`${label}触发幅度`}
                             aria-describedby="entry-table-hint"
-                            type="number"
-                            value={asText(entry.change)}
-                            step="0.1"
-                            onChange={(event) => updateEntry(entry.id, 'change', event.target.value)}
-                          />
+                            value={asText(absolutePercent(entry.change))}
+                            onChange={(event) => updateEntry(entry.id, 'change', `-${event.target.value}`)}
+                          >
+                            <option value="">选择</option>
+                            {PERCENT_OPTIONS.map((value) => (
+                              <option key={value} value={value}>
+                                {value}
+                              </option>
+                            ))}
+                          </select>
                           <span>%</span>
                         </label>
                       )}
@@ -347,7 +359,7 @@ export default function TradingCalculatorPage() {
                       {entry.confirmation ? (
                         <label className={styles.tableInput}>
                           <input
-                            aria-label={`${entry.label}执行净值`}
+                            aria-label={`${label}执行净值`}
                             aria-describedby="entry-table-hint"
                             type="number"
                             value={asText(entry.nav)}
@@ -361,9 +373,10 @@ export default function TradingCalculatorPage() {
                       )}
                     </td>
                     <td>
-                      <label className={styles.tableInput}>
+                      <label className={`${styles.tableInput} ${styles.inInput}`}>
+                        <span className={styles.sign}>+</span>
                         <input
-                          aria-label={`${entry.label}买入金额`}
+                          aria-label={`${label}买入金额`}
                           aria-describedby="entry-table-hint"
                           type="number"
                           value={asText(entry.amount)}
@@ -380,6 +393,7 @@ export default function TradingCalculatorPage() {
                     <td className={row.totalAssets < numericValue(form.capital) ? styles.down : styles.up}>
                       {formatMoney(row.totalAssets)}
                     </td>
+                    <td className={row.returnRate >= 0 ? styles.up : styles.down}>{formatPercent(row.returnRate)}</td>
                     <td>{formatNav(row.averageCost)}</td>
                   </tr>
                 );
@@ -418,23 +432,28 @@ export default function TradingCalculatorPage() {
             <tbody>
               {exits.map((exit, index) => {
                 const row = exitRows[index] || {};
+                const label = exitLabel(exit, index);
                 return (
                   <tr key={exit.id}>
                     <th scope="row">
                       <span className={styles.nodeIndex}>0{index + 1}</span>
-                      {exit.label}
+                      {label}
                     </th>
                     <td>
                       <label className={styles.tableInput}>
-                        <input
-                          aria-label={`${exit.label}上涨幅度`}
+                        <select
+                          aria-label={`${label}上涨幅度`}
                           aria-describedby="exit-table-hint"
-                          type="number"
-                          value={asText(exit.rebound)}
-                          min="0"
-                          step="1"
+                          value={asText(absolutePercent(exit.rebound))}
                           onChange={(event) => updateExit(exit.id, 'rebound', event.target.value)}
-                        />
+                        >
+                          <option value="">选择</option>
+                          {PERCENT_OPTIONS.map((value) => (
+                            <option key={value} value={value}>
+                              {value}
+                            </option>
+                          ))}
+                        </select>
                         <span>%</span>
                       </label>
                     </td>
@@ -442,7 +461,7 @@ export default function TradingCalculatorPage() {
                     <td>
                       <label className={styles.tableInput}>
                         <input
-                          aria-label={`${exit.label}卖出比例`}
+                          aria-label={`${label}卖出比例`}
                           aria-describedby="exit-table-hint"
                           type="number"
                           value={asText(exit.sellRatio)}
@@ -454,7 +473,7 @@ export default function TradingCalculatorPage() {
                         <span>%</span>
                       </label>
                     </td>
-                    <td>{formatMoney(row.netCash)}</td>
+                    <td className={styles.outAmount}>−{formatMoney(row.netCash)}</td>
                     <td>{formatMoney(row.cash)}</td>
                     <td>{formatMoney(row.holdingValue)}</td>
                     <td>{formatMoney(row.totalAssets)}</td>

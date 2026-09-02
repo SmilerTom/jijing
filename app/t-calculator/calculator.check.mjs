@@ -13,6 +13,7 @@ assert.equal(lastEntry.cumulativeInvested, 7000);
 assert.equal(lastEntry.cash, 3000);
 assert.ok(Math.abs(lastEntry.totalAssets - 9312.15) < 0.01);
 assert.ok(Math.abs(lastEntry.averageCost - 2.9775) < 0.0001);
+assert.ok(Math.abs(lastEntry.returnRate + 0.068785) < 0.0001);
 
 const recovery = calculateRecovery({ currentNav: 3.2743, lossPct: 40 });
 assert.ok(Math.abs(recovery.recoveryNav - 5.4571666667) < 0.0001);
