@@ -88,11 +88,9 @@ function Metric({ label, value, note, tone = '' }) {
 function SectionTitle({ id, eyebrow, title, detail }) {
   return (
     <div className={styles.sectionTitle}>
-      <div>
-        <span className={styles.eyebrow}>{eyebrow}</span>
-        <h2 id={id}>{title}</h2>
-      </div>
-      {detail && <p>{detail}</p>}
+      <span className={styles.eyebrow}>{eyebrow}</span>
+      <h2 id={id}>{title}</h2>
+      {detail && <p>· {detail}</p>}
     </div>
   );
 }
@@ -269,8 +267,19 @@ export default function TradingCalculatorPage() {
           可编辑触发幅度、执行净值和买入金额，数值变化会实时更新流水。
         </div>
         <div className={styles.tableScroll}>
-          <table>
+          <table className={styles.entryTable}>
             <caption className={styles.srOnly}>入仓后资金流水</caption>
+            <colgroup>
+              <col className={styles.entryNodeColumn} />
+              <col className={styles.entryPercentColumn} />
+              <col className={styles.entryAmountColumn} />
+              <col className={styles.entryValueColumn} />
+              <col className={styles.entryValueColumn} />
+              <col className={styles.entryValueColumn} />
+              <col className={styles.entryValueColumn} />
+              <col className={styles.entryNavColumn} />
+              <col className={styles.entryReturnColumn} />
+            </colgroup>
             <thead>
               <tr>
                 <th>节点</th>
@@ -373,12 +382,25 @@ export default function TradingCalculatorPage() {
           可编辑上涨幅度、卖出比例或卖出份额，数值变化会实时更新出仓资金。
         </div>
         <div className={styles.tableScroll}>
-          <table>
+          <table className={styles.exitTable}>
             <caption className={styles.srOnly}>出仓后资金流水</caption>
+            <colgroup>
+              <col className={styles.exitNodeColumn} />
+              <col className={styles.exitPercentColumn} />
+              <col className={styles.exitRatioColumn} />
+              <col className={styles.exitSharesColumn} />
+              <col className={styles.exitAmountColumn} />
+              <col className={styles.exitValueColumn} />
+              <col className={styles.exitValueColumn} />
+              <col className={styles.exitValueColumn} />
+              <col className={styles.exitNavColumn} />
+              <col className={styles.exitReturnColumn} />
+            </colgroup>
             <thead>
               <tr>
                 <th>节点</th>
-                <th>幅度 / 卖比例</th>
+                <th>幅度</th>
+                <th>卖比例</th>
                 <th>卖出份额</th>
                 <th>出仓金额</th>
                 <th>累计</th>
@@ -399,37 +421,37 @@ export default function TradingCalculatorPage() {
                       {label}
                     </th>
                     <td>
-                      <div className={styles.exitControls}>
-                        <label className={styles.tableInput}>
-                          <select
-                            aria-label={`${label}上涨幅度`}
-                            aria-describedby="exit-table-hint"
-                            value={asText(absolutePercent(exit.rebound))}
-                            onChange={(event) => updateExit(exit.id, 'rebound', event.target.value)}
-                          >
-                            <option value="">涨</option>
-                            {PERCENT_OPTIONS.map((value) => (
-                              <option key={value} value={value}>
-                                {value}
-                              </option>
-                            ))}
-                          </select>
-                          <span>%</span>
-                        </label>
-                        <label className={styles.tableInput}>
-                          <input
-                            aria-label={`${label}卖出比例`}
-                            aria-describedby="exit-table-hint"
-                            type="number"
-                            value={asText(exit.sellRatio)}
-                            min="0"
-                            max="100"
-                            step="1"
-                            onChange={(event) => updateExitRatio(exit.id, event.target.value)}
-                          />
-                          <span>%</span>
-                        </label>
-                      </div>
+                      <label className={styles.tableInput}>
+                        <select
+                          aria-label={`${label}上涨幅度`}
+                          aria-describedby="exit-table-hint"
+                          value={asText(absolutePercent(exit.rebound))}
+                          onChange={(event) => updateExit(exit.id, 'rebound', event.target.value)}
+                        >
+                          <option value="">涨</option>
+                          {PERCENT_OPTIONS.map((value) => (
+                            <option key={value} value={value}>
+                              {value}
+                            </option>
+                          ))}
+                        </select>
+                        <span>%</span>
+                      </label>
+                    </td>
+                    <td>
+                      <label className={styles.tableInput}>
+                        <input
+                          aria-label={`${label}卖出比例`}
+                          aria-describedby="exit-table-hint"
+                          type="number"
+                          value={asText(exit.sellRatio)}
+                          min="0"
+                          max="100"
+                          step="1"
+                          onChange={(event) => updateExitRatio(exit.id, event.target.value)}
+                        />
+                        <span>%</span>
+                      </label>
                     </td>
                     <td>
                       <label className={styles.tableInput}>
