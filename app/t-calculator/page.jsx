@@ -152,6 +152,24 @@ export default function TradingCalculatorPage() {
       }),
     [form.capital, form.baseNav, form.redemptionFee, exits]
   );
+  const updateExitRatio = (id, value) =>
+    setExits((current) =>
+      current.map((exit) => (exit.id === id ? { ...exit, sellRatio: value, sellShares: '' } : exit))
+    );
+  const updateExitShares = (id, index, value) => {
+    const beforeShares = exitRows[index]?.beforeShares || 0;
+    const shareValue = value === '' ? NaN : numericValue(value);
+    const boundedShareValue = Number.isFinite(shareValue) ? Math.min(beforeShares, Math.max(0, shareValue)) : NaN;
+    const ratio =
+      beforeShares > 0 && Number.isFinite(boundedShareValue)
+        ? ((boundedShareValue / beforeShares) * 100).toFixed(2)
+        : '';
+    const nextShares =
+      Number.isFinite(shareValue) && boundedShareValue !== shareValue ? boundedShareValue.toFixed(4) : value;
+    setExits((current) =>
+      current.map((exit) => (exit.id === id ? { ...exit, sellShares: nextShares, sellRatio: ratio } : exit))
+    );
+  };
   const drawdownPct =
     isValidPositive(form.baseNav) && isValidPositive(form.scenarioNav)
       ? Math.max(0, (1 - numericValue(form.scenarioNav) / numericValue(form.baseNav)) * 100)
@@ -312,15 +330,15 @@ export default function TradingCalculatorPage() {
             <thead>
               <tr>
                 <th>节点</th>
-                <th>触发幅度</th>
-                <th>执行净值</th>
-                <th>本次买入</th>
-                <th>累计投入</th>
-                <th>剩余现金</th>
+                <th>幅度</th>
+                <th>金额</th>
+                <th>累计</th>
+                <th>剩余</th>
+                <th>份额</th>
                 <th>持仓市值</th>
-                <th>账户总资产</th>
+                <th>总资产</th>
+                <th>净值</th>
                 <th>收益率</th>
-                <th>平均成本</th>
               </tr>
             </thead>
             <tbody>
@@ -356,6 +374,28 @@ export default function TradingCalculatorPage() {
                       )}
                     </td>
                     <td>
+                      <label className={`${styles.tableInput} ${styles.inInput}`}>
+                        <span className={styles.sign}>+</span>
+                        <input
+                          aria-label={`${label}买入金额`}
+                          aria-describedby="entry-table-hint"
+                          type="number"
+                          value={asText(entry.amount)}
+                          min="0"
+                          step="0.01"
+                          onChange={(event) => updateEntry(entry.id, 'amount', event.target.value)}
+                        />
+                        <span>元</span>
+                      </label>
+                    </td>
+                    <td>{formatMoney(row.cumulativeInvested)}</td>
+                    <td>{formatMoney(row.cash)}</td>
+                    <td>{formatNumber(row.buyShares)}</td>
+                    <td>{formatMoney(row.holdingValue)}</td>
+                    <td className={row.totalAssets < numericValue(form.capital) ? styles.down : styles.up}>
+                      {formatMoney(row.totalAssets)}
+                    </td>
+                    <td>
                       {entry.confirmation ? (
                         <label className={styles.tableInput}>
                           <input
@@ -372,29 +412,7 @@ export default function TradingCalculatorPage() {
                         <span>{formatNav(row.nav)}</span>
                       )}
                     </td>
-                    <td>
-                      <label className={`${styles.tableInput} ${styles.inInput}`}>
-                        <span className={styles.sign}>+</span>
-                        <input
-                          aria-label={`${label}买入金额`}
-                          aria-describedby="entry-table-hint"
-                          type="number"
-                          value={asText(entry.amount)}
-                          min="0"
-                          step="100"
-                          onChange={(event) => updateEntry(entry.id, 'amount', event.target.value)}
-                        />
-                        <span>元</span>
-                      </label>
-                    </td>
-                    <td>{formatMoney(row.cumulativeInvested)}</td>
-                    <td>{formatMoney(row.cash)}</td>
-                    <td>{formatMoney(row.holdingValue)}</td>
-                    <td className={row.totalAssets < numericValue(form.capital) ? styles.down : styles.up}>
-                      {formatMoney(row.totalAssets)}
-                    </td>
                     <td className={row.returnRate >= 0 ? styles.up : styles.down}>{formatPercent(row.returnRate)}</td>
-                    <td>{formatNav(row.averageCost)}</td>
                   </tr>
                 );
               })}
@@ -411,7 +429,7 @@ export default function TradingCalculatorPage() {
           detail="每轮涨幅作用于上一轮净值，每轮卖出当前剩余份额比例。"
         />
         <div id="exit-table-hint" className={styles.srOnly}>
-          可编辑上涨幅度和卖出比例，数值变化会实时更新出仓资金。
+          可编辑上涨幅度、卖出比例或卖出份额，数值变化会实时更新出仓资金。
         </div>
         <div className={styles.tableScroll}>
           <table>
@@ -419,14 +437,15 @@ export default function TradingCalculatorPage() {
             <thead>
               <tr>
                 <th>节点</th>
-                <th>上涨幅度</th>
-                <th>触发净值</th>
-                <th>卖出比例</th>
-                <th>本次卖出现金</th>
-                <th>累计现金</th>
-                <th>剩余持仓市值</th>
-                <th>账户总资产</th>
-                <th>总收益</th>
+                <th>幅度 / 卖比例</th>
+                <th>金额</th>
+                <th>累计</th>
+                <th>剩余</th>
+                <th>卖出份额</th>
+                <th>持仓市值</th>
+                <th>总资产</th>
+                <th>净值</th>
+                <th>收益率</th>
               </tr>
             </thead>
             <tbody>
@@ -440,43 +459,62 @@ export default function TradingCalculatorPage() {
                       {label}
                     </th>
                     <td>
-                      <label className={styles.tableInput}>
-                        <select
-                          aria-label={`${label}上涨幅度`}
-                          aria-describedby="exit-table-hint"
-                          value={asText(absolutePercent(exit.rebound))}
-                          onChange={(event) => updateExit(exit.id, 'rebound', event.target.value)}
-                        >
-                          <option value="">选择</option>
-                          {PERCENT_OPTIONS.map((value) => (
-                            <option key={value} value={value}>
-                              {value}
-                            </option>
-                          ))}
-                        </select>
-                        <span>%</span>
-                      </label>
-                    </td>
-                    <td>{formatNav(row.triggerNav)}</td>
-                    <td>
-                      <label className={styles.tableInput}>
-                        <input
-                          aria-label={`${label}卖出比例`}
-                          aria-describedby="exit-table-hint"
-                          type="number"
-                          value={asText(exit.sellRatio)}
-                          min="0"
-                          max="100"
-                          step="1"
-                          onChange={(event) => updateExit(exit.id, 'sellRatio', event.target.value)}
-                        />
-                        <span>%</span>
-                      </label>
+                      <div className={styles.exitControls}>
+                        <label className={styles.tableInput}>
+                          <select
+                            aria-label={`${label}上涨幅度`}
+                            aria-describedby="exit-table-hint"
+                            value={asText(absolutePercent(exit.rebound))}
+                            onChange={(event) => updateExit(exit.id, 'rebound', event.target.value)}
+                          >
+                            <option value="">涨</option>
+                            {PERCENT_OPTIONS.map((value) => (
+                              <option key={value} value={value}>
+                                {value}
+                              </option>
+                            ))}
+                          </select>
+                          <span>%</span>
+                        </label>
+                        <label className={styles.tableInput}>
+                          <input
+                            aria-label={`${label}卖出比例`}
+                            aria-describedby="exit-table-hint"
+                            type="number"
+                            value={asText(exit.sellRatio)}
+                            min="0"
+                            max="100"
+                            step="1"
+                            onChange={(event) => updateExitRatio(exit.id, event.target.value)}
+                          />
+                          <span>%</span>
+                        </label>
+                      </div>
                     </td>
                     <td className={styles.outAmount}>−{formatMoney(row.netCash)}</td>
                     <td>{formatMoney(row.cash)}</td>
+                    <td>{formatNumber(row.remainingShares)}</td>
+                    <td>
+                      <label className={styles.tableInput}>
+                        <input
+                          aria-label={`${label}卖出份额`}
+                          aria-describedby="exit-table-hint"
+                          type="number"
+                          value={asText(
+                            exit.sellShares === '' || exit.sellShares === undefined
+                              ? row.soldShares.toFixed(4)
+                              : exit.sellShares
+                          )}
+                          min="0"
+                          max={row.beforeShares || undefined}
+                          step="0.0001"
+                          onChange={(event) => updateExitShares(exit.id, index, event.target.value)}
+                        />
+                      </label>
+                    </td>
                     <td>{formatMoney(row.holdingValue)}</td>
                     <td>{formatMoney(row.totalAssets)}</td>
+                    <td>{formatNav(row.triggerNav)}</td>
                     <td className={row.totalReturn >= 0 ? styles.up : styles.down}>{formatPercent(row.totalReturn)}</td>
                   </tr>
                 );

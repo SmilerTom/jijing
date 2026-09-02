@@ -39,3 +39,19 @@ assert.ok(Math.abs(rollingExitRows[1].triggerNav - rollingExitRows[0].triggerNav
 assert.ok(Math.abs(rollingExitRows[1].netCash - 1089) < 0.01);
 assert.ok(Math.abs(rollingExitRows[1].holdingValue - 9801) < 0.01);
 assert.ok(Math.abs(rollingExitRows[1].totalAssets - 11990) < 0.01);
+
+const manualShareExitRows = calculateExitRows({
+  targetCapital: 3.2743 * 42000,
+  baseNav: 3.2743,
+  exits: [{ label: '手动卖出', rebound: 10, sellRatio: 10, sellShares: 4200 }]
+});
+assert.ok(Math.abs(manualShareExitRows[0].soldShares - 4200) < 0.0001);
+assert.ok(Math.abs(manualShareExitRows[0].usedSellRatio - 10) < 0.0001);
+
+const cappedShareExitRows = calculateExitRows({
+  targetCapital: 10000,
+  baseNav: 3.2743,
+  exits: [{ rebound: 10, sellRatio: 10, sellShares: 999999 }]
+});
+assert.equal(cappedShareExitRows[0].soldShares, cappedShareExitRows[0].beforeShares);
+assert.equal(cappedShareExitRows[0].usedSellRatio, 100);

@@ -397,6 +397,11 @@
 .tableInput:focus-within {
   border-color: var(--primary);
 }
+.exitControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .tableInput input {
   width: 70px;
   padding: 0;

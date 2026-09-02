@@ -1,9 +1,9 @@
 export const DEFAULT_ENTRIES = [
-  { id: 'initial', label: '首次建仓', change: 0, amount: 2000 },
-  { id: 'dip-6', label: '下跌 6% 补仓', change: -6, amount: 1500 },
-  { id: 'dip-12', label: '下跌 12% 补仓', change: -12, amount: 2000 },
-  { id: 'dip-18', label: '下跌 18% 补仓', change: -18, amount: 1500 },
-  { id: 'confirm', label: '止跌确认加仓', nav: 3, change: null, amount: 3000, confirmation: true }
+  { id: 'initial', label: '首次建仓', change: 0, amount: '2000.00' },
+  { id: 'dip-6', label: '下跌 6% 补仓', change: -6, amount: '1500.00' },
+  { id: 'dip-12', label: '下跌 12% 补仓', change: -12, amount: '2000.00' },
+  { id: 'dip-18', label: '下跌 18% 补仓', change: -18, amount: '1500.00' },
+  { id: 'confirm', label: '止跌确认加仓', nav: 3, change: null, amount: '3000.00', confirmation: true }
 ];
 
 export const DEFAULT_EXITS = [
@@ -13,6 +13,8 @@ export const DEFAULT_EXITS = [
 ];
 
 const numberOr = (value, fallback = 0) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
+const hasNumericValue = (value) =>
+  value !== '' && value !== null && value !== undefined && Number.isFinite(Number(value));
 
 const navForEntry = (entry, baseNav) => {
   const explicitNav = numberOr(entry?.nav);
@@ -31,7 +33,8 @@ export function calculateEntryRows({ capital = 0, baseNav = 0, entries = [] } = 
     const amount = Math.max(0, numberOr(entry?.amount));
     if (!(nav > 0)) return { ...entry, index, nav: 0, amount, error: '净值必须大于 0' };
     const buyAmount = Math.min(amount, Math.max(0, cash));
-    shares += buyAmount / nav;
+    const buyShares = buyAmount / nav;
+    shares += buyShares;
     cash -= buyAmount;
     cumulativeInvested += buyAmount;
     const holdingValue = shares * nav;
@@ -43,6 +46,7 @@ export function calculateEntryRows({ capital = 0, baseNav = 0, entries = [] } = 
       nav,
       amount: buyAmount,
       requestedAmount: amount,
+      buyShares,
       cumulativeInvested,
       cash,
       shares,
@@ -95,7 +99,10 @@ export function calculateExitRows({ targetCapital = 0, baseNav = 0, exits = [], 
   let previousNav = safeBaseNav;
   return exits.map((exit, index) => {
     const triggerNav = previousNav * (1 + numberOr(exit?.rebound) / 100);
-    const requestedShares = (remainingShares * Math.max(0, numberOr(exit?.sellRatio))) / 100;
+    const beforeShares = remainingShares;
+    const requestedShares = hasNumericValue(exit?.sellShares)
+      ? Math.max(0, numberOr(exit?.sellShares))
+      : (beforeShares * Math.max(0, numberOr(exit?.sellRatio))) / 100;
     const soldShares = Math.min(remainingShares, requestedShares);
     const grossCash = soldShares * triggerNav;
     const feeAmount = grossCash * fee;
@@ -110,7 +117,9 @@ export function calculateExitRows({ targetCapital = 0, baseNav = 0, exits = [], 
       index,
       targetShares,
       triggerNav,
+      beforeShares,
       soldShares,
+      usedSellRatio: beforeShares > 0 ? (soldShares / beforeShares) * 100 : 0,
       grossCash,
       feeAmount,
       netCash,
