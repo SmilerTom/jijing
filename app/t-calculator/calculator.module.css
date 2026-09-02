@@ -516,6 +516,14 @@
   font-weight: 700;
   text-align: center;
 }
+.flowTime {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 11PX;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
 .tableScroll tbody tr:last-child th,
 .tableScroll tbody tr:last-child td {
   border-bottom: 0;

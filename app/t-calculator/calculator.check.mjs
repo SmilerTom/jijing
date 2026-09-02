@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { calculateEntryRows, calculateExitRows, calculateRecovery } from './calculator.mjs';
+import { calculateEntryRows, calculateExitRows, calculateRecovery, summarizeEntryPosition } from './calculator.mjs';
 
 const entries = [
   { label: '首次建仓', change: 0, amount: 2000 },
@@ -18,6 +18,11 @@ assert.ok(Math.abs(lastEntry.returnRate + 0.068785) < 0.0001);
 const recovery = calculateRecovery({ currentNav: 3.2743, lossPct: 40 });
 assert.ok(Math.abs(recovery.recoveryNav - 5.4571666667) < 0.0001);
 assert.ok(Math.abs(recovery.requiredRise - 0.6666666667) < 0.0001);
+const emptyPosition = summarizeEntryPosition({
+  rows: calculateEntryRows({ capital: 0, baseNav: 3.2743, entries: [{ change: 0, amount: 0 }] }),
+  scenarioNav: 3.2743
+});
+assert.equal(emptyPosition.requiredRise, 0);
 
 const exitRows = calculateExitRows({
   targetCapital: 10000,

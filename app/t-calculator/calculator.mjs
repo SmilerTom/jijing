@@ -104,7 +104,7 @@ export function summarizeEntryPosition({ rows = [], scenarioNav = 0, redemptionF
     totalAssets: positionRow.cash + positionRow.shares * nav,
     averageCost: positionRow.averageCost,
     breakEvenNav,
-    requiredRise: nav > 0 ? breakEvenNav / nav - 1 : 0
+    requiredRise: breakEvenNav > 0 && nav > 0 ? breakEvenNav / nav - 1 : 0
   };
 }
 

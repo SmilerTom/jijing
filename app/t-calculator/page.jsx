@@ -14,7 +14,6 @@ import styles from './calculator.module.css';
 
 const DEFAULT_FORM = {
   baseNav: '3.2743',
-  holdingValue: '',
   profitRate: '',
   holdingDays: '30'
 };
@@ -23,32 +22,46 @@ const PENDING_FLOW_KEY = 'fundTradingCalculatorPendingFlows';
 
 const asText = (value) => (value === null || value === undefined ? '' : String(value));
 const numericValue = (value) => Number(value);
-const isValidNonNegative = (value) =>
-  value !== '' &&
-  value !== null &&
-  value !== undefined &&
-  Number.isFinite(numericValue(value)) &&
-  numericValue(value) >= 0;
 const formatMoney = (value) =>
   Number.isFinite(value)
     ? `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : '--';
 const formatAmount = (value) =>
   Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--';
-const formatInputAmount = (value) => (Number.isFinite(value) ? value.toFixed(2) : '');
 const formatNav = (value) => (Number.isFinite(value) && value > 0 ? value.toFixed(4) : '--');
 const formatNumber = (value) =>
   Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '--';
 const formatPercent = (value, digits = 2) =>
   Number.isFinite(value) ? `${value >= 0 ? '+' : ''}${(value * 100).toFixed(digits)}%` : '--';
 const absolutePercent = (value) => (Number.isFinite(numericValue(value)) ? Math.abs(numericValue(value)) : '');
-const entryLabel = (entry) =>
-  entry.manual || entry.confirmation ? entry.label : `下跌 ${absolutePercent(entry.change)}% 补仓`;
-const exitLabel = (exit, index) =>
-  exit.manual ? exit.label : `${index === 0 ? '上涨' : '再涨'} ${absolutePercent(exit.rebound)}%`;
+const hasNumericValue = (value) =>
+  value !== '' && value !== null && value !== undefined && Number.isFinite(numericValue(value));
+const entryMoveLabel = (change) => `${change >= 0 ? '上涨' : '下跌'} ${absolutePercent(change)}% ${change >= 0 ? '加仓' : '补仓'}`;
+const exitMoveLabel = (change, index) =>
+  `${change >= 0 ? (index === 0 ? '上涨' : '再涨') : index === 0 ? '下跌' : '再跌'} ${absolutePercent(change)}%`;
+const entryLabel = (entry, row) => {
+  if (entry.manual && hasNumericValue(row?.change) && !row?.pendingNav)
+    return entryMoveLabel(row.change);
+  return entry.manual || entry.confirmation ? entry.label : entryMoveLabel(numericValue(entry.change));
+};
+const exitLabel = (exit, index, row) => {
+  if (exit.manual && hasNumericValue(row?.rebound) && !row?.pendingNav)
+    return exitMoveLabel(row.rebound, index);
+  return exit.manual ? exit.label : exitMoveLabel(numericValue(exit.rebound), index);
+};
 const todayKey = () => {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+const localDateTimeValue = () => {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+const formatFlowTime = (value) => {
+  if (!value) return '';
+  const [datePart, timePart = ''] = String(value).split('T');
+  const [, month, day] = datePart.split('-');
+  return month && day ? `${month}-${day} ${timePart.slice(0, 5)}` : '';
 };
 const tomorrowKey = () => {
   const date = new Date();
@@ -149,7 +162,7 @@ export default function TradingCalculatorPage() {
   const [isEditingSnapshot, setIsEditingSnapshot] = useState(false);
   const [pendingFlows, setPendingFlows] = useState({ entries: [], exits: [] });
   const [flowType, setFlowType] = useState(null);
-  const [flowDraft, setFlowDraft] = useState({ amount: '', nav: '' });
+  const [flowDraft, setFlowDraft] = useState({ amount: '', nav: '', recordedAt: '' });
   const [flowError, setFlowError] = useState('');
   const [entryPage, setEntryPage] = useState(1);
   const [exitPage, setExitPage] = useState(1);
@@ -201,7 +214,6 @@ export default function TradingCalculatorPage() {
     [entries]
   );
   const errors = {
-    holdingValue: form.holdingValue === '' || isValidNonNegative(form.holdingValue) ? '' : '持仓市值不能为负数',
     profitRate:
       form.profitRate === '' ||
       (Number.isFinite(numericValue(form.profitRate)) &&
@@ -225,9 +237,8 @@ export default function TradingCalculatorPage() {
       }),
     [entryRows, form.baseNav]
   );
-  const hasManualHoldingValue = isValidNonNegative(form.holdingValue);
-  const currentHoldingValue = hasManualHoldingValue ? numericValue(form.holdingValue) : position.holdingValue;
-  const calculatedProfitRate = plannedCapital > 0 ? currentHoldingValue / plannedCapital - 1 : NaN;
+  const currentHoldingValue = position.holdingValue;
+  const calculatedProfitRate = plannedCapital > 0 ? currentHoldingValue / plannedCapital - 1 : 0;
   const hasManualProfitRate =
     form.profitRate !== '' &&
     Number.isFinite(numericValue(form.profitRate)) &&
@@ -304,7 +315,11 @@ export default function TradingCalculatorPage() {
     }));
   const openFlowDialog = (type) => {
     setFlowType(type);
-    setFlowDraft(type === 'entry' ? { amount: '', nav: '' } : { shares: '', nav: '' });
+    setFlowDraft(
+      type === 'entry'
+        ? { amount: '', nav: '', recordedAt: localDateTimeValue() }
+        : { shares: '', nav: '', recordedAt: localDateTimeValue() }
+    );
     setFlowError('');
   };
   const closeFlowDialog = () => {
@@ -329,6 +344,7 @@ export default function TradingCalculatorPage() {
       label: flowType === 'entry' ? '新增入仓' : '新增出仓',
       manual: true,
       availableOn: tomorrowKey(),
+      recordedAt: flowDraft.recordedAt || localDateTimeValue(),
       nav: hasNav ? String(nav) : '',
       ...(flowType === 'entry'
         ? { amount: String(value), change: null, confirmation: true }
@@ -378,22 +394,7 @@ export default function TradingCalculatorPage() {
               }
             />
             <div className={styles.metricsGrid}>
-              {isEditingSnapshot ? (
-                <div className={`${styles.metric} ${styles.metricField}`}>
-                  <Field
-                    id="holdingValue"
-                    label="持仓市值"
-                    value={hasManualHoldingValue ? form.holdingValue : formatInputAmount(position.holdingValue)}
-                    onChange={(value) => updateForm('holdingValue', value)}
-                    step="0.01"
-                    suffix="元"
-                    hint="只修改看板显示，不参与流水计算。"
-                    error={errors.holdingValue}
-                  />
-                </div>
-              ) : (
-                <Metric label="持仓市值" value={formatMoney(currentHoldingValue)} note="当前持仓市值" />
-              )}
+              <Metric label="持仓市值" value={formatMoney(currentHoldingValue)} note="当前持仓市值" />
               {isEditingSnapshot ? (
                 <div className={`${styles.metric} ${styles.metricField} ${profitTone ? styles[profitTone] : ''}`}>
                   <Field
@@ -477,7 +478,7 @@ export default function TradingCalculatorPage() {
             </colgroup>
             <thead>
               <tr>
-                <th>节点</th>
+                <th>时间 / 节点</th>
                 <th>幅度</th>
                 <th>金额</th>
                 <th>累计</th>
@@ -491,12 +492,17 @@ export default function TradingCalculatorPage() {
             <tbody>
               {visibleEntryItems.map(({ entry, row, pending }, visibleIndex) => {
                 const index = (safeEntryPage - 1) * entryPageSize + visibleIndex;
-                const label = entryLabel(entry);
+                const label = entryLabel(entry, row);
                 if (pending || row?.pendingNav) {
                   const pendingStatus = pending ? '待次日计算' : '待补净值';
                   return (
                     <tr key={entry.id} className={styles.pendingRow}>
                       <th scope="row">
+                        {entry.recordedAt && (
+                          <time className={styles.flowTime} dateTime={entry.recordedAt}>
+                            {formatFlowTime(entry.recordedAt)}
+                          </time>
+                        )}
                         <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
                         {label}
                         <span className={styles.pendingBadge}>{pendingStatus}</span>
@@ -535,6 +541,11 @@ export default function TradingCalculatorPage() {
                 return (
                   <tr key={entry.id}>
                     <th scope="row">
+                      {entry.recordedAt && (
+                        <time className={styles.flowTime} dateTime={entry.recordedAt}>
+                          {formatFlowTime(entry.recordedAt)}
+                        </time>
+                      )}
                       <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
                       {label}
                     </th>
@@ -657,7 +668,7 @@ export default function TradingCalculatorPage() {
             </colgroup>
             <thead>
               <tr>
-                <th>节点</th>
+                <th>时间 / 节点</th>
                 <th>幅度</th>
                 <th>卖比例</th>
                 <th>卖出份额</th>
@@ -672,12 +683,17 @@ export default function TradingCalculatorPage() {
             <tbody>
               {visibleExitItems.map(({ exit, row, pending }, visibleIndex) => {
                 const index = (safeExitPage - 1) * exitPageSize + visibleIndex;
-                const label = exitLabel(exit, index);
+                const label = exitLabel(exit, index, row);
                 if (pending || row?.pendingNav) {
                   const pendingStatus = pending ? '待次日计算' : '待补净值';
                   return (
                     <tr key={exit.id} className={styles.pendingRow}>
                       <th scope="row">
+                        {exit.recordedAt && (
+                          <time className={styles.flowTime} dateTime={exit.recordedAt}>
+                            {formatFlowTime(exit.recordedAt)}
+                          </time>
+                        )}
                         <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
                         {label}
                         <span className={styles.pendingBadge}>{pendingStatus}</span>
@@ -717,6 +733,11 @@ export default function TradingCalculatorPage() {
                 return (
                   <tr key={exit.id}>
                     <th scope="row">
+                      {exit.recordedAt && (
+                        <time className={styles.flowTime} dateTime={exit.recordedAt}>
+                          {formatFlowTime(exit.recordedAt)}
+                        </time>
+                      )}
                       <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
                       {label}
                     </th>
@@ -861,6 +882,14 @@ export default function TradingCalculatorPage() {
                       [flowType === 'entry' ? 'amount' : 'shares']: event.target.value
                     }))
                   }
+                />
+              </label>
+              <label className={styles.dialogField}>
+                <span>发生时间</span>
+                <input
+                  type="datetime-local"
+                  value={flowDraft.recordedAt}
+                  onChange={(event) => setFlowDraft((current) => ({ ...current, recordedAt: event.target.value }))}
                 />
               </label>
               <label className={styles.dialogField}>
