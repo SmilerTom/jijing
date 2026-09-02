@@ -1,9 +1,9 @@
 export const DEFAULT_ENTRIES = [
-  { id: 'initial', label: '首次建仓', change: 0, amount: '2000.00' },
-  { id: 'dip-6', label: '下跌 6% 补仓', change: -6, amount: '1500.00' },
-  { id: 'dip-12', label: '下跌 12% 补仓', change: -12, amount: '2000.00' },
-  { id: 'dip-18', label: '下跌 18% 补仓', change: -18, amount: '1500.00' },
-  { id: 'confirm', label: '止跌确认加仓', nav: 3, change: null, amount: '3000.00', confirmation: true }
+  { id: 'initial', label: '初始账户', change: 0, amount: '' },
+  { id: 'dip-6', label: '下跌 6% 补仓', change: -6, amount: '' },
+  { id: 'dip-12', label: '下跌 12% 补仓', change: -12, amount: '' },
+  { id: 'dip-18', label: '下跌 18% 补仓', change: -18, amount: '' },
+  { id: 'confirm', label: '止跌确认加仓', nav: 3, change: null, amount: '', confirmation: true }
 ];
 
 export const DEFAULT_EXITS = [

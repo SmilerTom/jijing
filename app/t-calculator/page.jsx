@@ -512,9 +512,11 @@ export default function TradingCalculatorPage() {
                           aria-describedby="exit-table-hint"
                           type="number"
                           value={asText(
-                            exit.sellShares === '' || exit.sellShares === undefined
-                              ? row.soldShares.toFixed(4)
-                              : exit.sellShares
+                            row.beforeShares > 0
+                              ? exit.sellShares === '' || exit.sellShares === undefined
+                                ? row.soldShares.toFixed(4)
+                                : exit.sellShares
+                              : ''
                           )}
                           min="0"
                           max={row.beforeShares || undefined}
@@ -524,13 +526,15 @@ export default function TradingCalculatorPage() {
                       </label>
                     </td>
                     <td>
-                      <output
-                        className={`${styles.tableInput} ${styles.outAmount}`}
-                        aria-label={`${label}参考出仓金额`}
-                      >
-                        <span className={styles.outSign}>−</span>
-                        {formatAmount(row.netCash)}
-                      </output>
+                      {row.beforeShares > 0 && (
+                        <output
+                          className={`${styles.tableInput} ${styles.outAmount}`}
+                          aria-label={`${label}参考出仓金额`}
+                        >
+                          <span className={styles.outSign}>−</span>
+                          {formatAmount(row.netCash)}
+                        </output>
+                      )}
                     </td>
                     <td>{formatMoney(row.cash)}</td>
                     <td>{formatMoney(row.holdingValue)}</td>
