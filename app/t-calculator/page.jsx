@@ -245,6 +245,11 @@ export default function TradingCalculatorPage() {
       }),
     [entryRows, form.baseNav]
   );
+  const toggleSnapshotEdit = () => {
+    if (!isEditingSnapshot && form.holdingValue === '')
+      updateForm('holdingValue', formatInputAmount(position.holdingValue));
+    setIsEditingSnapshot((current) => !current);
+  };
   const hasManualHoldingValue = isValidNonNegative(form.holdingValue);
   const currentHoldingValue = hasManualHoldingValue ? numericValue(form.holdingValue) : position.holdingValue;
   const calculatedProfitRate = plannedCapital > 0 ? currentHoldingValue / plannedCapital - 1 : 0;
@@ -396,7 +401,7 @@ export default function TradingCalculatorPage() {
                   type="button"
                   className={styles.editButton}
                   aria-pressed={isEditingSnapshot}
-                  onClick={() => setIsEditingSnapshot((current) => !current)}
+                  onClick={toggleSnapshotEdit}
                 >
                   {isEditingSnapshot ? '完成' : '编辑'}
                 </button>
@@ -408,7 +413,7 @@ export default function TradingCalculatorPage() {
                   <Field
                     id="holdingValue"
                     label="持仓市值"
-                    value={hasManualHoldingValue ? form.holdingValue : formatInputAmount(position.holdingValue)}
+                    value={form.holdingValue}
                     onChange={(value) => updateForm('holdingValue', value)}
                     step="0.01"
                     suffix="元"
