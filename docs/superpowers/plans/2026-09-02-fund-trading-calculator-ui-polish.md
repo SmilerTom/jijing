@@ -16,23 +16,23 @@
 
 - Modify: `app/t-calculator/calculator.module.css`
 
-- [ ] **Step 1: Update page and hero surfaces**
+- [x] **Step 1: Update page and hero surfaces**
 
   Use the existing theme variables and add only local visual tokens under `.page`: a dark surface color, a subtle divider color, and a restrained panel shadow. Style `.page`, `.ambient`, `.hero`, `.hero h1`, `.hero p`, `.kicker`, and `.textButton` so the title is dominant, metadata is secondary, and the reset action remains quiet.
 
-- [ ] **Step 2: Strengthen the snapshot hierarchy**
+- [x] **Step 2: Strengthen the snapshot hierarchy**
 
   Adjust `.panel`, `.snapshotPanel`, `.metricsGrid`, `.metric`, `.metric strong`, `.positive`, `.negative`, and `.accent` so the snapshot has a clear featured surface, consistent card height, readable labels, and high-contrast numeric values. Keep the existing 3×2 desktop grid and all semantic colors.
 
-- [ ] **Step 3: Make flow panels and controls easier to scan**
+- [x] **Step 3: Make flow panels and controls easier to scan**
 
   Refine `.flowPanel`, `.sectionTitle`, `.sectionTitle h2`, `.sectionTitle p`, `.editButton`, `.addButton`, `.tableScroll`, `.tableScroll th`, `.tableScroll td`, `.tableInput`, `.pendingRow`, `.pendingBadge`, and `.pagination`. Keep the table widths and horizontal scrolling intact; use subtle row separators/hover states and stronger alignment for numeric cells.
 
-- [ ] **Step 4: Keep modal and focus states visually consistent**
+- [x] **Step 4: Keep modal and focus states visually consistent**
 
   Refine `.flowDialog`, `.flowDialogCard`, `.flowDialogHeader h2`, `.dialogField input`, `.secondaryButton`, and the existing focus selectors. Ensure every keyboard-focusable control keeps a visible `outline` or focus ring with the existing `--ring` variable.
 
-- [ ] **Step 5: Run focused checks**
+- [x] **Step 5: Run focused checks**
 
   Run:
 
@@ -50,19 +50,19 @@
 
 - Modify: `app/t-calculator/calculator.module.css` only if browser verification finds a layout regression.
 
-- [ ] **Step 1: Verify desktop rendering**
+- [x] **Step 1: Verify desktop rendering**
 
   Open `http://127.0.0.1:3000/t-calculator` and inspect the desktop view. Confirm the page title, snapshot cards, flow headings, add/edit buttons, table headers, and pagination have a clear hierarchy without console errors.
 
-- [ ] **Step 2: Verify mobile rendering**
+- [x] **Step 2: Verify mobile rendering**
 
   Check a 390px-wide viewport. Confirm the snapshot remains a usable two-column grid, page content has no page-level horizontal overflow, flow tables scroll inside `.tableScroll`, and pagination wraps without clipping.
 
-- [ ] **Step 3: Verify interaction states**
+- [x] **Step 3: Verify interaction states**
 
   Tab through the reset, edit, add, input, pagination, and modal controls. Confirm focus is visible, positive/negative colors remain meaningful, pending rows remain distinguishable, and opening/closing the modal does not change calculator results.
 
-- [ ] **Step 4: Re-run focused checks after any CSS correction**
+- [x] **Step 4: Re-run focused checks after any CSS correction**
 
   Run the exact commands from Task 1 Step 5 after each correction. Do not run a full build unless explicitly requested.
 
@@ -72,11 +72,11 @@
 
 - Modify: none unless verification requires a focused fix.
 
-- [ ] **Step 1: Inspect the final diff**
+- [x] **Step 1: Inspect the final diff**
 
   Run `git diff --stat`, `git diff --check`, and `git status --short`. Confirm only the approved UI stylesheet and, if needed, the page class attributes are changed beyond the already committed design and plan documents.
 
-- [ ] **Step 2: Commit the implementation**
+- [x] **Step 2: Commit the implementation**
 
   Run `git add app/t-calculator/calculator.module.css app/t-calculator/page.jsx` and commit with:
 
