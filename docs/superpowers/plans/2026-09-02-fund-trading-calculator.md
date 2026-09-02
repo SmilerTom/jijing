@@ -42,7 +42,7 @@ Run `git add app/t-calculator/calculator.mjs app/t-calculator/calculator.check.m
 **Files:**
 
 - Create: `app/t-calculator/page.jsx`
-- Create: `app/t-calculator/calculator.css`
+- Create: `app/t-calculator/calculator.module.css`
 
 - [ ] **Step 1: Add the client page using controlled state**
 
@@ -62,14 +62,14 @@ Run `npx eslint app/t-calculator/page.jsx` and `node --check app/t-calculator/ca
 
 - [ ] **Step 5: Commit**
 
-Run `git add app/t-calculator/page.jsx app/t-calculator/calculator.css && git commit -m "feat: add interactive fund calculator page"`.
+Run `git add app/t-calculator/page.jsx app/t-calculator/calculator.module.css && git commit -m "feat: add interactive fund calculator page"`.
 
 ### Task 3: Verify the interaction and responsive behavior
 
 **Files:**
 
 - Modify: `app/t-calculator/page.jsx` only if a focused verification finds a page defect.
-- Modify: `app/t-calculator/calculator.css` only if a focused verification finds a layout defect.
+- Modify: `app/t-calculator/calculator.module.css` only if a focused verification finds a layout defect.
 
 - [ ] **Step 1: Run the pure calculation check**
 

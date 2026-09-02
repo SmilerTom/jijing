@@ -34,7 +34,7 @@
 - `app/t-calculator/page.jsx`：客户端页面状态、表单、结果展示和交互。
 - `app/t-calculator/calculator.mjs`：纯计算函数和默认配置。
 - `app/t-calculator/calculator.check.mjs`：基于 Node 内置 `assert` 的最小可运行计算检查。
-- `app/t-calculator/calculator.css`：页面局部样式，优先复用全局主题变量。
+- `app/t-calculator/calculator.module.css`：页面局部样式，优先复用全局主题变量，并由 Next.js CSS Modules 负责作用域隔离。
 
 不修改 `app/page.jsx`、现有 Zustand store、外部 API 和现有持仓数据。
 
