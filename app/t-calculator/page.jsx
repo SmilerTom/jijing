@@ -36,17 +36,16 @@ const formatPercent = (value, digits = 2) =>
 const absolutePercent = (value) => (Number.isFinite(numericValue(value)) ? Math.abs(numericValue(value)) : '');
 const hasNumericValue = (value) =>
   value !== '' && value !== null && value !== undefined && Number.isFinite(numericValue(value));
-const entryMoveLabel = (change) => `${change >= 0 ? '上涨' : '下跌'} ${absolutePercent(change)}% ${change >= 0 ? '加仓' : '补仓'}`;
+const entryMoveLabel = (change) =>
+  `${change >= 0 ? '上涨' : '下跌'} ${absolutePercent(change)}% ${change >= 0 ? '加仓' : '补仓'}`;
 const exitMoveLabel = (change, index) =>
   `${change >= 0 ? (index === 0 ? '上涨' : '再涨') : index === 0 ? '下跌' : '再跌'} ${absolutePercent(change)}%`;
 const entryLabel = (entry, row) => {
-  if (entry.manual && hasNumericValue(row?.change) && !row?.pendingNav)
-    return entryMoveLabel(row.change);
+  if (entry.manual && hasNumericValue(row?.change) && !row?.pendingNav) return entryMoveLabel(row.change);
   return entry.manual || entry.confirmation ? entry.label : entryMoveLabel(numericValue(entry.change));
 };
 const exitLabel = (exit, index, row) => {
-  if (exit.manual && hasNumericValue(row?.rebound) && !row?.pendingNav)
-    return exitMoveLabel(row.rebound, index);
+  if (exit.manual && hasNumericValue(row?.rebound) && !row?.pendingNav) return exitMoveLabel(row.rebound, index);
   return exit.manual ? exit.label : exitMoveLabel(numericValue(exit.rebound), index);
 };
 const todayKey = () => {
@@ -866,7 +865,7 @@ export default function TradingCalculatorPage() {
                 关闭
               </button>
             </div>
-            <p className={styles.flowDialogHint}>金额或份额必填；执行净值可先留空，补全后才参与流水计算。</p>
+            <p className={styles.flowDialogHint}>金额或份额必填；发生时间默认当天，可修改；执行净值可先留空。</p>
             <div className={styles.flowDialogFields}>
               <label className={styles.dialogField}>
                 <span>{flowType === 'entry' ? '买入金额' : '卖出份额'}</span>
