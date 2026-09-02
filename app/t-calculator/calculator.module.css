@@ -537,6 +537,12 @@
 .pendingRow th {
   box-shadow: inset 3px 0 0 var(--accent);
 }
+.pendingRow .tableInput {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+}
+.pendingRow .tableInput input {
+  color: var(--accent);
+}
 .pendingBadge {
   display: inline-block;
   margin-left: 8px;

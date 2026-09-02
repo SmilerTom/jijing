@@ -17,6 +17,7 @@ const hasNumericValue = (value) =>
 
 const navForEntry = (entry, baseNav) => {
   const explicitNav = numberOr(entry?.nav);
+  if (entry?.manual && !(explicitNav > 0)) return 0;
   if (explicitNav > 0) return explicitNav;
   return baseNav * (1 + numberOr(entry?.change) / 100);
 };
@@ -30,7 +31,25 @@ export function calculateEntryRows({ capital = 0, baseNav = 0, entries = [] } = 
   return entries.map((entry, index) => {
     const nav = navForEntry(entry, safeBaseNav);
     const amount = Math.max(0, numberOr(entry?.amount));
-    if (!(nav > 0)) return { ...entry, index, nav: 0, amount, error: '净值必须大于 0' };
+    if (!(nav > 0))
+      return {
+        ...entry,
+        index,
+        nav: 0,
+        amount: 0,
+        requestedAmount: amount,
+        buyShares: 0,
+        cumulativeInvested,
+        cash,
+        shares,
+        holdingValue: 0,
+        totalAssets: cash,
+        averageCost: shares > 0 ? cumulativeInvested / shares : 0,
+        breakEvenNav: shares > 0 ? cumulativeInvested / shares : 0,
+        returnRate: startingCash > 0 ? cash / startingCash - 1 : 0,
+        pendingNav: true,
+        error: entry?.manual ? '等待补全净值' : '净值必须大于 0'
+      };
     const buyAmount = Math.min(amount, Math.max(0, cash));
     const buyShares = buyAmount / nav;
     shares += buyShares;
@@ -43,6 +62,7 @@ export function calculateEntryRows({ capital = 0, baseNav = 0, entries = [] } = 
       ...entry,
       index,
       nav,
+      change: entry?.manual && safeBaseNav > 0 ? (nav / safeBaseNav - 1) * 100 : entry?.change,
       amount: buyAmount,
       requestedAmount: amount,
       buyShares,
@@ -60,12 +80,13 @@ export function calculateEntryRows({ capital = 0, baseNav = 0, entries = [] } = 
 
 export function summarizeEntryPosition({ rows = [], scenarioNav = 0, redemptionFeePct = 0 } = {}) {
   const last = rows.at(-1);
+  const positionRow = [...rows].reverse().find((row) => !row?.pendingNav) || last;
   const nav = numberOr(scenarioNav);
   if (!last || !(nav > 0))
     return {
-      cash: last?.cash || 0,
-      shares: last?.shares || 0,
-      cumulativeInvested: last?.cumulativeInvested || 0,
+      cash: positionRow?.cash || 0,
+      shares: positionRow?.shares || 0,
+      cumulativeInvested: positionRow?.cumulativeInvested || 0,
       holdingValue: 0,
       totalAssets: last?.cash || 0,
       averageCost: last?.averageCost || 0,
@@ -74,32 +95,68 @@ export function summarizeEntryPosition({ rows = [], scenarioNav = 0, redemptionF
       error: '模拟净值必须大于 0'
     };
   const fee = Math.min(99.99, Math.max(0, numberOr(redemptionFeePct))) / 100;
-  const breakEvenNav = last.averageCost > 0 ? last.averageCost / (1 - fee) : 0;
+  const breakEvenNav = positionRow.averageCost > 0 ? positionRow.averageCost / (1 - fee) : 0;
   return {
-    cash: last.cash,
-    shares: last.shares,
-    cumulativeInvested: last.cumulativeInvested,
-    holdingValue: last.shares * nav,
-    totalAssets: last.cash + last.shares * nav,
-    averageCost: last.averageCost,
+    cash: positionRow.cash,
+    shares: positionRow.shares,
+    cumulativeInvested: positionRow.cumulativeInvested,
+    holdingValue: positionRow.shares * nav,
+    totalAssets: positionRow.cash + positionRow.shares * nav,
+    averageCost: positionRow.averageCost,
     breakEvenNav,
     requiredRise: nav > 0 ? breakEvenNav / nav - 1 : 0
   };
 }
 
-export function calculateExitRows({ targetCapital = 0, baseNav = 0, exits = [], redemptionFeePct = 0 } = {}) {
+export function calculateExitRows({
+  targetCapital = 0,
+  baseNav = 0,
+  initialShares,
+  initialCash = 0,
+  exits = [],
+  redemptionFeePct = 0
+} = {}) {
   const capital = Math.max(0, numberOr(targetCapital));
   const safeBaseNav = numberOr(baseNav);
   if (!(safeBaseNav > 0)) return [];
-  const targetShares = capital / safeBaseNav;
+  const targetShares = hasNumericValue(initialShares) ? Math.max(0, numberOr(initialShares)) : capital / safeBaseNav;
   const fee = Math.min(99.99, Math.max(0, numberOr(redemptionFeePct))) / 100;
   let remainingShares = targetShares;
-  let cash = 0;
+  let cash = hasNumericValue(initialCash) ? Math.max(0, numberOr(initialCash)) : 0;
   let previousNav = safeBaseNav;
+  let blocked = false;
   return exits.map((exit, index) => {
     const explicitNav = numberOr(exit?.nav);
-    const triggerNav = explicitNav > 0 ? explicitNav : previousNav * (1 + numberOr(exit?.rebound) / 100);
+    const referenceNav = previousNav;
     const beforeShares = remainingShares;
+    const triggerNav =
+      exit?.manual && !(explicitNav > 0)
+        ? 0
+        : explicitNav > 0
+          ? explicitNav
+          : previousNav * (1 + numberOr(exit?.rebound) / 100);
+    if (blocked || !(triggerNav > 0)) {
+      blocked = true;
+      return {
+        ...exit,
+        index,
+        targetShares,
+        triggerNav: 0,
+        beforeShares,
+        soldShares: 0,
+        usedSellRatio: 0,
+        grossCash: 0,
+        feeAmount: 0,
+        netCash: 0,
+        cash,
+        remainingShares,
+        holdingValue: 0,
+        totalAssets: cash,
+        totalReturn: capital > 0 ? cash / capital - 1 : 0,
+        pendingNav: true,
+        error: '等待补全净值'
+      };
+    }
     const requestedShares = hasNumericValue(exit?.sellShares)
       ? Math.max(0, numberOr(exit?.sellShares))
       : (beforeShares * Math.max(0, numberOr(exit?.sellRatio))) / 100;
@@ -115,6 +172,7 @@ export function calculateExitRows({ targetCapital = 0, baseNav = 0, exits = [], 
     return {
       ...exit,
       index,
+      rebound: exit?.manual && referenceNav > 0 ? (triggerNav / referenceNav - 1) * 100 : exit?.rebound,
       targetShares,
       triggerNav,
       beforeShares,

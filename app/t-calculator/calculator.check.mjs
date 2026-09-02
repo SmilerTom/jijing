@@ -62,3 +62,49 @@ const manualNavExitRows = calculateExitRows({
   exits: [{ nav: 3.6, sellShares: 100 }]
 });
 assert.equal(manualNavExitRows[0].triggerNav, 3.6);
+
+const actualPositionRows = calculateEntryRows({
+  capital: 1000,
+  baseNav: 10,
+  entries: [{ amount: 500, nav: 2, manual: true }]
+});
+assert.equal(actualPositionRows[0].change, -80);
+const dynamicExitRows = calculateExitRows({
+  targetCapital: 1000,
+  baseNav: 10,
+  initialShares: actualPositionRows.at(-1).shares,
+  initialCash: actualPositionRows.at(-1).cash,
+  exits: [{ rebound: 10, sellRatio: 10 }]
+});
+assert.equal(dynamicExitRows[0].beforeShares, 250);
+assert.equal(dynamicExitRows[0].soldShares, 25);
+assert.equal(dynamicExitRows[0].cash, 775);
+assert.equal(dynamicExitRows[0].totalAssets, 3250);
+
+const manualFilledExitRows = calculateExitRows({
+  targetCapital: 1000,
+  baseNav: 10,
+  initialShares: 100,
+  exits: [{ manual: true, sellShares: 10, nav: 11 }]
+});
+assert.ok(Math.abs(manualFilledExitRows[0].rebound - 10) < 0.0001);
+
+const pendingEntryRows = calculateEntryRows({
+  capital: 1000,
+  baseNav: 10,
+  entries: [{ amount: 500, nav: '', manual: true }]
+});
+assert.equal(pendingEntryRows[0].pendingNav, true);
+assert.equal(pendingEntryRows[0].buyShares, 0);
+assert.equal(pendingEntryRows[0].cumulativeInvested, 0);
+
+const pendingExitRows = calculateExitRows({
+  targetCapital: 1000,
+  baseNav: 10,
+  initialShares: 100,
+  initialCash: 0,
+  exits: [{ manual: true, sellShares: 10, nav: '' }]
+});
+assert.equal(pendingExitRows[0].pendingNav, true);
+assert.equal(pendingExitRows[0].soldShares, 0);
+assert.equal(pendingExitRows[0].remainingShares, 100);

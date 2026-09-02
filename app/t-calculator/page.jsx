@@ -36,14 +36,14 @@ const formatMoney = (value) =>
 const formatAmount = (value) =>
   Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--';
 const formatInputAmount = (value) => (Number.isFinite(value) ? value.toFixed(2) : '');
-const formatInputPercent = (value) => (Number.isFinite(value) ? (value * 100).toFixed(2) : '');
 const formatNav = (value) => (Number.isFinite(value) && value > 0 ? value.toFixed(4) : '--');
 const formatNumber = (value) =>
   Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '--';
 const formatPercent = (value, digits = 2) =>
   Number.isFinite(value) ? `${value >= 0 ? '+' : ''}${(value * 100).toFixed(digits)}%` : '--';
 const absolutePercent = (value) => (Number.isFinite(numericValue(value)) ? Math.abs(numericValue(value)) : '');
-const entryLabel = (entry) => (entry.confirmation ? entry.label : `下跌 ${absolutePercent(entry.change)}% 补仓`);
+const entryLabel = (entry) =>
+  entry.manual || entry.confirmation ? entry.label : `下跌 ${absolutePercent(entry.change)}% 补仓`;
 const exitLabel = (exit, index) =>
   exit.manual ? exit.label : `${index === 0 ? '上涨' : '再涨'} ${absolutePercent(exit.rebound)}%`;
 const todayKey = () => {
@@ -61,7 +61,7 @@ const cloneDefaults = () => ({
   exits: DEFAULT_EXITS.map((exit) => ({ ...exit }))
 });
 
-function Field({ id, label, value, onChange, min = '0', max, step = '0.01', suffix, hint, error }) {
+function Field({ id, label, value, onChange, min = '0', max, step = '0.01', suffix, hint, error, placeholder }) {
   return (
     <div className={styles.field}>
       <label htmlFor={id}>{label}</label>
@@ -71,6 +71,7 @@ function Field({ id, label, value, onChange, min = '0', max, step = '0.01', suff
           type="number"
           inputMode="decimal"
           value={value}
+          placeholder={placeholder}
           min={min}
           max={max}
           step={step}
@@ -194,7 +195,8 @@ export default function TradingCalculatorPage() {
     () =>
       entries.reduce((sum, entry) => {
         const amount = numericValue(entry.amount);
-        return sum + (Number.isFinite(amount) ? Math.max(0, amount) : 0);
+        const ready = !entry.manual || numericValue(entry.nav) > 0;
+        return sum + (ready && Number.isFinite(amount) ? Math.max(0, amount) : 0);
       }, 0),
     [entries]
   );
@@ -225,22 +227,25 @@ export default function TradingCalculatorPage() {
   );
   const hasManualHoldingValue = isValidNonNegative(form.holdingValue);
   const currentHoldingValue = hasManualHoldingValue ? numericValue(form.holdingValue) : position.holdingValue;
-  const calculatedProfitRate = plannedCapital > 0 ? currentHoldingValue / plannedCapital - 1 : 0;
+  const calculatedProfitRate = plannedCapital > 0 ? currentHoldingValue / plannedCapital - 1 : NaN;
   const hasManualProfitRate =
     form.profitRate !== '' &&
     Number.isFinite(numericValue(form.profitRate)) &&
     numericValue(form.profitRate) >= -100 &&
     numericValue(form.profitRate) <= 100;
   const profitRate = hasManualProfitRate ? numericValue(form.profitRate) / 100 : calculatedProfitRate;
-  const profitRateInput = form.profitRate === '' ? formatInputPercent(profitRate) : asText(form.profitRate);
+  const profitRateInput = form.profitRate === '' ? '' : asText(form.profitRate);
+  const profitTone = Number.isFinite(profitRate) ? (profitRate >= 0 ? 'positive' : 'negative') : '';
   const exitRows = useMemo(
     () =>
       calculateExitRows({
         targetCapital: plannedCapital,
         baseNav: numericValue(form.baseNav),
+        initialShares: position.shares,
+        initialCash: position.cash,
         exits
       }),
-    [plannedCapital, form.baseNav, exits]
+    [plannedCapital, form.baseNav, position.shares, position.cash, exits]
   );
   const lastExit = exitRows.at(-1);
   const entryItems = useMemo(
@@ -292,6 +297,11 @@ export default function TradingCalculatorPage() {
       current.map((exit) => (exit.id === id ? { ...exit, sellShares: nextShares, sellRatio: ratio } : exit))
     );
   };
+  const updatePendingFlow = (type, id, key, value) =>
+    setPendingFlows((current) => ({
+      ...current,
+      [type]: current[type].map((flow) => (flow.id === id ? { ...flow, [key]: value } : flow))
+    }));
   const openFlowDialog = (type) => {
     setFlowType(type);
     setFlowDraft(type === 'entry' ? { amount: '', nav: '' } : { shares: '', nav: '' });
@@ -304,9 +314,14 @@ export default function TradingCalculatorPage() {
   const submitFlow = (event) => {
     event.preventDefault();
     const nav = numericValue(flowDraft.nav);
+    const hasNav = flowDraft.nav !== '' && flowDraft.nav !== null && flowDraft.nav !== undefined;
     const value = numericValue(flowType === 'entry' ? flowDraft.amount : flowDraft.shares);
-    if (!(value > 0) || !(nav > 0)) {
-      setFlowError(flowType === 'entry' ? '买入金额和净值都必须大于 0' : '卖出份额和净值都必须大于 0');
+    if (!(value > 0) || (hasNav && !(nav > 0))) {
+      setFlowError(
+        flowType === 'entry'
+          ? '买入金额必须大于 0；净值可留空，填写时必须大于 0'
+          : '卖出份额必须大于 0；净值可留空，填写时必须大于 0'
+      );
       return;
     }
     const record = {
@@ -314,7 +329,7 @@ export default function TradingCalculatorPage() {
       label: flowType === 'entry' ? '新增入仓' : '新增出仓',
       manual: true,
       availableOn: tomorrowKey(),
-      nav: String(nav),
+      nav: hasNav ? String(nav) : '',
       ...(flowType === 'entry'
         ? { amount: String(value), change: null, confirmation: true }
         : { sellShares: String(value), sellRatio: '' })
@@ -380,9 +395,7 @@ export default function TradingCalculatorPage() {
                 <Metric label="持仓市值" value={formatMoney(currentHoldingValue)} note="当前持仓市值" />
               )}
               {isEditingSnapshot ? (
-                <div
-                  className={`${styles.metric} ${styles.metricField} ${profitRate >= 0 ? styles.positive : styles.negative}`}
-                >
+                <div className={`${styles.metric} ${styles.metricField} ${profitTone ? styles[profitTone] : ''}`}>
                   <Field
                     id="profitRate"
                     label="盈利率"
@@ -394,15 +407,11 @@ export default function TradingCalculatorPage() {
                     suffix="%"
                     hint="只修改看板显示，不参与流水计算。"
                     error={errors.profitRate}
+                    placeholder="自动计算"
                   />
                 </div>
               ) : (
-                <Metric
-                  label="盈利率"
-                  value={formatPercent(profitRate)}
-                  tone={profitRate >= 0 ? 'positive' : 'negative'}
-                  note="当前账户盈利率"
-                />
+                <Metric label="盈利率" value={formatPercent(profitRate)} tone={profitTone} note="当前账户盈利率" />
               )}
               <Metric label="持仓份额" value={formatNumber(latestEntry?.shares || 0)} note="当前持仓份额" />
               <Metric label="平均成本" value={formatNav(position.averageCost)} note="累计投入 ÷ 累计份额" />
@@ -483,15 +492,18 @@ export default function TradingCalculatorPage() {
               {visibleEntryItems.map(({ entry, row, pending }, visibleIndex) => {
                 const index = (safeEntryPage - 1) * entryPageSize + visibleIndex;
                 const label = entryLabel(entry);
-                if (pending) {
+                if (pending || row?.pendingNav) {
+                  const pendingStatus = pending ? '待次日计算' : '待补净值';
                   return (
                     <tr key={entry.id} className={styles.pendingRow}>
                       <th scope="row">
                         <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
                         {label}
-                        <span className={styles.pendingBadge}>待次日计算</span>
+                        <span className={styles.pendingBadge}>{pendingStatus}</span>
                       </th>
-                      <td>—</td>
+                      <td>
+                        <span className={styles.pendingBadge}>待补净值</span>
+                      </td>
                       <td>
                         <span className={`${styles.tableInput} ${styles.inInput}`}>
                           <span className={styles.sign}>+</span>
@@ -499,7 +511,23 @@ export default function TradingCalculatorPage() {
                         </span>
                       </td>
                       <td colSpan="4">—</td>
-                      <td>{formatNav(numericValue(entry.nav))}</td>
+                      <td>
+                        <label className={styles.tableInput}>
+                          <input
+                            aria-label={`${label}执行净值`}
+                            aria-describedby="entry-table-hint"
+                            type="number"
+                            value={asText(entry.nav)}
+                            min="0"
+                            step="0.0001"
+                            onChange={(event) =>
+                              pending
+                                ? updatePendingFlow('entries', entry.id, 'nav', event.target.value)
+                                : updateEntry(entry.id, 'nav', event.target.value)
+                            }
+                          />
+                        </label>
+                      </td>
                       <td>待计算</td>
                     </tr>
                   );
@@ -511,7 +539,11 @@ export default function TradingCalculatorPage() {
                       {label}
                     </th>
                     <td>
-                      {entry.confirmation ? (
+                      {entry.manual ? (
+                        <span className={row.pendingNav ? styles.pendingBadge : styles.confirmBadge}>
+                          {row.pendingNav ? '待补净值' : formatPercent(numericValue(row.change) / 100)}
+                        </span>
+                      ) : entry.confirmation ? (
                         <span className={styles.confirmBadge}>确认</span>
                       ) : (
                         <label className={styles.tableInput}>
@@ -552,7 +584,7 @@ export default function TradingCalculatorPage() {
                       {formatMoney(row.totalAssets)}
                     </td>
                     <td>
-                      {entry.confirmation ? (
+                      {entry.manual || entry.confirmation ? (
                         <label className={styles.tableInput}>
                           <input
                             aria-label={`${label}执行净值`}
@@ -641,15 +673,18 @@ export default function TradingCalculatorPage() {
               {visibleExitItems.map(({ exit, row, pending }, visibleIndex) => {
                 const index = (safeExitPage - 1) * exitPageSize + visibleIndex;
                 const label = exitLabel(exit, index);
-                if (pending) {
+                if (pending || row?.pendingNav) {
+                  const pendingStatus = pending ? '待次日计算' : '待补净值';
                   return (
                     <tr key={exit.id} className={styles.pendingRow}>
                       <th scope="row">
                         <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
                         {label}
-                        <span className={styles.pendingBadge}>待次日计算</span>
+                        <span className={styles.pendingBadge}>{pendingStatus}</span>
                       </th>
-                      <td>—</td>
+                      <td>
+                        <span className={styles.pendingBadge}>待补净值</span>
+                      </td>
                       <td>—</td>
                       <td>{formatNumber(numericValue(exit.sellShares))}</td>
                       <td>
@@ -658,7 +693,23 @@ export default function TradingCalculatorPage() {
                         </span>
                       </td>
                       <td colSpan="3">—</td>
-                      <td>{formatNav(numericValue(exit.nav))}</td>
+                      <td>
+                        <label className={styles.tableInput}>
+                          <input
+                            aria-label={`${label}执行净值`}
+                            aria-describedby="exit-table-hint"
+                            type="number"
+                            value={asText(exit.nav)}
+                            min="0"
+                            step="0.0001"
+                            onChange={(event) =>
+                              pending
+                                ? updatePendingFlow('exits', exit.id, 'nav', event.target.value)
+                                : updateExit(exit.id, 'nav', event.target.value)
+                            }
+                          />
+                        </label>
+                      </td>
                       <td>待计算</td>
                     </tr>
                   );
@@ -670,19 +721,23 @@ export default function TradingCalculatorPage() {
                       {label}
                     </th>
                     <td>
-                      <label className={styles.tableInput}>
-                        <input
-                          aria-label={`${label}上涨幅度`}
-                          aria-describedby="exit-table-hint"
-                          type="number"
-                          value={asText(absolutePercent(exit.rebound))}
-                          min="0"
-                          max="100"
-                          step="0.01"
-                          onChange={(event) => updateExit(exit.id, 'rebound', event.target.value)}
-                        />
-                        <span>%</span>
-                      </label>
+                      {exit.manual ? (
+                        <span className={styles.confirmBadge}>{formatPercent(numericValue(row.rebound) / 100)}</span>
+                      ) : (
+                        <label className={styles.tableInput}>
+                          <input
+                            aria-label={`${label}上涨幅度`}
+                            aria-describedby="exit-table-hint"
+                            type="number"
+                            value={asText(absolutePercent(exit.rebound))}
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            onChange={(event) => updateExit(exit.id, 'rebound', event.target.value)}
+                          />
+                          <span>%</span>
+                        </label>
+                      )}
                     </td>
                     <td>
                       <label className={styles.tableInput}>
@@ -733,7 +788,23 @@ export default function TradingCalculatorPage() {
                     <td>{formatMoney(row.cash)}</td>
                     <td>{formatMoney(row.holdingValue)}</td>
                     <td>{formatMoney(row.totalAssets)}</td>
-                    <td>{formatNav(row.triggerNav)}</td>
+                    <td>
+                      {exit.manual ? (
+                        <label className={styles.tableInput}>
+                          <input
+                            aria-label={`${label}执行净值`}
+                            aria-describedby="exit-table-hint"
+                            type="number"
+                            value={asText(exit.nav)}
+                            min="0"
+                            step="0.0001"
+                            onChange={(event) => updateExit(exit.id, 'nav', event.target.value)}
+                          />
+                        </label>
+                      ) : (
+                        formatNav(row.triggerNav)
+                      )}
+                    </td>
                     <td className={row.totalReturn >= 0 ? styles.up : styles.down}>{formatPercent(row.totalReturn)}</td>
                   </tr>
                 );
@@ -774,7 +845,7 @@ export default function TradingCalculatorPage() {
                 关闭
               </button>
             </div>
-            <p className={styles.flowDialogHint}>记录后当天不参与计算，第二天打开页面后才更新流水。</p>
+            <p className={styles.flowDialogHint}>金额或份额必填；执行净值可先留空，补全后才参与流水计算。</p>
             <div className={styles.flowDialogFields}>
               <label className={styles.dialogField}>
                 <span>{flowType === 'entry' ? '买入金额' : '卖出份额'}</span>
@@ -798,6 +869,7 @@ export default function TradingCalculatorPage() {
                   type="number"
                   min="0"
                   step="0.0001"
+                  placeholder="可稍后补填"
                   value={flowDraft.nav}
                   onChange={(event) => setFlowDraft((current) => ({ ...current, nav: event.target.value }))}
                 />
