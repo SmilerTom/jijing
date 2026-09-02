@@ -438,10 +438,10 @@ export default function TradingCalculatorPage() {
               <tr>
                 <th>节点</th>
                 <th>幅度 / 卖比例</th>
+                <th>卖出份额</th>
                 <th>金额</th>
                 <th>累计</th>
                 <th>剩余</th>
-                <th>卖出份额</th>
                 <th>持仓市值</th>
                 <th>总资产</th>
                 <th>净值</th>
@@ -491,9 +491,6 @@ export default function TradingCalculatorPage() {
                         </label>
                       </div>
                     </td>
-                    <td className={styles.outAmount}>−{formatMoney(row.netCash)}</td>
-                    <td>{formatMoney(row.cash)}</td>
-                    <td>{formatNumber(row.remainingShares)}</td>
                     <td>
                       <label className={styles.tableInput}>
                         <input
@@ -512,6 +509,17 @@ export default function TradingCalculatorPage() {
                         />
                       </label>
                     </td>
+                    <td>
+                      <output
+                        className={`${styles.tableInput} ${styles.outAmount}`}
+                        aria-label={`${label}参考出仓金额`}
+                      >
+                        <span className={styles.outSign}>−</span>
+                        {formatMoney(row.netCash)}
+                      </output>
+                    </td>
+                    <td>{formatMoney(row.cash)}</td>
+                    <td>{formatNumber(row.remainingShares)}</td>
                     <td>{formatMoney(row.holdingValue)}</td>
                     <td>{formatMoney(row.totalAssets)}</td>
                     <td>{formatNav(row.triggerNav)}</td>

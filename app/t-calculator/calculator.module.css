@@ -463,6 +463,16 @@
   color: var(--danger);
   font-weight: 700;
 }
+.outSign {
+  color: var(--danger);
+  font:
+    700 14px/1 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
+}
 .recoveryPanel {
   display: flex;
   justify-content: space-between;
