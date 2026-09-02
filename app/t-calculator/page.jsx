@@ -14,6 +14,7 @@ import styles from './calculator.module.css';
 
 const DEFAULT_FORM = {
   baseNav: '3.2743',
+  holdingValue: '',
   profitRate: '',
   holdingDays: '30'
 };
@@ -22,12 +23,19 @@ const PENDING_FLOW_KEY = 'fundTradingCalculatorPendingFlows';
 
 const asText = (value) => (value === null || value === undefined ? '' : String(value));
 const numericValue = (value) => Number(value);
+const isValidNonNegative = (value) =>
+  value !== '' &&
+  value !== null &&
+  value !== undefined &&
+  Number.isFinite(numericValue(value)) &&
+  numericValue(value) >= 0;
 const formatMoney = (value) =>
   Number.isFinite(value)
     ? `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : '--';
 const formatAmount = (value) =>
   Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--';
+const formatInputAmount = (value) => (Number.isFinite(value) ? value.toFixed(2) : '');
 const formatNav = (value) => (Number.isFinite(value) && value > 0 ? value.toFixed(4) : '--');
 const formatNumber = (value) =>
   Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '--';
@@ -213,6 +221,7 @@ export default function TradingCalculatorPage() {
     [entries]
   );
   const errors = {
+    holdingValue: form.holdingValue === '' || isValidNonNegative(form.holdingValue) ? '' : '持仓市值不能为负数',
     profitRate:
       form.profitRate === '' ||
       (Number.isFinite(numericValue(form.profitRate)) &&
@@ -236,7 +245,8 @@ export default function TradingCalculatorPage() {
       }),
     [entryRows, form.baseNav]
   );
-  const currentHoldingValue = position.holdingValue;
+  const hasManualHoldingValue = isValidNonNegative(form.holdingValue);
+  const currentHoldingValue = hasManualHoldingValue ? numericValue(form.holdingValue) : position.holdingValue;
   const calculatedProfitRate = plannedCapital > 0 ? currentHoldingValue / plannedCapital - 1 : 0;
   const hasManualProfitRate =
     form.profitRate !== '' &&
@@ -393,7 +403,22 @@ export default function TradingCalculatorPage() {
               }
             />
             <div className={styles.metricsGrid}>
-              <Metric label="持仓市值" value={formatMoney(currentHoldingValue)} note="当前持仓市值" />
+              {isEditingSnapshot ? (
+                <div className={`${styles.metric} ${styles.metricField}`}>
+                  <Field
+                    id="holdingValue"
+                    label="持仓市值"
+                    value={hasManualHoldingValue ? form.holdingValue : formatInputAmount(position.holdingValue)}
+                    onChange={(value) => updateForm('holdingValue', value)}
+                    step="0.01"
+                    suffix="元"
+                    hint="只修改看板显示，不参与流水计算。"
+                    error={errors.holdingValue}
+                  />
+                </div>
+              ) : (
+                <Metric label="持仓市值" value={formatMoney(currentHoldingValue)} note="当前持仓市值" />
+              )}
               {isEditingSnapshot ? (
                 <div className={`${styles.metric} ${styles.metricField} ${profitTone ? styles[profitTone] : ''}`}>
                   <Field
