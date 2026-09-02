@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   calculateEntryRows,
   calculateExitRows,
-  calculateRecovery,
   DEFAULT_ENTRIES,
   DEFAULT_EXITS,
   summarizeEntryPosition
@@ -12,23 +11,27 @@ import {
 import styles from './calculator.module.css';
 
 const DEFAULT_FORM = {
-  capital: '10000',
   baseNav: '3.2743',
-  scenarioNav: '3.2743',
-  redemptionFee: '0',
+  holdingValue: '',
   holdingDays: '30'
 };
 const PERCENT_OPTIONS = Array.from({ length: 46 }, (_, index) => index + 5);
 
 const asText = (value) => (value === null || value === undefined ? '' : String(value));
 const numericValue = (value) => Number(value);
-const isValidPositive = (value) => Number.isFinite(numericValue(value)) && numericValue(value) > 0;
+const isValidNonNegative = (value) =>
+  value !== '' &&
+  value !== null &&
+  value !== undefined &&
+  Number.isFinite(numericValue(value)) &&
+  numericValue(value) >= 0;
 const formatMoney = (value) =>
   Number.isFinite(value)
     ? `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : '--';
 const formatAmount = (value) =>
   Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--';
+const formatInputAmount = (value) => (Number.isFinite(value) ? value.toFixed(2) : '');
 const formatNav = (value) => (Number.isFinite(value) && value > 0 ? value.toFixed(4) : '--');
 const formatNumber = (value) =>
   Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '--';
@@ -113,15 +116,6 @@ export default function TradingCalculatorPage() {
 
   const errors = useMemo(
     () => ({
-      capital: !isValidPositive(form.capital) ? '账户金额必须大于 0' : '',
-      baseNav: !isValidPositive(form.baseNav) ? '基准净值必须大于 0' : '',
-      scenarioNav: !isValidPositive(form.scenarioNav) ? '模拟净值必须大于 0' : '',
-      redemptionFee:
-        Number.isFinite(numericValue(form.redemptionFee)) &&
-        numericValue(form.redemptionFee) >= 0 &&
-        numericValue(form.redemptionFee) < 100
-          ? ''
-          : '费率需在 0～100 之间',
       holdingDays:
         Number.isFinite(numericValue(form.holdingDays)) && numericValue(form.holdingDays) >= 0
           ? ''
@@ -130,32 +124,41 @@ export default function TradingCalculatorPage() {
     [form]
   );
 
+  const plannedCapital = useMemo(
+    () =>
+      entries.reduce((sum, entry) => {
+        const amount = numericValue(entry.amount);
+        return sum + (Number.isFinite(amount) ? Math.max(0, amount) : 0);
+      }, 0),
+    [entries]
+  );
   const entryRows = useMemo(
-    () => calculateEntryRows({ capital: numericValue(form.capital), baseNav: numericValue(form.baseNav), entries }),
-    [form.capital, form.baseNav, entries]
+    () => calculateEntryRows({ capital: plannedCapital, baseNav: numericValue(form.baseNav), entries }),
+    [plannedCapital, form.baseNav, entries]
   );
   const latestEntry = entryRows.at(-1);
   const position = useMemo(
     () =>
       summarizeEntryPosition({
         rows: entryRows,
-        scenarioNav: numericValue(form.scenarioNav),
-        redemptionFeePct: numericValue(form.redemptionFee)
+        scenarioNav: numericValue(form.baseNav)
       }),
-    [entryRows, form.scenarioNav, form.redemptionFee]
+    [entryRows, form.baseNav]
   );
+  const hasHoldingValue = isValidNonNegative(form.holdingValue);
+  const currentHoldingValue = hasHoldingValue ? numericValue(form.holdingValue) : position.holdingValue;
+  const profitRate = latestEntry?.cumulativeInvested > 0 ? currentHoldingValue / latestEntry.cumulativeInvested - 1 : 0;
   const exitRows = useMemo(
     () =>
       calculateExitRows({
-        targetCapital: numericValue(form.capital),
+        targetCapital: plannedCapital,
         baseNav: numericValue(form.baseNav),
-        exits,
-        redemptionFeePct: numericValue(form.redemptionFee)
+        exits
       }),
-    [form.capital, form.baseNav, form.redemptionFee, exits]
+    [plannedCapital, form.baseNav, exits]
   );
   const lastExit = exitRows.at(-1);
-  const holdingActive = (latestEntry?.shares || 0) > 0 && (lastExit?.remainingShares ?? latestEntry?.shares ?? 0) > 0;
+  const holdingActive = currentHoldingValue > 0 && (lastExit?.remainingShares ?? latestEntry?.shares ?? 0) > 0;
   useEffect(() => {
     const timer = window.setInterval(() => {
       if (!holdingActive) return;
@@ -184,17 +187,6 @@ export default function TradingCalculatorPage() {
       current.map((exit) => (exit.id === id ? { ...exit, sellShares: nextShares, sellRatio: ratio } : exit))
     );
   };
-  const drawdownPct =
-    isValidPositive(form.baseNav) && isValidPositive(form.scenarioNav)
-      ? Math.max(0, (1 - numericValue(form.scenarioNav) / numericValue(form.baseNav)) * 100)
-      : 0;
-  const recovery = useMemo(
-    () => calculateRecovery({ currentNav: numericValue(form.scenarioNav), lossPct: drawdownPct }),
-    [form.scenarioNav, drawdownPct]
-  );
-  const setDrawdown40 = () =>
-    updateForm('scenarioNav', isValidPositive(form.baseNav) ? (numericValue(form.baseNav) * 0.6).toFixed(4) : '');
-
   return (
     <main className={styles.page}>
       <div className={styles.ambient} aria-hidden="true" />
@@ -208,9 +200,6 @@ export default function TradingCalculatorPage() {
           <p>分批入仓 · 回撤补仓 · 确认加仓 · 反弹出仓</p>
         </div>
         <div className={styles.heroActions}>
-          <button type="button" className={styles.secondaryButton} onClick={setDrawdown40}>
-            回撤 −40% 情景
-          </button>
           <button type="button" className={styles.textButton} onClick={reset}>
             恢复默认
           </button>
@@ -223,48 +212,19 @@ export default function TradingCalculatorPage() {
             id="account-board-title"
             eyebrow="01 / ACCOUNT BOARD"
             title="账户看板"
-            detail="账户金额、持有时间与实时资产合并展示。"
+            detail="持仓市值可修改，盈利率按累计投入实时计算。"
           />
           <div className={styles.boardGrid}>
             <div className={styles.boardInputs}>
               <div className={styles.fieldsGrid}>
                 <Field
-                  id="capital"
-                  label="账户金额"
-                  value={form.capital}
-                  onChange={(value) => updateForm('capital', value)}
-                  step="100"
-                  suffix="元"
-                  hint="可用于分批入仓的账户金额。"
-                  error={errors.capital}
-                />
-                <Field
-                  id="baseNav"
-                  label="基准净值 P0"
-                  value={form.baseNav}
-                  onChange={(value) => updateForm('baseNav', value)}
-                  step="0.0001"
-                  hint="首次确认买入时的净值。"
-                  error={errors.baseNav}
-                />
-                <Field
-                  id="scenarioNav"
-                  label="模拟净值"
-                  value={form.scenarioNav}
-                  onChange={(value) => updateForm('scenarioNav', value)}
-                  step="0.0001"
-                  hint="用于查看当前资金和回本要求。"
-                  error={errors.scenarioNav}
-                />
-                <Field
-                  id="redemptionFee"
-                  label="赎回费率"
-                  value={form.redemptionFee}
-                  onChange={(value) => updateForm('redemptionFee', value)}
+                  id="holdingValue"
+                  label="持仓市值"
+                  value={hasHoldingValue ? form.holdingValue : formatInputAmount(position.holdingValue)}
+                  onChange={(value) => updateForm('holdingValue', value)}
                   step="0.01"
-                  suffix="%"
-                  hint="满 30 天可填 0。"
-                  error={errors.redemptionFee}
+                  suffix="元"
+                  hint="可手动修改；盈利率按累计投入实时计算。"
                 />
                 <Field
                   id="holdingDays"
@@ -278,47 +238,22 @@ export default function TradingCalculatorPage() {
                 />
               </div>
               <div className={styles.assumption}>
-                <span>当前场景</span>
-                <strong>{formatPercent(-drawdownPct / 100)} </strong>
-                <em>相对 P0</em>
+                <span>累计投入</span>
+                <strong>{formatAmount(latestEntry?.cumulativeInvested || 0)}</strong>
+                <em>元</em>
                 <span className={styles.assumptionDivider}>|</span>
-                <span>计划投入</span>
-                <strong>{formatMoney(latestEntry?.cumulativeInvested || 0)}</strong>
+                <span>当前份额</span>
+                <strong>{formatNumber(latestEntry?.shares || 0)}</strong>
               </div>
             </div>
 
             <div className={styles.boardResults} aria-label="实时账户指标">
               <div className={styles.metricsGrid}>
-                <Metric label="剩余现金" value={formatMoney(position.cash)} note="入仓后未使用资金" />
-                <Metric
-                  label="持仓市值"
-                  value={formatMoney(position.holdingValue)}
-                  note={`${formatNumber(position.shares)} 份`}
-                />
                 <Metric
                   label="盈利率"
-                  value={formatPercent(position.totalAssets / numericValue(form.capital) - 1)}
-                  tone={position.totalAssets >= numericValue(form.capital) ? 'positive' : 'negative'}
-                  note="账户总资产相对账户金额"
-                />
-                <Metric
-                  label="账户总资产"
-                  value={formatMoney(position.totalAssets)}
-                  tone={position.totalAssets >= numericValue(form.capital) ? 'positive' : 'negative'}
-                  note={`相对账户金额 ${formatPercent(position.totalAssets / numericValue(form.capital) - 1)}`}
-                />
-                <Metric label="平均成本" value={formatNav(position.averageCost)} note="累计投入 ÷ 累计份额" />
-                <Metric
-                  label="回本净值"
-                  value={formatNav(position.breakEvenNav)}
-                  tone="accent"
-                  note={`当前还需 ${formatPercent(position.requiredRise)}`}
-                />
-                <Metric
-                  label="回撤回本"
-                  value={formatNav(recovery.recoveryNav)}
-                  tone="accent"
-                  note={`回撤 ${drawdownPct.toFixed(2)}% · 需涨 ${formatPercent(recovery.requiredRise)}`}
+                  value={formatPercent(profitRate)}
+                  tone={profitRate >= 0 ? 'positive' : 'negative'}
+                  note="持仓市值相对累计投入"
                 />
               </div>
             </div>
@@ -329,7 +264,7 @@ export default function TradingCalculatorPage() {
       <section className={styles.panel} aria-labelledby="entry-title">
         <SectionTitle
           id="entry-title"
-          eyebrow="03 / ENTRY LADDER"
+          eyebrow="02 / ENTRY LADDER"
           title="入仓流水"
           detail="下跌补仓与止跌确认加仓分开显示；最后一档净值可手工输入。"
         />
@@ -403,7 +338,7 @@ export default function TradingCalculatorPage() {
                     <td>{formatMoney(row.cash)}</td>
                     <td>{formatNumber(row.buyShares)}</td>
                     <td>{formatMoney(row.holdingValue)}</td>
-                    <td className={row.totalAssets < numericValue(form.capital) ? styles.down : styles.up}>
+                    <td className={row.totalAssets < plannedCapital ? styles.down : styles.up}>
                       {formatMoney(row.totalAssets)}
                     </td>
                     <td>
@@ -435,7 +370,7 @@ export default function TradingCalculatorPage() {
       <section className={styles.panel} aria-labelledby="exit-title">
         <SectionTitle
           id="exit-title"
-          eyebrow="04 / EXIT LADDER"
+          eyebrow="03 / EXIT LADDER"
           title="出仓流水"
           detail="每轮涨幅作用于上一轮净值，每轮卖出当前剩余份额比例。"
         />
@@ -543,25 +478,9 @@ export default function TradingCalculatorPage() {
         </div>
       </section>
 
-      <section className={styles.recoveryPanel} aria-labelledby="recovery-title">
-        <div>
-          <span className={styles.eyebrow}>05 / RECOVERY MATH</span>
-          <h2 id="recovery-title">回撤之后，净值要走多远？</h2>
-          <p>
-            当前模拟净值 <strong>{formatNav(recovery.currentNav)}</strong>，相对基准回撤{' '}
-            <strong>{drawdownPct.toFixed(2)}%</strong>。
-          </p>
-        </div>
-        <div className={styles.recoveryNumber}>
-          <span>回本净值</span>
-          <strong>{formatNav(recovery.recoveryNav)}</strong>
-          <em>还需上涨 {formatPercent(recovery.requiredRise)}</em>
-        </div>
-      </section>
-
       <footer className={styles.footer}>
         <span>CALCULATION ONLY · 不构成投资建议</span>
-        <span>C 类份额：交易前核对持有天数与赎回费</span>
+        <span>C 类份额：按持有时间记录</span>
       </footer>
     </main>
   );
