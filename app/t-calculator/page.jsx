@@ -33,7 +33,6 @@ const formatMoney = (value) =>
 const formatAmount = (value) =>
   Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--';
 const formatInputAmount = (value) => (Number.isFinite(value) ? value.toFixed(2) : '');
-const formatInputPercent = (value) => (Number.isFinite(value) ? (value * 100).toFixed(2) : '');
 const formatNav = (value) => (Number.isFinite(value) && value > 0 ? value.toFixed(4) : '--');
 const formatNumber = (value) =>
   Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '--';
@@ -162,7 +161,7 @@ export default function TradingCalculatorPage() {
     numericValue(form.profitRate) >= -100 &&
     numericValue(form.profitRate) <= 100;
   const profitRate = hasManualProfitRate ? numericValue(form.profitRate) / 100 : calculatedProfitRate;
-  const profitRateInput = form.profitRate === '' ? formatInputPercent(calculatedProfitRate) : asText(form.profitRate);
+  const profitRateInput = form.profitRate === '' ? '' : asText(form.profitRate);
   const exitRows = useMemo(
     () =>
       calculateExitRows({
