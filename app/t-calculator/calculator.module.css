@@ -355,6 +355,9 @@
   font-weight: 700;
   letter-spacing: 0.05em;
 }
+.tableScroll thead th:first-child {
+  text-align: left;
+}
 .tableScroll tbody th {
   color: var(--text);
   font-weight: 700;

@@ -385,7 +385,6 @@ export default function TradingCalculatorPage() {
                           step="0.01"
                           onChange={(event) => updateEntry(entry.id, 'amount', event.target.value)}
                         />
-                        <span>元</span>
                       </label>
                     </td>
                     <td>{formatMoney(row.cumulativeInvested)}</td>
