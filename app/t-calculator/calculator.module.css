@@ -1,23 +1,27 @@
 .page {
   --calc-line: color-mix(in srgb, var(--border) 86%, transparent);
+  --calc-surface: color-mix(in srgb, var(--card) 94%, var(--primary) 2%);
+  isolation: isolate;
   position: relative;
   min-height: 100vh;
   max-width: 1480px;
   margin: 0 auto;
   padding: 42px 40px 56px;
   color: var(--text);
+  background: radial-gradient(circle at 92% 2%, color-mix(in srgb, var(--primary) 7%, transparent), transparent 31rem);
   font-size: 14PX;
   overflow: hidden;
 }
 .ambient {
   position: absolute;
-  top: -180px;
-  right: -160px;
-  width: 520px;
-  height: 520px;
+  top: -210px;
+  right: -180px;
+  width: 580px;
+  height: 580px;
   border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--primary) 18%, transparent), transparent 68%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--primary) 13%, transparent), transparent 67%);
   pointer-events: none;
+  filter: blur(2px);
 }
 .hero,
 .workspace,
@@ -35,7 +39,7 @@
   justify-content: space-between;
   gap: 32px;
   align-items: flex-end;
-  margin-bottom: 28px;
+  margin-bottom: 32px;
 }
 .kicker,
 .eyebrow,
@@ -48,7 +52,7 @@
   display: flex;
   gap: 10px;
   align-items: center;
-  color: var(--muted);
+  color: color-mix(in srgb, var(--primary) 42%, var(--muted));
   font-size: 12PX;
   font-weight: 700;
 }
@@ -65,15 +69,18 @@
 .hero h1 {
   margin: 16px 0 8px;
   max-width: 760px;
-  font-size: clamp(36PX, 5vw, 64PX);
+  color: var(--foreground);
+  font-size: clamp(36PX, 4.6vw, 58PX);
   line-height: 0.98;
   letter-spacing: -0.06em;
   font-weight: 800;
+  text-wrap: balance;
 }
 .hero p {
   margin: 0;
   color: var(--muted);
-  font-size: 16PX;
+  font-size: 15PX;
+  letter-spacing: 0.01em;
 }
 .heroActions {
   display: flex;
@@ -112,6 +119,7 @@
   color: var(--muted);
   background: transparent;
   border: 0;
+  transition: color 0.2s ease, opacity 0.2s ease;
 }
 .textButton:hover,
 .textButton:focus-visible {
@@ -161,18 +169,25 @@
 .panel {
   position: relative;
   z-index: 1;
-  padding: 24px;
-  background: color-mix(in srgb, var(--card) 92%, transparent);
+  padding: 26px;
+  background: var(--calc-surface);
   border: 1px solid var(--calc-line);
-  border-radius: 12px;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(12px);
+}
+.snapshotPanel {
+  border-top: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  box-shadow: 0 20px 60px color-mix(in srgb, var(--accent) 8%, rgba(0, 0, 0, 0.26));
 }
 .sectionTitle {
   display: flex;
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
 }
 .sectionTitleContent {
   min-width: 0;
@@ -194,7 +209,7 @@
 .sectionTitle h2 {
   display: inline;
   margin: 0;
-  font-size: 26PX;
+  font-size: 24PX;
   letter-spacing: -0.03em;
 }
 .snapshotPanel h2 {
@@ -248,7 +263,7 @@
   display: inline;
   margin: 0 0 0 10px;
   color: var(--muted);
-  font-size: 14PX;
+  font-size: 13PX;
   line-height: 1.5;
 }
 .fieldsGrid {
@@ -342,14 +357,34 @@
 .metricsGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 .metric {
+  position: relative;
+  overflow: hidden;
   min-height: 96px;
   padding: 14px;
-  background: color-mix(in srgb, var(--background) 40%, transparent);
+  background: color-mix(in srgb, var(--background) 54%, transparent);
   border: 1px solid var(--calc-line);
-  border-radius: 9px;
+  border-radius: 10px;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+.metric:hover {
+  background: color-mix(in srgb, var(--background) 76%, var(--primary) 4%);
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
+  transform: translateY(-1px);
+}
+.metricsGrid > .metric:nth-child(-n + 2),
+.metricsGrid > .metricField:nth-child(-n + 2) {
+  border-color: color-mix(in srgb, var(--accent) 27%, var(--border));
+}
+.metricsGrid > .metric:nth-child(-n + 2)::before,
+.metricsGrid > .metricField:nth-child(-n + 2)::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--accent);
+  content: '';
 }
 .metricField .field small {
   min-height: 15px;
@@ -405,8 +440,9 @@
 }
 .tableScroll {
   overflow-x: auto;
-  margin: 0 -24px;
-  padding: 0 24px 2px;
+  margin: 0 -26px;
+  padding: 0 26px 4px;
+  scrollbar-color: color-mix(in srgb, var(--primary) 45%, var(--border)) transparent;
 }
 .tableScroll table {
   width: 100%;
@@ -460,13 +496,17 @@
 }
 .tableScroll th,
 .tableScroll td {
-  padding: 12px 10px;
+  padding: 13px 10px;
   text-align: center;
   border-bottom: 1px solid var(--calc-line);
   white-space: nowrap;
 }
 .tableScroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   color: var(--muted);
+  background: var(--calc-surface);
   font-size: 12PX;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -483,10 +523,19 @@
 .tableScroll tbody tr:hover {
   background: color-mix(in srgb, var(--primary) 5%, transparent);
 }
+.tableScroll tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--background) 24%, transparent);
+}
+.tableScroll tbody tr:nth-child(even):hover {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
 .pendingRow th,
 .pendingRow td {
   color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent) !important;
+}
+.pendingRow th {
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 .pendingBadge {
   display: inline-block;
@@ -523,12 +572,13 @@
   gap: 4px;
   height: 30px;
   padding: 0 7px;
-  background: color-mix(in srgb, var(--input) 70%, transparent);
-  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--input) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   border-radius: 5px;
 }
 .tableInput:focus-within {
   border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 12%, transparent);
 }
 .tableInput input {
   width: 70px;
@@ -726,9 +776,11 @@
 .pagination {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 10px;
   margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
   color: var(--muted);
   font-size: 12PX;
 }
@@ -750,6 +802,12 @@
 .pagination button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+.pagination button:not(:disabled):hover,
+.pagination button:not(:disabled):focus-visible,
+.pagination select:focus-visible {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--input));
 }
 .srOnly {
   position: absolute;
@@ -791,11 +849,12 @@
     display: none;
   }
   .panel {
-    padding: 18px 14px;
+    padding: 20px 14px;
     border-radius: 10px;
   }
   .sectionTitle {
     margin-bottom: 16px;
+    padding-bottom: 12px;
   }
   .sectionTitleAction {
     margin-top: -4px;
@@ -818,6 +877,10 @@
     margin: 0 -14px;
     padding: 0 14px 2px;
   }
+  .pagination {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
   .recoveryPanel {
     display: block;
     padding: 20px 16px;
@@ -832,5 +895,12 @@
   .footer {
     display: block;
     line-height: 1.8;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .secondaryButton,
+  .textButton,
+  .metric {
+    transition: none;
   }
 }
