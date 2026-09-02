@@ -12,7 +12,7 @@ import styles from './calculator.module.css';
 
 const DEFAULT_FORM = {
   baseNav: '3.2743',
-  initialAccountValue: '10000.00',
+  initialAccountValue: '',
   profitRate: '',
   holdingDays: '30'
 };
@@ -32,6 +32,7 @@ const formatMoney = (value) =>
     : '--';
 const formatAmount = (value) =>
   Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--';
+const formatInputAmount = (value) => (Number.isFinite(value) ? value.toFixed(2) : '');
 const formatInputPercent = (value) => (Number.isFinite(value) ? (value * 100).toFixed(2) : '');
 const formatNav = (value) => (Number.isFinite(value) && value > 0 ? value.toFixed(4) : '--');
 const formatNumber = (value) =>
@@ -123,10 +124,12 @@ export default function TradingCalculatorPage() {
     [entries]
   );
   const hasInitialAccountValue =
-    isValidNonNegative(form.initialAccountValue) && numericValue(form.initialAccountValue) > 0;
+    form.initialAccountValue !== '' &&
+    isValidNonNegative(form.initialAccountValue) &&
+    numericValue(form.initialAccountValue) > 0;
   const initialAccountValue = hasInitialAccountValue ? numericValue(form.initialAccountValue) : 0;
   const errors = {
-    initialAccountValue: hasInitialAccountValue ? '' : '初始账户市值必须大于 0',
+    initialAccountValue: form.initialAccountValue === '' || hasInitialAccountValue ? '' : '初始账户市值必须大于 0',
     profitRate:
       form.profitRate === '' ||
       (Number.isFinite(numericValue(form.profitRate)) &&
@@ -148,14 +151,14 @@ export default function TradingCalculatorPage() {
       }),
     [entryRows, form.baseNav]
   );
-  const calculatedProfitRate = initialAccountValue > 0 ? position.holdingValue / initialAccountValue - 1 : 0;
+  const calculatedProfitRate = plannedCapital > 0 ? position.holdingValue / plannedCapital - 1 : 0;
   const hasManualProfitRate =
     form.profitRate !== '' &&
     Number.isFinite(numericValue(form.profitRate)) &&
     numericValue(form.profitRate) >= -100 &&
     numericValue(form.profitRate) <= 100;
   const profitRate = hasManualProfitRate ? numericValue(form.profitRate) / 100 : calculatedProfitRate;
-  const currentHoldingValue = Math.max(0, initialAccountValue * (1 + profitRate));
+  const currentHoldingValue = hasInitialAccountValue ? initialAccountValue : position.holdingValue;
   const profitRateInput = form.profitRate === '' ? formatInputPercent(calculatedProfitRate) : asText(form.profitRate);
   const exitRows = useMemo(
     () =>
@@ -229,7 +232,7 @@ export default function TradingCalculatorPage() {
                 <Field
                   id="initialAccountValue"
                   label="初始账户"
-                  value={form.initialAccountValue}
+                  value={hasInitialAccountValue ? form.initialAccountValue : formatInputAmount(position.holdingValue)}
                   onChange={(value) => updateForm('initialAccountValue', value)}
                   step="0.01"
                   suffix="元"
@@ -253,7 +256,11 @@ export default function TradingCalculatorPage() {
                   error={errors.profitRate}
                 />
               </div>
-              <Metric label="持仓市值" value={formatMoney(currentHoldingValue)} note="初始账户市值 × (1 + 盈利率)" />
+              <Metric
+                label="持仓市值"
+                value={formatMoney(currentHoldingValue)}
+                note="账户市值直接展示，不参与流水计算"
+              />
               <Metric label="持仓份额" value={formatNumber(latestEntry?.shares || 0)} note="当前持仓份额" />
               <Metric label="平均成本" value={formatNav(position.averageCost)} note="累计投入 ÷ 累计份额" />
               <Metric
