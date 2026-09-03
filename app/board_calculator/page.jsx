@@ -239,162 +239,27 @@ function PreviewA() {
   );
 }
 
-function PreviewB() {
-  return (
-    <div className={styles.boardPreview}>
-      <div className={styles.previewHead}>
-        <strong>交易账本</strong>
-        <span>本基金</span>
-      </div>
-      <table className={styles.miniTable}>
-        <thead>
-          <tr>
-            <th>时间</th>
-            <th>日涨跌幅</th>
-            <th>金额</th>
-            <th>累计</th>
-            <th>收益率</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>09-03 10:20</td>
-            <td className={styles.down}>-6.00%</td>
-            <td className={styles.up}>+200.00</td>
-            <td>2,200.00</td>
-            <td className={styles.down}>-1.80%</td>
-          </tr>
-          <tr>
-            <td>09-05 14:10</td>
-            <td className={styles.up}>+10.00%</td>
-            <td className={styles.down}>-200.00</td>
-            <td>2,000.00</td>
-            <td className={styles.up}>+3.20%</td>
-          </tr>
-          <tr>
-            <td>09-08 09:35</td>
-            <td className={styles.down}>-3.00%</td>
-            <td className={styles.up}>+300.00</td>
-            <td>2,300.00</td>
-            <td className={styles.down}>-0.60%</td>
-          </tr>
-        </tbody>
-      </table>
-      <div className={styles.signalGrid}>
-        <div className={styles.signal}>
-          <small>当前份额</small>
-          <strong>682.41</strong>
-        </div>
-        <div className={styles.signal}>
-          <small>已实现收益</small>
-          <strong className={styles.up}>+64.00</strong>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PreviewC() {
-  return (
-    <div className={styles.boardPreview}>
-      <div className={styles.previewHead}>
-        <strong>风控雷达</strong>
-        <span>3 条规则</span>
-      </div>
-      <div className={`${styles.risk} ${styles.ok}`}>
-        <b>当前状态 · 正常</b>
-        <span>回撤 -4.2%</span>
-      </div>
-      <div className={styles.risk}>
-        <b>涨幅 ≥ +8%</b>
-        <span>提示分批出仓</span>
-      </div>
-      <div className={styles.risk}>
-        <b>跌幅 ≤ -10%</b>
-        <span>提示分批补仓</span>
-      </div>
-      <div className={styles.signalGrid}>
-        <div className={styles.signal}>
-          <small>今日涨跌幅</small>
-          <strong className={styles.down}>-6.00%</strong>
-        </div>
-        <div className={styles.signal}>
-          <small>账户收益率</small>
-          <strong className={styles.up}>+2.40%</strong>
-        </div>
-        <div className={styles.signal}>
-          <small>计划出仓</small>
-          <strong>¥200.00</strong>
-        </div>
-        <div className={styles.signal}>
-          <small>计划补仓</small>
-          <strong>¥300.00</strong>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function BoardOption({ name, title, description, children, selected, onSelect }) {
-  return (
-    <article
-      className={`${styles.boardOption} ${selected ? styles.boardSelected : ''}`}
-      onClick={onSelect}
-      onKeyDown={(event) => (event.key === 'Enter' || event.key === ' ') && onSelect()}
-      role="button"
-      tabIndex="0"
-      aria-pressed={selected}
-    >
-      <div className={styles.cardImage}>
-        <div className={styles.mockup}>
-          <div className={styles.mockupHeader}>{name}</div>
-          <div className={styles.mockupBody}>{children}</div>
-        </div>
-      </div>
-      <div className={styles.cardBody}>
-        <h3>{title}</h3>
-        <p>{description}</p>
-      </div>
-    </article>
-  );
-}
-
 export default function BoardCalculatorPage() {
-  const [selected, setSelected] = useState('cockpit');
   return (
     <main className={styles.page}>
-      <h1>选择基金看板的信息层级</h1>
-      <p className={styles.subtitle}>三种方案都保留：时间、日涨跌幅、出入金金额、累计金额、收益率与风控提示。</p>
+      <h1>交易驾驶舱</h1>
+      <p className={styles.subtitle}>查看持仓收益、行情和风控状态，记录本基金的出入金流水。</p>
       <div className={styles.boardOptions}>
-        <BoardOption
-          name="A · 交易驾驶舱"
-          title="交易驾驶舱"
-          description="先看仓位、收益和风控状态，再看流水。适合每天快速决定是否补仓或做 T。"
-          selected={selected === 'cockpit'}
-          onSelect={() => setSelected('cockpit')}
-        >
-          <PreviewA />
-        </BoardOption>
-        <BoardOption
-          name="B · 流水账本"
-          title="流水账本"
-          description="把每次出入金和日涨跌幅放在同一张表，适合复盘和核对金额。"
-          selected={selected === 'ledger'}
-          onSelect={() => setSelected('ledger')}
-        >
-          <PreviewB />
-        </BoardOption>
-        <BoardOption
-          name="C · 信号提醒"
-          title="信号提醒"
-          description="把风控线放到第一视线，触发时直接告诉你“补仓 / 出仓 / 观望”。"
-          selected={selected === 'signals'}
-          onSelect={() => setSelected('signals')}
-        >
-          <PreviewC />
-        </BoardOption>
+        <article className={`${styles.boardOption} ${styles.boardSelected}`}>
+          <div className={styles.cardImage}>
+            <div className={styles.mockup}>
+              <div className={styles.mockupHeader}>A · 交易驾驶舱</div>
+              <div className={styles.mockupBody}>
+                <PreviewA />
+              </div>
+            </div>
+          </div>
+          <div className={styles.cardBody}>
+            <h3>交易驾驶舱</h3>
+            <p>先看仓位、收益和风控状态，再看流水。适合每天快速决定是否补仓或做 T。</p>
+          </div>
+        </article>
       </div>
-      <p className={styles.subtitleBottom}>请选择一种作为主布局；风控规则仍可在下一步细化。</p>
     </main>
   );
 }
