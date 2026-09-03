@@ -1,27 +1,23 @@
 .page {
+  --board-bg: #0b1220;
+  --board-card: #101b2d;
+  --board-border: #263752;
+  --board-green: #75e6c1;
   --calc-line: color-mix(in srgb, var(--border) 86%, transparent);
   --calc-surface: color-mix(in srgb, var(--card) 94%, var(--primary) 2%);
   isolation: isolate;
   position: relative;
   min-height: 100vh;
-  max-width: 1480px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 42px 40px 56px;
+  padding: 26px 20px 42px;
   color: var(--text);
-  background: radial-gradient(circle at 92% 2%, color-mix(in srgb, var(--primary) 7%, transparent), transparent 31rem);
-  font-size: 14px;
+  background: var(--board-bg);
+  font-size: 13px;
   overflow: hidden;
 }
 .ambient {
-  position: absolute;
-  top: -210px;
-  right: -180px;
-  width: 580px;
-  height: 580px;
-  border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--primary) 13%, transparent), transparent 67%);
-  pointer-events: none;
-  filter: blur(2px);
+  display: none;
 }
 .hero,
 .workspace,
@@ -39,7 +35,7 @@
   justify-content: space-between;
   gap: 32px;
   align-items: flex-end;
-  margin-bottom: 32px;
+  margin-bottom: 18px;
 }
 .kicker,
 .eyebrow,
@@ -52,8 +48,8 @@
   display: flex;
   gap: 10px;
   align-items: center;
-  color: color-mix(in srgb, var(--primary) 42%, var(--muted));
-  font-size: 12px;
+  color: var(--board-green);
+  font-size: 10px;
   font-weight: 700;
 }
 .kicker span:not(.liveDot) {
@@ -67,19 +63,19 @@
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 14%, transparent);
 }
 .hero h1 {
-  margin: 16px 0 8px;
+  margin: 8px 0 6px;
   max-width: 760px;
   color: var(--foreground);
-  font-size: clamp(36px, 4.6vw, 58px);
-  line-height: 0.98;
-  letter-spacing: -0.06em;
+  font-size: clamp(26px, 3.2vw, 38px);
+  line-height: 1.08;
+  letter-spacing: -0.04em;
   font-weight: 800;
   text-wrap: balance;
 }
 .hero p {
   margin: 0;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 12px;
   letter-spacing: 0.01em;
 }
 .heroActions {
@@ -199,20 +195,20 @@
 .panel {
   position: relative;
   z-index: 1;
-  padding: 26px;
-  background: var(--calc-surface);
-  border: 1px solid var(--calc-line);
-  border-radius: 14px;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(12px);
+  padding: 18px;
+  background: var(--board-card);
+  border: 1px solid var(--board-border);
+  border-radius: 8px;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 .snapshotPanel {
-  border-top: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
-  box-shadow: 0 20px 60px color-mix(in srgb, var(--accent) 8%, rgba(0, 0, 0, 0.26));
+  border-top: 0;
+  box-shadow: none;
 }
 .marketPanel {
   margin-bottom: 18px;
-  border-top: 2px solid color-mix(in srgb, var(--primary) 70%, transparent);
+  border-top: 1px solid var(--board-border);
 }
 .marketGrid {
   display: grid;
@@ -324,9 +320,9 @@
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
-  margin-bottom: 22px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--board-border);
 }
 .sectionTitleContent {
   min-width: 0;
@@ -348,7 +344,7 @@
 .sectionTitle h2 {
   display: inline;
   margin: 0;
-  font-size: 24px;
+  font-size: 18px;
   letter-spacing: -0.03em;
 }
 .snapshotPanel h2 {
@@ -496,25 +492,23 @@
 .metricsGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
 }
 .metric {
   position: relative;
   overflow: hidden;
-  min-height: 96px;
-  padding: 14px;
-  background: color-mix(in srgb, var(--background) 54%, transparent);
-  border: 1px solid var(--calc-line);
-  border-radius: 10px;
+  min-height: 78px;
+  padding: 10px;
+  background: var(--board-bg);
+  border: 1px solid var(--board-border);
+  border-radius: 6px;
   transition:
     border-color 0.2s ease,
-    background 0.2s ease,
-    transform 0.2s ease;
+    background 0.2s ease;
 }
 .metric:hover {
-  background: color-mix(in srgb, var(--background) 76%, var(--primary) 4%);
-  border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
-  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--board-bg) 92%, var(--primary) 8%);
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--board-border));
 }
 .metricsGrid > .metric:nth-child(-n + 2),
 .metricsGrid > .metricField:nth-child(-n + 2) {
@@ -546,10 +540,10 @@
 }
 .metric strong {
   display: block;
-  margin: 11px 0 7px;
+  margin: 8px 0 5px;
   color: var(--text);
   font:
-    700 clamp(18px, 2vw, 24px)/1 ui-monospace,
+    700 clamp(16px, 2vw, 21px)/1 ui-monospace,
     SFMono-Regular,
     Menlo,
     Monaco,
@@ -582,15 +576,15 @@
 }
 .tableScroll {
   overflow-x: auto;
-  margin: 0 -26px;
-  padding: 0 26px 4px;
+  margin: 0 -18px;
+  padding: 0 18px 4px;
   scrollbar-color: color-mix(in srgb, var(--primary) 45%, var(--border)) transparent;
 }
 .tableScroll table {
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 12px;
 }
 .entryTable {
   min-width: 1076px;
@@ -632,7 +626,7 @@
 }
 .tableScroll th,
 .tableScroll td {
-  padding: 13px 10px;
+  padding: 9px 8px;
   text-align: center;
   border-bottom: 1px solid var(--calc-line);
   white-space: nowrap;
@@ -642,8 +636,8 @@
   top: 0;
   z-index: 1;
   color: var(--muted);
-  background: var(--calc-surface);
-  font-size: 12px;
+  background: var(--board-card);
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.05em;
 }
@@ -1001,7 +995,7 @@
     margin-bottom: 22px;
   }
   .hero h1 {
-    font-size: 40px;
+    font-size: 28px;
   }
   .heroActions {
     margin-top: 20px;
@@ -1020,12 +1014,12 @@
     display: none;
   }
   .panel {
-    padding: 20px 14px;
-    border-radius: 10px;
+    padding: 14px 12px;
+    border-radius: 8px;
   }
   .sectionTitle {
-    margin-bottom: 16px;
-    padding-bottom: 12px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
   }
   .sectionTitleAction {
     margin-top: -4px;
@@ -1042,15 +1036,15 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .metric {
-    min-height: 86px;
-    padding: 12px 10px;
+    min-height: 72px;
+    padding: 10px 8px;
   }
   .metric strong {
     font-size: 16px;
   }
   .tableScroll {
-    margin: 0 -14px;
-    padding: 0 14px 2px;
+    margin: 0 -12px;
+    padding: 0 12px 2px;
   }
   .pagination {
     justify-content: flex-start;

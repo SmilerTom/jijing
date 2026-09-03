@@ -543,7 +543,7 @@ export default function TradingCalculatorPage() {
         <div>
           <div className={styles.kicker}>
             <span className={styles.liveDot} />
-            POSITION BOARD <span>/</span> 017811
+            LIVE <span>/</span> 017811
           </div>
           <h1>东方人工智能主题混合 C</h1>
           <p>分批入仓 · 回撤补仓 · 确认加仓 · 反弹出仓</p>
@@ -576,90 +576,6 @@ export default function TradingCalculatorPage() {
           </button>
         </div>
       </header>
-
-      <section className={`${styles.panel} ${styles.marketPanel}`} aria-labelledby="market-title">
-        <SectionTitle id="market-title" title="今日行情" detail="基金净值更新后，流水中的待更新节点会自动补全。" />
-        <div className={styles.marketGrid}>
-          <Metric
-            label="基金净值"
-            value={formatNav(fundQuote.nav)}
-            note={
-              fundQuote.date ? `净值日期 ${fundQuote.date}` : fundQuote.status === 'loading' ? '正在获取' : '暂无数据'
-            }
-          />
-          <Metric
-            label="基金日涨跌幅"
-            value={formatPointPercent(fundQuote.dailyChangePct)}
-            tone={
-              hasNumericValue(fundQuote.dailyChangePct) ? (fundQuote.dailyChangePct >= 0 ? 'positive' : 'negative') : ''
-            }
-            note={fundQuote.status === 'pending' ? '今日净值尚未更新' : '以基金净值为准'}
-          />
-          <Metric
-            label="业绩基准指数参考"
-            value={formatPointPercent(
-              hasNumericValue(benchmarkQuote.pct) ? numericValue(benchmarkQuote.pct) * 100 : null
-            )}
-            tone={hasNumericValue(benchmarkQuote.pct) ? (benchmarkQuote.pct >= 0 ? 'positive' : 'negative') : ''}
-            note={`${BENCHMARK_INDEX.name} · 参考权重 ${BENCHMARK_INDEX.weight}%`}
-          />
-          <Metric
-            label="行情状态"
-            value={
-              fundQuote.status === 'updated'
-                ? '已更新'
-                : fundQuote.status === 'pending'
-                  ? '待更新'
-                  : fundQuote.status === 'loading'
-                    ? '获取中'
-                    : '暂不可用'
-            }
-            tone={fundQuote.status === 'updated' ? 'positive' : 'accent'}
-            note="指数仅作预警参考"
-          />
-        </div>
-        <div className={styles.riskStrip} role="status" aria-live="polite">
-          {riskSignals.length ? (
-            riskSignals.map((signal) => (
-              <div key={signal.id} className={`${styles.riskItem} ${styles[`risk${signal.level}`]}`}>
-                <strong>{signal.action}</strong>
-                <span>
-                  {signal.source}：{signal.message}
-                </span>
-              </div>
-            ))
-          ) : (
-            <div className={`${styles.riskItem} ${styles.riskSafe}`}>
-              <strong>暂无风控触发</strong>
-              <span>基金和账户数据未达到已设置的提醒线</span>
-            </div>
-          )}
-        </div>
-        <details className={styles.riskSettings}>
-          <summary>风控设置</summary>
-          <div className={styles.riskSettingsGrid}>
-            {RISK_FIELDS.map(([key, label]) => (
-              <label key={key}>
-                <span>{label}</span>
-                <span className={styles.riskInputWrap}>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={riskRules[key]}
-                    onChange={(event) =>
-                      setRiskRules((current) => ({
-                        ...current,
-                        [key]: event.target.value === '' ? '' : numericValue(event.target.value)
-                      }))
-                    }
-                  />
-                  <em>%</em>
-                </span>
-              </label>
-            ))}
-          </div>
-        </details>
-      </section>
 
       <div className={styles.workspace}>
         <section className={`${styles.panel} ${styles.snapshotPanel}`} aria-labelledby="results-title">
@@ -740,9 +656,93 @@ export default function TradingCalculatorPage() {
                 <Metric label="持有时间" value={`${form.holdingDays} 天`} note="未清仓时每天自动增加 1 天" />
               )}
             </div>
+            <div className={styles.riskStrip} role="status" aria-live="polite">
+              {riskSignals.length ? (
+                riskSignals.map((signal) => (
+                  <div key={signal.id} className={`${styles.riskItem} ${styles[`risk${signal.level}`]}`}>
+                    <strong>{signal.action}</strong>
+                    <span>
+                      {signal.source}：{signal.message}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className={`${styles.riskItem} ${styles.riskSafe}`}>
+                  <strong>暂无风控触发</strong>
+                  <span>基金和账户数据未达到已设置的提醒线</span>
+                </div>
+              )}
+            </div>
           </div>
         </section>
       </div>
+
+      <section className={`${styles.panel} ${styles.marketPanel}`} aria-labelledby="market-title">
+        <SectionTitle id="market-title" title="今日行情" detail="基金净值更新后，流水中的待更新节点会自动补全。" />
+        <div className={styles.marketGrid}>
+          <Metric
+            label="基金净值"
+            value={formatNav(fundQuote.nav)}
+            note={
+              fundQuote.date ? `净值日期 ${fundQuote.date}` : fundQuote.status === 'loading' ? '正在获取' : '暂无数据'
+            }
+          />
+          <Metric
+            label="基金日涨跌幅"
+            value={formatPointPercent(fundQuote.dailyChangePct)}
+            tone={
+              hasNumericValue(fundQuote.dailyChangePct) ? (fundQuote.dailyChangePct >= 0 ? 'positive' : 'negative') : ''
+            }
+            note={fundQuote.status === 'pending' ? '今日净值尚未更新' : '以基金净值为准'}
+          />
+          <Metric
+            label="业绩基准指数参考"
+            value={formatPointPercent(
+              hasNumericValue(benchmarkQuote.pct) ? numericValue(benchmarkQuote.pct) * 100 : null
+            )}
+            tone={hasNumericValue(benchmarkQuote.pct) ? (benchmarkQuote.pct >= 0 ? 'positive' : 'negative') : ''}
+            note={`${BENCHMARK_INDEX.name} · 参考权重 ${BENCHMARK_INDEX.weight}%`}
+          />
+          <Metric
+            label="行情状态"
+            value={
+              fundQuote.status === 'updated'
+                ? '已更新'
+                : fundQuote.status === 'pending'
+                  ? '待更新'
+                  : fundQuote.status === 'loading'
+                    ? '获取中'
+                    : '暂不可用'
+            }
+            tone={fundQuote.status === 'updated' ? 'positive' : 'accent'}
+            note="指数仅作预警参考"
+          />
+        </div>
+        <details className={styles.riskSettings}>
+          <summary>风控设置</summary>
+          <div className={styles.riskSettingsGrid}>
+            {RISK_FIELDS.map(([key, label]) => (
+              <label key={key}>
+                <span>{label}</span>
+                <span className={styles.riskInputWrap}>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={riskRules[key]}
+                    onChange={(event) =>
+                      setRiskRules((current) => ({
+                        ...current,
+                        [key]: event.target.value === '' ? '' : numericValue(event.target.value)
+                      }))
+                    }
+                  />
+                  <em>%</em>
+                </span>
+              </label>
+            ))}
+          </div>
+        </details>
+      </section>
 
       <section className={`${styles.panel} ${styles.flowPanel}`} aria-labelledby="entry-title">
         <SectionTitle
