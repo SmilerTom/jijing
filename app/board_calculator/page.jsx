@@ -79,8 +79,7 @@ function PreviewA() {
   const rateValue = Number(rate);
   const flowValue = Number(flowAmount);
   const profitValue = Number(profit);
-  const costValue = amountValue - profitValue;
-  const checkedRate = costValue !== 0 ? (profitValue / costValue) * 100 : NaN;
+  const totalValue = amountValue * (1 + rateValue / 100);
   const saveSnapshot = () => setEditing(false);
   const addFlow = () => {
     if (!(flowValue > 0) || !flowDate) return;
@@ -124,8 +123,11 @@ function PreviewA() {
               placeholder="输入金额"
             />
           ) : (
-            <b className={styles.statValue}>{amountValue > 0 ? formatMoney(amountValue) : '--'}</b>
+            <b className={styles.statValue}>{hasNumber(amount) ? formatMoney(amountValue) : '--'}</b>
           )}
+          {hasNumber(amount) && hasNumber(rate) ? (
+            <small className={styles.statSubvalue}>总额 {formatMoney(totalValue)}</small>
+          ) : null}
         </div>
         <div className={styles.stat}>
           <i>持有收益</i>
@@ -172,9 +174,10 @@ function PreviewA() {
           <b className={styles.statValue}>--</b>
         </div>
       </div>
-      {hasNumber(amount) && hasNumber(profit) ? (
+      {hasNumber(amount) && hasNumber(rate) ? (
         <p className={styles.snapshotSummary} aria-live="polite">
-          总额 {formatMoney(amountValue)} · 持仓成本 {formatMoney(costValue)} · 收益率校验 {formatRate(checkedRate)}
+          账户金额 {formatMoney(amountValue)} · 总额 {formatMoney(totalValue)} · 收益率 {formatRate(rateValue)}
+          {hasNumber(profit) ? ` · 持有收益 ${formatMoney(profitValue)}` : ''}
         </p>
       ) : null}
       <table className={styles.miniTable}>

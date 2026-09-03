@@ -250,6 +250,13 @@
   color: #f8fafc;
   font-size: 21px;
 }
+.statSubvalue {
+  display: block;
+  margin-top: 6px;
+  color: #8ca2bf;
+  font-size: 12px;
+  font-weight: 400;
+}
 .statEdit {
   display: block;
   width: 100%;
