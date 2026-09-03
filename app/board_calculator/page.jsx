@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import styles from './page.module.css';
 
+const FUND_ID = '017811';
+const STORAGE_KEY = `board-calculator:${FUND_ID}`;
 const DOWN_RISK = [-5, -8, -10, -15, -20];
 const UP_RISK = [5, 8, 10, 15, 20];
+const RISK_VALUES = new Set([...DOWN_RISK, ...UP_RISK]);
 
 const pad = (value) => String(value).padStart(2, '0');
 const localDateTime = () => {
@@ -21,14 +24,7 @@ const formatMoney = (value) => (Number.isFinite(value) ? `¥${value.toFixed(2)}`
 const formatRate = (value) => (Number.isFinite(value) ? `${value >= 0 ? '+' : ''}${value.toFixed(2)}%` : '--');
 const hasNumber = (value) => value !== '' && Number.isFinite(Number(value));
 
-function RiskSettings() {
-  const [selected, setSelected] = useState(new Set([-8, 5]));
-  const toggle = (value) =>
-    setSelected((current) => {
-      const next = new Set(current);
-      next.has(value) ? next.delete(value) : next.add(value);
-      return next;
-    });
+function RiskSettings({ selected, onToggle }) {
   return (
     <div className={styles.riskSettings}>
       <span className={styles.riskSettingsTitle}>风控线（可多选）</span>
@@ -41,7 +37,7 @@ function RiskSettings() {
               type="button"
               className={`${styles.riskChip} ${selected.has(value) ? styles.selected : ''}`}
               aria-pressed={selected.has(value)}
-              onClick={() => toggle(value)}
+              onClick={() => onToggle(value)}
             >
               {value}%
             </button>
@@ -55,7 +51,7 @@ function RiskSettings() {
               type="button"
               className={`${styles.riskChip} ${selected.has(value) ? styles.selected : ''}`}
               aria-pressed={selected.has(value)}
-              onClick={() => toggle(value)}
+              onClick={() => onToggle(value)}
             >
               +{value}%
             </button>
@@ -69,7 +65,9 @@ function RiskSettings() {
 function PreviewA() {
   const [editing, setEditing] = useState(false);
   const [amount, setAmount] = useState('');
+  const [profit, setProfit] = useState('');
   const [rate, setRate] = useState('');
+  const [riskThresholds, setRiskThresholds] = useState(new Set([-8, 5]));
   const [flowType, setFlowType] = useState('buy');
   const [flowAmount, setFlowAmount] = useState('');
   const [flowDate, setFlowDate] = useState(localDateTime);
@@ -79,7 +77,62 @@ function PreviewA() {
   const flowValue = Number(flowAmount);
   const rateFactor = 1 + rateValue / 100;
   const totalValue = rateFactor !== 0 ? amountValue / rateFactor : NaN;
-  const profitValue = Number.isFinite(totalValue) ? amountValue - totalValue : NaN;
+  const calculatedProfit = Number.isFinite(totalValue) ? amountValue - totalValue : NaN;
+  const profitValue = hasNumber(profit) ? Number(profit) : calculatedProfit;
+  const [hydrated, setHydrated] = useState(false);
+  const toggleRiskThreshold = (value) =>
+    setRiskThresholds((current) => {
+      const next = new Set(current);
+      next.has(value) ? next.delete(value) : next.add(value);
+      return next;
+    });
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+      if (saved && typeof saved === 'object') {
+        setAmount(
+          saved.amount === '' || typeof saved.amount === 'number' || typeof saved.amount === 'string'
+            ? String(saved.amount)
+            : ''
+        );
+        setProfit(
+          saved.profit === '' || typeof saved.profit === 'number' || typeof saved.profit === 'string'
+            ? String(saved.profit)
+            : ''
+        );
+        setRate(
+          saved.rate === '' || typeof saved.rate === 'number' || typeof saved.rate === 'string'
+            ? String(saved.rate)
+            : ''
+        );
+        if (Array.isArray(saved.rows)) {
+          setRows(
+            saved.rows
+              .filter(
+                (row) =>
+                  row &&
+                  typeof row.date === 'string' &&
+                  (row.type === 'buy' || row.type === 'sell') &&
+                  Number.isFinite(Number(row.amount))
+              )
+              .map((row) => ({ ...row, amount: Number(row.amount) }))
+          );
+        }
+        if (Array.isArray(saved.riskThresholds))
+          setRiskThresholds(new Set(saved.riskThresholds.filter((value) => RISK_VALUES.has(value))));
+      }
+    } catch {}
+    setHydrated(true);
+  }, []);
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ amount, profit, rate, rows, riskThresholds: [...riskThresholds] })
+      );
+    } catch {}
+  }, [hydrated, amount, profit, rate, rows, riskThresholds]);
   const saveSnapshot = () => setEditing(false);
   const addFlow = () => {
     if (!(flowValue > 0) || !flowDate) return;
@@ -106,7 +159,7 @@ function PreviewA() {
           <span className={styles.riskState}>待更新</span>
           <span className={styles.riskMessage}>等待跟踪指数更新</span>
         </div>
-        <RiskSettings />
+        <RiskSettings selected={riskThresholds} onToggle={toggleRiskThreshold} />
       </div>
       <div className={styles.stats}>
         <div className={styles.stat}>
@@ -131,9 +184,21 @@ function PreviewA() {
         </div>
         <div className={styles.stat}>
           <i>持有收益</i>
-          <b className={styles.statValue}>
-            {hasNumber(amount) && hasNumber(rate) && Number.isFinite(profitValue) ? formatMoney(profitValue) : '--'}
-          </b>
+          {editing ? (
+            <input
+              className={styles.statEdit}
+              type="number"
+              step="0.01"
+              value={profit}
+              onChange={(event) => setProfit(event.target.value)}
+              aria-label="编辑持有收益"
+              placeholder="自动计算，可修改"
+            />
+          ) : (
+            <b className={styles.statValue}>
+              {hasNumber(amount) && hasNumber(rate) && Number.isFinite(profitValue) ? formatMoney(profitValue) : '--'}
+            </b>
+          )}
         </div>
         <div className={styles.stat}>
           <i>持有收益率</i>
