@@ -29,17 +29,19 @@
   .risk-top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .risk b { font-size:11px; }
   .risk-state { color:#ffdfb5; font-size:9px; }
-  .risk-controls { display:grid; gap:6px; }
+  .risk-controls { display:flex; align-items:center; gap:6px; }
   .risk-group { display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
   .risk-group legend { margin-right:2px; color:#ffdfb5; font-size:9px; }
   .risk-chip { padding:3px 6px; color:#ffdfb5; background:#2b2118; border:1px solid #6b5135; border-radius:4px; font:9px ui-monospace,SFMono-Regular,Menlo,monospace; cursor:pointer; }
   .risk-chip.selected { color:#75e6c1; background:#10271f; border-color:#408d78; }
   .risk-chip:hover,.risk-chip:focus-visible { border-color:#ffdfb5; }
   .risk-panel { display:contents; }
-  .risk-banner { order:1; display:grid; gap:8px; margin:10px 0 0; padding:9px 10px; border-left:3px solid #ffbd77; background:#2b2118; color:#ffdfb5; }
-  .risk-settings { order:3; display:grid; gap:6px; margin-top:9px; padding:8px 10px; border:1px solid #1f2c42; background:#0f1a2a; }
+  .risk-banner { order:1; display:grid; gap:8px; margin:10px 0 0; padding:9px 10px; background:#2b2118; color:#ffdfb5; }
+  .risk-banner .risk-top { justify-content:flex-end; }
+  .risk-banner .risk-top b { display:none; }
+  .risk-settings { order:3; display:flex; align-items:center; gap:8px; margin-top:9px; padding:0; border:0; background:transparent; white-space:nowrap; overflow-x:auto; }
   .risk-settings-title { color:#8ca2bf; font-size:9px; }
-  .risk-panel.triggered .risk-banner { border-left-color:#ff8d8d; }
+  .risk-panel.triggered .risk-banner { background:#3a2020; }
   .risk-panel.triggered .risk-state { color:#ff8d8d; }
   .risk-panel.triggered .risk-message { animation:risk-scroll 8s linear infinite; }
   .risk-ticker { overflow:hidden; border-top:1px solid #5b4328; padding-top:6px; }
