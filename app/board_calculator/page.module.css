@@ -272,6 +272,12 @@
   outline-offset: 1px;
   border-color: #75e6c1;
 }
+.snapshotSummary {
+  margin: -8px 0 0;
+  color: #8ca2bf;
+  font-size: 12px;
+  line-height: 1.5;
+}
 .miniTable {
   width: 100%;
   border-collapse: collapse;

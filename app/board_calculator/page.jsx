@@ -69,6 +69,7 @@ function RiskSettings() {
 function PreviewA() {
   const [editing, setEditing] = useState(false);
   const [amount, setAmount] = useState('');
+  const [profit, setProfit] = useState('');
   const [rate, setRate] = useState('');
   const [flowType, setFlowType] = useState('buy');
   const [flowAmount, setFlowAmount] = useState('');
@@ -77,6 +78,9 @@ function PreviewA() {
   const amountValue = Number(amount);
   const rateValue = Number(rate);
   const flowValue = Number(flowAmount);
+  const profitValue = Number(profit);
+  const costValue = amountValue - profitValue;
+  const checkedRate = costValue !== 0 ? (profitValue / costValue) * 100 : NaN;
   const saveSnapshot = () => setEditing(false);
   const addFlow = () => {
     if (!(flowValue > 0) || !flowDate) return;
@@ -125,9 +129,19 @@ function PreviewA() {
         </div>
         <div className={styles.stat}>
           <i>持有收益</i>
-          <b className={styles.statValue}>
-            {amountValue > 0 && hasNumber(rate) ? formatMoney((amountValue * rateValue) / 100) : '--'}
-          </b>
+          {editing ? (
+            <input
+              className={styles.statEdit}
+              type="number"
+              step="0.01"
+              value={profit}
+              onChange={(event) => setProfit(event.target.value)}
+              aria-label="编辑持有收益"
+              placeholder="输入持有收益"
+            />
+          ) : (
+            <b className={styles.statValue}>{hasNumber(profit) ? formatMoney(profitValue) : '--'}</b>
+          )}
         </div>
         <div className={styles.stat}>
           <i>持有收益率</i>
@@ -158,6 +172,11 @@ function PreviewA() {
           <b className={styles.statValue}>--</b>
         </div>
       </div>
+      {hasNumber(amount) && hasNumber(profit) ? (
+        <p className={styles.snapshotSummary} aria-live="polite">
+          总额 {formatMoney(amountValue)} · 持仓成本 {formatMoney(costValue)} · 收益率校验 {formatRate(checkedRate)}
+        </p>
+      ) : null}
       <table className={styles.miniTable}>
         <thead>
           <tr>
