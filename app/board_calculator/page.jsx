@@ -79,8 +79,8 @@ function PreviewA() {
   const totalValue = rateFactor !== 0 ? amountValue / rateFactor : NaN;
   const calculatedProfit = Number.isFinite(totalValue) ? amountValue - totalValue : NaN;
   const profitValue = hasNumber(profit) ? Number(profit) : calculatedProfit;
-  const profitTone = Number.isFinite(profitValue) ? (profitValue >= 0 ? styles.up : styles.down) : '';
-  const rateTone = hasNumber(rate) ? (rateValue >= 0 ? styles.up : styles.down) : '';
+  const profitTone = Number.isFinite(profitValue) ? (profitValue >= 0 ? styles.down : styles.up) : '';
+  const rateTone = hasNumber(rate) ? (rateValue >= 0 ? styles.down : styles.up) : '';
   const [hydrated, setHydrated] = useState(false);
   const toggleRiskThreshold = (value) =>
     setRiskThresholds((current) => {
