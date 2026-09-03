@@ -79,7 +79,8 @@ function PreviewA() {
   const rateValue = Number(rate);
   const flowValue = Number(flowAmount);
   const profitValue = Number(profit);
-  const totalValue = amountValue * (1 + rateValue / 100);
+  const rateFactor = 1 + rateValue / 100;
+  const totalValue = rateFactor !== 0 ? amountValue / rateFactor : NaN;
   const saveSnapshot = () => setEditing(false);
   const addFlow = () => {
     if (!(flowValue > 0) || !flowDate) return;
@@ -125,7 +126,7 @@ function PreviewA() {
           ) : (
             <b className={styles.statValue}>{hasNumber(amount) ? formatMoney(amountValue) : '--'}</b>
           )}
-          {hasNumber(amount) && hasNumber(rate) ? (
+          {hasNumber(amount) && hasNumber(rate) && Number.isFinite(totalValue) ? (
             <small className={styles.statSubvalue}>总额 {formatMoney(totalValue)}</small>
           ) : null}
         </div>
@@ -174,12 +175,6 @@ function PreviewA() {
           <b className={styles.statValue}>--</b>
         </div>
       </div>
-      {hasNumber(amount) && hasNumber(rate) ? (
-        <p className={styles.snapshotSummary} aria-live="polite">
-          账户金额 {formatMoney(amountValue)} · 总额 {formatMoney(totalValue)} · 收益率 {formatRate(rateValue)}
-          {hasNumber(profit) ? ` · 持有收益 ${formatMoney(profitValue)}` : ''}
-        </p>
-      ) : null}
       <table className={styles.miniTable}>
         <thead>
           <tr>
