@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import styles from './page.module.css';
 
-const FUND_ID = '017811';
-const STORAGE_KEY = `board-calculator:${FUND_ID}`;
+const DEFAULT_FUND_ID = '017811';
+const DEFAULT_FUND_NAME = '东方人工智能主题混合 C';
 const DOWN_RISK = [-5, -8, -10, -15, -20];
 const UP_RISK = [5, 8, 10, 15, 20];
 const RISK_VALUES = new Set([...DOWN_RISK, ...UP_RISK]);
@@ -62,7 +63,7 @@ function RiskSettings({ selected, onToggle }) {
   );
 }
 
-function PreviewA() {
+function PreviewA({ fundId, fundName }) {
   const [editing, setEditing] = useState(false);
   const [amount, setAmount] = useState('');
   const [profit, setProfit] = useState('');
@@ -72,6 +73,7 @@ function PreviewA() {
   const [flowAmount, setFlowAmount] = useState('');
   const [flowDate, setFlowDate] = useState(localDateTime);
   const [rows, setRows] = useState([]);
+  const storageKey = `board-calculator:${fundId}`;
   const amountValue = Number(amount);
   const rateValue = Number(rate);
   const flowValue = Number(flowAmount);
@@ -90,7 +92,7 @@ function PreviewA() {
     });
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+      const saved = JSON.parse(localStorage.getItem(storageKey) || 'null');
       if (saved && typeof saved === 'object') {
         setAmount(
           saved.amount === '' || typeof saved.amount === 'number' || typeof saved.amount === 'string'
@@ -125,16 +127,16 @@ function PreviewA() {
       }
     } catch {}
     setHydrated(true);
-  }, []);
+  }, [storageKey]);
   useEffect(() => {
     if (!hydrated) return;
     try {
       localStorage.setItem(
-        STORAGE_KEY,
+        storageKey,
         JSON.stringify({ amount, profit, rate, rows, riskThresholds: [...riskThresholds] })
       );
     } catch {}
-  }, [hydrated, amount, profit, rate, rows, riskThresholds]);
+  }, [hydrated, amount, profit, rate, rows, riskThresholds, storageKey]);
   const saveSnapshot = () => setEditing(false);
   const addFlow = () => {
     if (!(flowValue > 0) || !flowDate) return;
@@ -144,7 +146,7 @@ function PreviewA() {
   return (
     <div className={styles.boardPreview}>
       <div className={styles.previewHead}>
-        <strong>东方人工智能主题混合 C</strong>
+        <strong>{fundName}</strong>
         <div className={styles.previewTools}>
           <span>● 行情待更新</span>
           <button
@@ -313,6 +315,10 @@ function PreviewA() {
 }
 
 export default function BoardCalculatorPage() {
+  const searchParams = useSearchParams();
+  const rawFundId = searchParams.get('fundCode') || DEFAULT_FUND_ID;
+  const fundId = /^\d{6}$/.test(rawFundId) ? rawFundId : DEFAULT_FUND_ID;
+  const fundName = searchParams.get('fundName')?.trim() || DEFAULT_FUND_NAME;
   return (
     <main className={styles.page}>
       <h1>交易驾驶舱</h1>
@@ -323,7 +329,7 @@ export default function BoardCalculatorPage() {
             <div className={styles.mockup}>
               <div className={styles.mockupHeader}>A · 交易驾驶舱</div>
               <div className={styles.mockupBody}>
-                <PreviewA />
+                <PreviewA key={fundId} fundId={fundId} fundName={fundName} />
               </div>
             </div>
           </div>

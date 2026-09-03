@@ -91,7 +91,15 @@ export default function SearchBar({
                       }}
                     >
                       <div className="fund-info">
-                        <span className="fund-name">{fund.NAME}</span>
+                        <a
+                          className="fund-name"
+                          href={`/board_calculator?fundCode=${encodeURIComponent(fund.CODE)}&fundName=${encodeURIComponent(fund.NAME)}`}
+                          aria-label={`打开${fund.NAME}交易看板`}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {fund.NAME}
+                        </a>
                         <span className="fund-code muted">
                           #{fund.CODE} | {fund.TYPE}
                         </span>
