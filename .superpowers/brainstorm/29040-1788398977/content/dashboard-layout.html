@@ -69,6 +69,8 @@
   .flow-form { display:grid; grid-template-columns:74px 1fr 1.2fr auto; gap:6px; align-items:end; }
   .flow-form label { display:grid; gap:4px; color:#8ca2bf; font-size:9px; }
   .flow-form input,.flow-form select { width:100%; min-width:0; box-sizing:border-box; padding:6px; color:#dbeafe; background:#0b1220; border:1px solid #263752; border-radius:4px; font:10px ui-monospace,SFMono-Regular,Menlo,monospace; }
+  .flow-form select.buy,.flow-form input.flow-amount.buy { color:#75e6c1; }
+  .flow-form select.sell,.flow-form input.flow-amount.sell { color:#ff8d8d; }
   .flow-form input:focus,.flow-form select:focus,.stat-edit:focus { outline:2px solid #75e6c1; outline-offset:1px; border-color:#75e6c1; }
   .flow-box small { display:block; margin-top:7px; }
   @media (max-width:520px) { .stats { grid-template-columns:1fr 1fr; } .flow-form { grid-template-columns:1fr 1fr; } .flow-submit { min-height:28px; } }
@@ -102,6 +104,7 @@
     window.toggleRiskChip = (button) => { const selected = button.classList.toggle('selected'); button.setAttribute('aria-pressed', String(selected)); updateRisk(button.closest('.risk-panel')); };
     document.querySelectorAll('[data-risk-message]').forEach((message) => updateRisk(message.closest('.risk-panel')));
     const cockpit = document.querySelector('.cockpit-preview'); cockpit.querySelector('.preview-tools span').textContent = '行情待更新'; cockpit.querySelector('[data-risk-state]').textContent = '待更新'; cockpit.querySelector('[data-risk-message]').textContent = '等待跟踪指数更新'; cockpit.querySelectorAll('.stats .stat b').forEach((value) => value.textContent = '--'); cockpit.querySelector('.stat.warn b').textContent = '待更新'; cockpit.querySelector('.stat-index b').textContent = '待更新'; cockpit.querySelector('.mini-table tbody').innerHTML = '<tr><td colspan="5">暂无流水</td></tr>';
+    const flowBox = cockpit.querySelector('.flow-box'); const flowType = flowBox.querySelector('select'); const flowAmount = flowBox.querySelector('.flow-amount'); const updateFlowColor = () => { const type = flowType.value; flowType.className = type; flowAmount.className = `flow-amount ${type}`; }; flowType.addEventListener('change', updateFlowColor); updateFlowColor();
     window.addPreviewFlow = (button) => { const box = button.closest('.flow-box'); const type = box.querySelector('select').value; const amount = Number(box.querySelector('.flow-amount').value); const date = box.querySelector('.flow-date').value; if (!(amount > 0) || !date) return; const row = box.previousElementSibling.querySelector('tbody').insertRow(); const daily = '待更新'; row.innerHTML = `<td>${dateText(date)}</td><td>${daily}</td><td class="${type === 'buy' ? 'up' : 'down'}">${type === 'buy' ? '+' : '−'}${amount.toFixed(2)}</td><td>待更新</td><td>${daily}</td>`; box.querySelector('.flow-amount').value = ''; };
   })();
 </script>
