@@ -79,6 +79,8 @@ function PreviewA() {
   const totalValue = rateFactor !== 0 ? amountValue / rateFactor : NaN;
   const calculatedProfit = Number.isFinite(totalValue) ? amountValue - totalValue : NaN;
   const profitValue = hasNumber(profit) ? Number(profit) : calculatedProfit;
+  const profitTone = Number.isFinite(profitValue) ? (profitValue >= 0 ? styles.up : styles.down) : '';
+  const rateTone = hasNumber(rate) ? (rateValue >= 0 ? styles.up : styles.down) : '';
   const [hydrated, setHydrated] = useState(false);
   const toggleRiskThreshold = (value) =>
     setRiskThresholds((current) => {
@@ -166,7 +168,7 @@ function PreviewA() {
           <i>金额</i>
           {editing ? (
             <input
-              className={styles.statEdit}
+              className={`${styles.statEdit} ${profitTone}`}
               type="number"
               min="0"
               step="0.01"
@@ -195,7 +197,7 @@ function PreviewA() {
               placeholder="自动计算，可修改"
             />
           ) : (
-            <b className={styles.statValue}>
+            <b className={`${styles.statValue} ${profitTone}`}>
               {hasNumber(amount) && hasNumber(rate) && Number.isFinite(profitValue) ? formatMoney(profitValue) : '--'}
             </b>
           )}
@@ -204,7 +206,7 @@ function PreviewA() {
           <i>持有收益率</i>
           {editing ? (
             <input
-              className={styles.statEdit}
+              className={`${styles.statEdit} ${rateTone}`}
               type="number"
               step="0.01"
               value={rate}
@@ -213,7 +215,7 @@ function PreviewA() {
               placeholder="输入收益率"
             />
           ) : (
-            <b className={styles.statValue}>{hasNumber(rate) ? formatRate(rateValue) : '--'}</b>
+            <b className={`${styles.statValue} ${rateTone}`}>{hasNumber(rate) ? formatRate(rateValue) : '--'}</b>
           )}
         </div>
         <div className={styles.stat}>
