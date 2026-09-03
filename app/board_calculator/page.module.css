@@ -1,7 +1,7 @@
 .page {
   min-height: 100vh;
   box-sizing: border-box;
-  padding: 32px 24px 44px;
+  padding: 40px clamp(24px, 4vw, 64px) 56px;
   color: #dbeafe;
   background: #07101e;
   font:
@@ -13,7 +13,7 @@
     monospace;
 }
 .page h1 {
-  max-width: 1120px;
+  max-width: 1440px;
   margin: 0 auto 8px;
   color: #f8fafc;
   font:
@@ -22,17 +22,16 @@
 }
 .subtitle,
 .subtitleBottom {
-  max-width: 1120px;
+  max-width: 1440px;
   margin: 0 auto;
   color: #8ca2bf;
-  font-size: 11px;
+  font-size: 13px;
 }
 .boardOptions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
-  max-width: 1120px;
-  margin: 22px auto 0;
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 1440px;
+  margin: 28px auto 0;
 }
 .boardOption {
   min-width: 0;
@@ -51,7 +50,7 @@
   border-color: #75e6c1;
 }
 .boardOption:hover {
-  transform: translateY(-3px);
+  transform: none;
 }
 .boardOption:focus-visible {
   outline: 2px solid #75e6c1;
@@ -64,18 +63,18 @@
   height: 100%;
 }
 .mockupHeader {
-  padding: 9px 12px;
+  padding: 12px 18px;
   color: #8ca2bf;
   background: #101b2d;
   border-bottom: 1px solid #263752;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.08em;
 }
 .mockupBody {
   padding: 0;
 }
 .cardBody {
-  padding: 14px 16px 16px;
+  padding: 18px 22px 20px;
   background: #101b2d;
   border-top: 1px solid #263752;
 }
@@ -83,41 +82,41 @@
 .cardBody h3 {
   margin: 0;
   color: #f8fafc;
-  font-size: 15px;
+  font-size: 18px;
 }
 .cardBody p {
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   color: #8ca2bf;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.55;
 }
 .boardPreview {
-  min-height: 370px;
-  padding: 16px;
+  min-height: 0;
+  padding: 24px;
   box-sizing: border-box;
   background: #0b1220;
   color: #dbeafe;
-  font-size: 12px;
+  font-size: 14px;
 }
 .previewHead {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 8px;
-  padding-bottom: 14px;
+  padding-bottom: 18px;
   border-bottom: 1px solid #27364e;
 }
 .previewHead strong {
   color: #f8fafc;
   font:
-    700 14px/1.1 Georgia,
+    700 20px/1.1 Georgia,
     serif;
   white-space: nowrap;
 }
 .previewHead > span,
 .previewTools > span {
   color: #75e6c1;
-  font-size: 10px;
+  font-size: 12px;
 }
 .previewTools {
   display: flex;
@@ -126,13 +125,13 @@
 }
 .previewEdit,
 .flowSubmit {
-  padding: 5px 8px;
+  padding: 7px 12px;
   color: #dbeafe;
   background: #16243a;
   border: 1px solid #365070;
   border-radius: 5px;
   font: inherit;
-  font-size: 10px;
+  font-size: 12px;
   cursor: pointer;
 }
 .previewEdit:hover,
@@ -159,14 +158,14 @@
 .riskState {
   flex: 0 0 auto;
   color: #ffbd77;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 .riskMessage {
   min-width: 0;
   overflow: hidden;
   color: #ffdfb5;
-  font-size: 10px;
+  font-size: 12px;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -178,7 +177,7 @@
   display: block;
   margin-bottom: 5px;
   color: #8ca2bf;
-  font-size: 9px;
+  font-size: 11px;
 }
 .riskControls {
   display: flex;
@@ -197,21 +196,21 @@
   float: left;
   margin: 0 2px 0 0;
   color: #ffdfb5;
-  font-size: 9px;
-  line-height: 16px;
+  font-size: 11px;
+  line-height: 22px;
 }
 .riskGroup legend::after {
   content: '：';
 }
 .riskChip {
   display: inline-block;
-  padding: 3px 6px;
+  padding: 5px 9px;
   color: #ffdfb5;
   background: #2b2118;
   border: 1px solid #6b5135;
   border-radius: 4px;
   font:
-    9px ui-monospace,
+    11px ui-monospace,
     SFMono-Regular,
     Menlo,
     monospace;
@@ -227,41 +226,41 @@
 }
 .stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin: 12px 0;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
 }
 .stat {
   min-width: 0;
-  padding: 10px;
+  padding: 14px;
   background: #101b2d;
   border: 1px solid #263752;
   border-radius: 6px;
 }
 .stat i {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
   color: #8ca2bf;
   font-style: normal;
-  font-size: 9px;
+  font-size: 11px;
 }
 .statValue {
   display: block;
-  min-height: 18px;
+  min-height: 24px;
   color: #f8fafc;
-  font-size: 16px;
+  font-size: 21px;
 }
 .statEdit {
   display: block;
   width: 100%;
   box-sizing: border-box;
-  padding: 3px 4px;
+  padding: 5px 6px;
   color: #f8fafc;
   background: #0b1220;
   border: 1px solid #365070;
   border-radius: 4px;
   font:
-    600 13px ui-monospace,
+    600 16px ui-monospace,
     SFMono-Regular,
     Menlo,
     monospace;
@@ -276,11 +275,11 @@
 .miniTable {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 13px;
+  margin-top: 20px;
 }
 .miniTable th,
 .miniTable td {
-  padding: 8px 4px;
+  padding: 11px 8px;
   border-bottom: 1px solid #1f2c42;
   text-align: right;
   white-space: nowrap;
@@ -291,12 +290,12 @@
 }
 .miniTable th {
   color: #8195b1;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 400;
 }
 .miniTable td {
   color: #cdd9eb;
-  font-size: 10px;
+  font-size: 12px;
 }
 .emptyCell {
   padding: 22px 4px !important;
@@ -310,8 +309,8 @@
   color: #ff8d8d !important;
 }
 .flowBox {
-  margin-top: 13px;
-  padding: 10px;
+  margin-top: 20px;
+  padding: 16px;
   background: #101b2d;
   border: 1px solid #263752;
   border-radius: 6px;
@@ -325,37 +324,37 @@
 }
 .flowBoxHead b {
   color: #f8fafc;
-  font-size: 11px;
+  font-size: 14px;
 }
 .flowBoxHead span,
 .flowBox small {
   color: #8ca2bf;
-  font-size: 9px;
+  font-size: 11px;
 }
 .flowForm {
   display: grid;
-  grid-template-columns: 74px 1fr 1.2fr auto;
-  gap: 6px;
+  grid-template-columns: 120px minmax(180px, 1fr) 260px auto;
+  gap: 10px;
   align-items: end;
 }
 .flowForm label {
   display: grid;
   gap: 4px;
   color: #8ca2bf;
-  font-size: 9px;
+  font-size: 11px;
 }
 .flowForm input,
 .flowForm select {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  padding: 6px;
+  padding: 9px 10px;
   color: #dbeafe;
   background: #0b1220;
   border: 1px solid #263752;
   border-radius: 4px;
   font:
-    10px ui-monospace,
+    12px ui-monospace,
     SFMono-Regular,
     Menlo,
     monospace;
@@ -370,7 +369,7 @@
 }
 .flowBox small {
   display: block;
-  margin-top: 7px;
+  margin-top: 10px;
 }
 .subtitleBottom {
   margin-top: 22px;
@@ -411,8 +410,10 @@
 }
 @media (max-width: 900px) {
   .boardOptions {
-    grid-template-columns: 1fr;
     max-width: 560px;
+  }
+  .stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 @media (max-width: 520px) {
