@@ -1,15 +1,23 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { isArray } from 'lodash';
+import { isArray, isObject } from 'lodash';
 import {
   calculateEntryRows,
   calculateExitRows,
+  calculateRiskSignals,
   DEFAULT_ENTRIES,
   DEFAULT_EXITS,
+  DEFAULT_RISK_RULES,
+  summarizeAccountPosition,
   summarizeEntryPosition
 } from './calculator.mjs';
-import { fetchSmartFundNetValueBackward } from '../api/fund';
+import {
+  fetchEastmoneySectorQuotesBatch,
+  fetchFundNetValueRange,
+  fetchNavMetricsFromTrendFallback,
+  fetchSmartFundNetValueBackward
+} from '../api/fund';
 import { storageStore } from '../stores/storageStore';
 import styles from './calculator.module.css';
 
@@ -21,6 +29,18 @@ const DEFAULT_FORM = {
 };
 const PAGE_SIZE_OPTIONS = [5, 10];
 const PENDING_FLOW_KEY = 'fundTradingCalculatorPendingFlows';
+const RISK_SETTINGS_KEY = 'fundTradingCalculatorRiskSettings';
+const BENCHMARK_INDEX = { secid: '2.930713', name: '中证人工智能主题指数', weight: 80 };
+const RISK_FIELDS = [
+  ['fundDownWatch', '基金跌幅观察'],
+  ['fundDownEntry', '基金跌幅补仓'],
+  ['fundDownStop', '基金跌幅暂停补仓'],
+  ['fundUpWatch', '基金涨幅观察'],
+  ['fundUpExit', '基金涨幅出仓'],
+  ['fundUpStrong', '基金涨幅强提醒'],
+  ['drawdownWarn', '最大回撤提醒'],
+  ['drawdownStop', '最大回撤暂停补仓']
+];
 
 const asText = (value) => (value === null || value === undefined ? '' : String(value));
 const numericValue = (value) => Number(value);
@@ -40,13 +60,15 @@ const formatNumber = (value) =>
   Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '--';
 const formatPercent = (value, digits = 2) =>
   Number.isFinite(value) ? `${value >= 0 ? '+' : ''}${(value * 100).toFixed(digits)}%` : '--';
+const formatPointPercent = (value, digits = 2) =>
+  hasNumericValue(value) ? `${numericValue(value) >= 0 ? '+' : ''}${numericValue(value).toFixed(digits)}%` : '--';
 const absolutePercent = (value) => (Number.isFinite(numericValue(value)) ? Math.abs(numericValue(value)) : '');
 const hasNumericValue = (value) =>
   value !== '' && value !== null && value !== undefined && Number.isFinite(numericValue(value));
 const entryMoveLabel = (change) =>
-  `${change >= 0 ? '上涨' : '下跌'} ${absolutePercent(change)}% ${change >= 0 ? '加仓' : '补仓'}`;
+  `${change >= 0 ? '上涨' : '下跌'} ${absolutePercent(change).toFixed(2)}% ${change >= 0 ? '加仓' : '补仓'}`;
 const exitMoveLabel = (change, index) =>
-  `${change >= 0 ? (index === 0 ? '上涨' : '再涨') : index === 0 ? '下跌' : '再跌'} ${absolutePercent(change)}%`;
+  `${change >= 0 ? (index === 0 ? '上涨' : '再涨') : index === 0 ? '下跌' : '再跌'} ${absolutePercent(change).toFixed(2)}%`;
 const entryLabel = (entry, row) => {
   if (entry.manual && hasNumericValue(row?.change) && !row?.pendingNav) return entryMoveLabel(row.change);
   if (entry.manual || entry.confirmation) return entry.label;
@@ -60,8 +82,17 @@ const exitLabel = (exit, index, row) => {
     index
   );
 };
+const dailyChangeLabel = (row) => {
+  if (row?.pendingDailyChange) return '待更新';
+  return hasNumericValue(row?.dailyChange) ? formatPointPercent(row.dailyChange) : '--';
+};
 const todayKey = () => {
   const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+const dateBefore = (value, days = 7) => {
+  const date = new Date(`${value}T00:00:00`);
+  date.setDate(date.getDate() - days);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 const localDateTimeValue = () => {
@@ -190,6 +221,11 @@ export default function TradingCalculatorPage() {
   const [entryPageSize, setEntryPageSize] = useState(5);
   const [exitPageSize, setExitPageSize] = useState(5);
   const [navByDate, setNavByDate] = useState({});
+  const [dailyChangeByDate, setDailyChangeByDate] = useState({});
+  const [fundQuote, setFundQuote] = useState({ nav: null, dailyChangePct: null, date: '', status: 'loading' });
+  const [benchmarkQuote, setBenchmarkQuote] = useState({ pct: null, status: 'loading' });
+  const [riskRules, setRiskRules] = useState(DEFAULT_RISK_RULES);
+  const [flowMenuOpen, setFlowMenuOpen] = useState(false);
   const flowsHydrated = useRef(false);
 
   const updateForm = (key, value) => setForm((current) => ({ ...current, [key]: value }));
@@ -229,6 +265,8 @@ export default function TradingCalculatorPage() {
     setExits(defaults.exits.map((exit) => ({ ...exit })));
     setIsEditingSnapshot(false);
     setPendingFlows({ entries: [], exits: [] });
+    setRiskRules(DEFAULT_RISK_RULES);
+    setFlowMenuOpen(false);
   };
 
   useEffect(() => {
@@ -252,6 +290,42 @@ export default function TradingCalculatorPage() {
     if (flowsHydrated.current) storageStore.setItem(PENDING_FLOW_KEY, JSON.stringify(pendingFlows));
   }, [pendingFlows]);
 
+  useEffect(() => {
+    const saved = storageStore.getItem(RISK_SETTINGS_KEY, DEFAULT_RISK_RULES);
+    if (isObject(saved)) setRiskRules((current) => ({ ...current, ...saved }));
+  }, []);
+  useEffect(() => {
+    storageStore.setItem(RISK_SETTINGS_KEY, JSON.stringify(riskRules));
+  }, [riskRules]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.allSettled([
+      fetchNavMetricsFromTrendFallback('017811'),
+      fetchEastmoneySectorQuotesBatch([BENCHMARK_INDEX.secid])
+    ]).then(([fundResult, benchmarkResult]) => {
+      if (cancelled) return;
+      const metrics = fundResult.status === 'fulfilled' ? fundResult.value : null;
+      const today = todayKey();
+      const nav = hasNumericValue(metrics?.dwjz) ? numericValue(metrics.dwjz) : null;
+      const isToday = metrics?.jzrq === today;
+      setFundQuote({
+        nav: nav > 0 ? nav : null,
+        dailyChangePct: isToday && hasNumericValue(metrics?.zzl) ? numericValue(metrics.zzl) : null,
+        date: metrics?.jzrq || '',
+        status: fundResult.status === 'fulfilled' && nav > 0 ? (isToday ? 'updated' : 'pending') : 'error'
+      });
+      const quote = benchmarkResult.status === 'fulfilled' ? benchmarkResult.value?.[BENCHMARK_INDEX.secid] : null;
+      setBenchmarkQuote({
+        pct: hasNumericValue(quote?.pct) ? numericValue(quote.pct) : null,
+        status: quote ? 'updated' : 'error'
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const flowDateKey = useMemo(
     () =>
       [...entries, ...exits, ...pendingFlows.entries, ...pendingFlows.exits]
@@ -264,25 +338,39 @@ export default function TradingCalculatorPage() {
   useEffect(() => {
     const dates = flowDateKey ? flowDateKey.split(',') : [];
     const missing = dates.filter((date) => !hasDateNav(navByDate, date));
-    if (!missing.length) return undefined;
+    const dailyMissing = dates.filter((date) => !hasDateNav(dailyChangeByDate, date));
+    if (!missing.length && !dailyMissing.length) return undefined;
     let cancelled = false;
-    Promise.all(
+    const navPromise = Promise.all(
       missing.map(async (date) => {
         try {
           const result = await fetchSmartFundNetValueBackward('017811', date);
-          return [date, result?.value > 0 ? result.value : null];
+          return [date, result?.value > 0 && (date !== todayKey() || result.date === date) ? result.value : null];
         } catch {
           return [date, null];
         }
       })
-    ).then((results) => {
+    );
+    const dailyPromise = dailyMissing.length
+      ? fetchFundNetValueRange('017811', dateBefore(dailyMissing.slice().sort()[0]), todayKey())
+      : Promise.resolve([]);
+    Promise.all([navPromise, dailyPromise]).then(([results, dailyRows]) => {
       if (cancelled) return;
-      setNavByDate((current) => ({ ...current, ...Object.fromEntries(results) }));
+      if (results.length) setNavByDate((current) => ({ ...current, ...Object.fromEntries(results) }));
+      if (dailyMissing.length) {
+        const dailyResults = Object.fromEntries(
+          dailyMissing.map((date) => {
+            const resolved = dailyRows.filter((row) => row?.date <= date).at(-1);
+            return [date, date === todayKey() && resolved?.date !== date ? null : (resolved?.growth ?? null)];
+          })
+        );
+        setDailyChangeByDate((current) => ({ ...current, ...dailyResults }));
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [flowDateKey, navByDate]);
+  }, [flowDateKey, navByDate, dailyChangeByDate]);
 
   const plannedCapital = useMemo(
     () =>
@@ -308,8 +396,15 @@ export default function TradingCalculatorPage() {
       Number.isFinite(numericValue(form.holdingDays)) && numericValue(form.holdingDays) >= 0 ? '' : '持有时间不能为负数'
   };
   const entryRows = useMemo(
-    () => calculateEntryRows({ capital: plannedCapital, baseNav: numericValue(form.baseNav), entries, navByDate }),
-    [plannedCapital, form.baseNav, entries, navByDate]
+    () =>
+      calculateEntryRows({
+        capital: plannedCapital,
+        baseNav: numericValue(form.baseNav),
+        entries,
+        navByDate,
+        dailyChangeByDate
+      }),
+    [plannedCapital, form.baseNav, entries, navByDate, dailyChangeByDate]
   );
   const latestEntry = entryRows.at(-1);
   const position = useMemo(
@@ -325,17 +420,6 @@ export default function TradingCalculatorPage() {
       updateForm('holdingValue', formatInputAmount(position.holdingValue));
     setIsEditingSnapshot((current) => !current);
   };
-  const hasManualHoldingValue = isValidNonNegative(form.holdingValue);
-  const currentHoldingValue = hasManualHoldingValue ? numericValue(form.holdingValue) : position.holdingValue;
-  const calculatedProfitRate = plannedCapital > 0 ? currentHoldingValue / plannedCapital - 1 : 0;
-  const hasManualProfitRate =
-    form.profitRate !== '' &&
-    Number.isFinite(numericValue(form.profitRate)) &&
-    numericValue(form.profitRate) >= -100 &&
-    numericValue(form.profitRate) <= 100;
-  const profitRate = hasManualProfitRate ? numericValue(form.profitRate) / 100 : calculatedProfitRate;
-  const profitRateInput = form.profitRate === '' ? '' : asText(form.profitRate);
-  const profitTone = Number.isFinite(profitRate) ? (profitRate >= 0 ? 'positive' : 'negative') : '';
   const exitRows = useMemo(
     () =>
       calculateExitRows({
@@ -344,11 +428,38 @@ export default function TradingCalculatorPage() {
         initialShares: position.shares,
         initialCash: position.cash,
         exits,
-        navByDate
+        navByDate,
+        dailyChangeByDate
       }),
-    [plannedCapital, form.baseNav, position.shares, position.cash, exits, navByDate]
+    [plannedCapital, form.baseNav, position.shares, position.cash, exits, navByDate, dailyChangeByDate]
   );
   const lastExit = exitRows.at(-1);
+  const currentNav = fundQuote.nav > 0 ? fundQuote.nav : numericValue(form.baseNav);
+  const accountSummary = useMemo(
+    () => summarizeAccountPosition({ entryRows, exitRows, currentNav }),
+    [entryRows, exitRows, currentNav]
+  );
+  const hasManualHoldingValue = isValidNonNegative(form.holdingValue);
+  const currentHoldingValue = hasManualHoldingValue ? numericValue(form.holdingValue) : accountSummary.holdingValue;
+  const calculatedProfitRate = accountSummary.profitRate;
+  const hasManualProfitRate =
+    form.profitRate !== '' &&
+    Number.isFinite(numericValue(form.profitRate)) &&
+    numericValue(form.profitRate) >= -100 &&
+    numericValue(form.profitRate) <= 100;
+  const profitRate = hasManualProfitRate ? numericValue(form.profitRate) / 100 : calculatedProfitRate;
+  const profitRateInput = form.profitRate === '' ? '' : asText(form.profitRate);
+  const profitTone = Number.isFinite(profitRate) ? (profitRate >= 0 ? 'positive' : 'negative') : '';
+  const riskSignals = useMemo(
+    () =>
+      calculateRiskSignals({
+        fundDailyChange: fundQuote.dailyChangePct,
+        benchmarkChange: hasNumericValue(benchmarkQuote.pct) ? numericValue(benchmarkQuote.pct) * 100 : null,
+        maxDrawdown: accountSummary.maxDrawdown,
+        rules: riskRules
+      }),
+    [fundQuote.dailyChangePct, benchmarkQuote.pct, accountSummary.maxDrawdown, riskRules]
+  );
   const entryItems = useMemo(
     () => [
       ...entries.map((entry, index) => ({ entry, row: entryRows[index], pending: false })),
@@ -394,6 +505,10 @@ export default function TradingCalculatorPage() {
     setFlowDraft({ amount: '', recordedAt: localDateTimeValue() });
     setFlowError('');
   };
+  const openFlowFromMenu = (type) => {
+    setFlowMenuOpen(false);
+    openFlowDialog(type);
+  };
   const closeFlowDialog = () => {
     setFlowType(null);
     setFlowError('');
@@ -434,11 +549,117 @@ export default function TradingCalculatorPage() {
           <p>分批入仓 · 回撤补仓 · 确认加仓 · 反弹出仓</p>
         </div>
         <div className={styles.heroActions}>
+          <div className={styles.flowMenu}>
+            <button
+              type="button"
+              className={styles.addButton}
+              aria-expanded={flowMenuOpen}
+              aria-controls="flow-actions"
+              aria-label="新增入金或出金"
+              onClick={() => setFlowMenuOpen((open) => !open)}
+            >
+              +
+            </button>
+            {flowMenuOpen && (
+              <div id="flow-actions" className={styles.flowActions} role="menu">
+                <button type="button" role="menuitem" onClick={() => openFlowFromMenu('entry')}>
+                  入金
+                </button>
+                <button type="button" role="menuitem" onClick={() => openFlowFromMenu('exit')}>
+                  出金
+                </button>
+              </div>
+            )}
+          </div>
           <button type="button" className={styles.textButton} onClick={reset}>
             恢复默认
           </button>
         </div>
       </header>
+
+      <section className={`${styles.panel} ${styles.marketPanel}`} aria-labelledby="market-title">
+        <SectionTitle id="market-title" title="今日行情" detail="基金净值更新后，流水中的待更新节点会自动补全。" />
+        <div className={styles.marketGrid}>
+          <Metric
+            label="基金净值"
+            value={formatNav(fundQuote.nav)}
+            note={
+              fundQuote.date ? `净值日期 ${fundQuote.date}` : fundQuote.status === 'loading' ? '正在获取' : '暂无数据'
+            }
+          />
+          <Metric
+            label="基金日涨跌幅"
+            value={formatPointPercent(fundQuote.dailyChangePct)}
+            tone={
+              hasNumericValue(fundQuote.dailyChangePct) ? (fundQuote.dailyChangePct >= 0 ? 'positive' : 'negative') : ''
+            }
+            note={fundQuote.status === 'pending' ? '今日净值尚未更新' : '以基金净值为准'}
+          />
+          <Metric
+            label="业绩基准指数参考"
+            value={formatPointPercent(
+              hasNumericValue(benchmarkQuote.pct) ? numericValue(benchmarkQuote.pct) * 100 : null
+            )}
+            tone={hasNumericValue(benchmarkQuote.pct) ? (benchmarkQuote.pct >= 0 ? 'positive' : 'negative') : ''}
+            note={`${BENCHMARK_INDEX.name} · 参考权重 ${BENCHMARK_INDEX.weight}%`}
+          />
+          <Metric
+            label="行情状态"
+            value={
+              fundQuote.status === 'updated'
+                ? '已更新'
+                : fundQuote.status === 'pending'
+                  ? '待更新'
+                  : fundQuote.status === 'loading'
+                    ? '获取中'
+                    : '暂不可用'
+            }
+            tone={fundQuote.status === 'updated' ? 'positive' : 'accent'}
+            note="指数仅作预警参考"
+          />
+        </div>
+        <div className={styles.riskStrip} role="status" aria-live="polite">
+          {riskSignals.length ? (
+            riskSignals.map((signal) => (
+              <div key={signal.id} className={`${styles.riskItem} ${styles[`risk${signal.level}`]}`}>
+                <strong>{signal.action}</strong>
+                <span>
+                  {signal.source}：{signal.message}
+                </span>
+              </div>
+            ))
+          ) : (
+            <div className={`${styles.riskItem} ${styles.riskSafe}`}>
+              <strong>暂无风控触发</strong>
+              <span>基金和账户数据未达到已设置的提醒线</span>
+            </div>
+          )}
+        </div>
+        <details className={styles.riskSettings}>
+          <summary>风控设置</summary>
+          <div className={styles.riskSettingsGrid}>
+            {RISK_FIELDS.map(([key, label]) => (
+              <label key={key}>
+                <span>{label}</span>
+                <span className={styles.riskInputWrap}>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={riskRules[key]}
+                    onChange={(event) =>
+                      setRiskRules((current) => ({
+                        ...current,
+                        [key]: event.target.value === '' ? '' : numericValue(event.target.value)
+                      }))
+                    }
+                  />
+                  <em>%</em>
+                </span>
+              </label>
+            ))}
+          </div>
+        </details>
+      </section>
 
       <div className={styles.workspace}>
         <section className={`${styles.panel} ${styles.snapshotPanel}`} aria-labelledby="results-title">
@@ -528,16 +749,6 @@ export default function TradingCalculatorPage() {
           id="entry-title"
           title="入仓流水"
           detail="按添加时间取得净值；输入入仓金额后自动计算幅度、份额与后续资产。"
-          action={
-            <button
-              type="button"
-              className={styles.addButton}
-              aria-label="新增入仓记录"
-              onClick={() => openFlowDialog('entry')}
-            >
-              +
-            </button>
-          }
         />
         <div id="entry-table-hint" className={styles.srOnly}>
           可编辑添加时间和买入金额，日期净值更新后自动计算幅度、份额与后续流水。
@@ -559,7 +770,7 @@ export default function TradingCalculatorPage() {
             <thead>
               <tr>
                 <th>时间 / 节点</th>
-                <th>幅度</th>
+                <th>日涨跌幅</th>
                 <th>金额</th>
                 <th>累计</th>
                 <th>份额</th>
@@ -628,8 +839,16 @@ export default function TradingCalculatorPage() {
                     </th>
                     <td>
                       {entry.recordedAt ? (
-                        <span className={row.pendingNav ? styles.pendingBadge : styles.confirmBadge}>
-                          {row.pendingNav ? '等待日期净值' : formatPercent(numericValue(row.change) / 100)}
+                        <span
+                          className={
+                            row.pendingNav || row.pendingDailyChange
+                              ? styles.pendingBadge
+                              : row.dailyChange >= 0
+                                ? styles.up
+                                : styles.down
+                          }
+                        >
+                          {row.pendingNav ? '等待日期净值' : dailyChangeLabel(row)}
                         </span>
                       ) : entry.manual ? (
                         <span className={styles.confirmBadge}>{formatPercent(numericValue(row.change) / 100)}</span>
@@ -700,16 +919,6 @@ export default function TradingCalculatorPage() {
           id="exit-title"
           title="出仓流水"
           detail="按添加时间取得净值；输入出仓金额后自动计算幅度、份额与后续资产。"
-          action={
-            <button
-              type="button"
-              className={styles.addButton}
-              aria-label="新增出仓记录"
-              onClick={() => openFlowDialog('exit')}
-            >
-              +
-            </button>
-          }
         />
         <div id="exit-table-hint" className={styles.srOnly}>
           可编辑添加时间和出仓金额，日期净值更新后自动计算幅度、份额与后续资金。
@@ -731,7 +940,7 @@ export default function TradingCalculatorPage() {
             <thead>
               <tr>
                 <th>时间 / 节点</th>
-                <th>幅度</th>
+                <th>日涨跌幅</th>
                 <th>出仓金额</th>
                 <th>累计</th>
                 <th>份额</th>
@@ -800,7 +1009,17 @@ export default function TradingCalculatorPage() {
                     </th>
                     <td>
                       {exit.recordedAt || exit.manual ? (
-                        <span className={styles.confirmBadge}>{formatPercent(numericValue(row.rebound) / 100)}</span>
+                        <span
+                          className={
+                            row.pendingDailyChange
+                              ? styles.pendingBadge
+                              : row.dailyChange >= 0
+                                ? styles.up
+                                : styles.down
+                          }
+                        >
+                          {exit.recordedAt ? dailyChangeLabel(row) : formatPercent(numericValue(row.rebound) / 100)}
+                        </span>
                       ) : (
                         <label className={styles.tableInput}>
                           <input

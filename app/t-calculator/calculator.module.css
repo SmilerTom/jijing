@@ -9,7 +9,7 @@
   padding: 42px 40px 56px;
   color: var(--text);
   background: radial-gradient(circle at 92% 2%, color-mix(in srgb, var(--primary) 7%, transparent), transparent 31rem);
-  font-size: 14PX;
+  font-size: 14px;
   overflow: hidden;
 }
 .ambient {
@@ -53,7 +53,7 @@
   gap: 10px;
   align-items: center;
   color: color-mix(in srgb, var(--primary) 42%, var(--muted));
-  font-size: 12PX;
+  font-size: 12px;
   font-weight: 700;
 }
 .kicker span:not(.liveDot) {
@@ -70,7 +70,7 @@
   margin: 16px 0 8px;
   max-width: 760px;
   color: var(--foreground);
-  font-size: clamp(36PX, 4.6vw, 58PX);
+  font-size: clamp(36px, 4.6vw, 58px);
   line-height: 0.98;
   letter-spacing: -0.06em;
   font-weight: 800;
@@ -79,7 +79,7 @@
 .hero p {
   margin: 0;
   color: var(--muted);
-  font-size: 15PX;
+  font-size: 15px;
   letter-spacing: 0.01em;
 }
 .heroActions {
@@ -87,6 +87,34 @@
   align-items: center;
   gap: 12px;
   padding-bottom: 2px;
+}
+.flowMenu {
+  position: relative;
+}
+.flowActions {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 4;
+  display: grid;
+  min-width: 96px;
+  padding: 5px;
+  background: var(--card);
+  border: 1px solid var(--calc-line);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+}
+.flowActions button {
+  padding: 9px 12px;
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+}
+.flowActions button:hover,
+.flowActions button:focus-visible {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
 }
 .page button {
   font: inherit;
@@ -96,7 +124,7 @@
 .textButton {
   min-height: 40px;
   border-radius: 8px;
-  font-size: 13PX;
+  font-size: 13px;
   font-weight: 700;
   transition:
     transform 0.2s ease,
@@ -119,7 +147,9 @@
   color: var(--muted);
   background: transparent;
   border: 0;
-  transition: color 0.2s ease, opacity 0.2s ease;
+  transition:
+    color 0.2s ease,
+    opacity 0.2s ease;
 }
 .textButton:hover,
 .textButton:focus-visible {
@@ -146,12 +176,12 @@
   background: var(--primary);
   border-radius: 50%;
   font:
-    700 12PX/1 Georgia,
+    700 12px/1 Georgia,
     serif;
 }
 .notice p {
   margin: 0;
-  font-size: 13PX;
+  font-size: 13px;
   line-height: 1.5;
 }
 .noticeTag {
@@ -160,7 +190,7 @@
   color: var(--primary);
   border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
   border-radius: 5px;
-  font-size: 10PX;
+  font-size: 10px;
   white-space: nowrap;
 }
 .workspace {
@@ -179,6 +209,115 @@
 .snapshotPanel {
   border-top: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
   box-shadow: 0 20px 60px color-mix(in srgb, var(--accent) 8%, rgba(0, 0, 0, 0.26));
+}
+.marketPanel {
+  margin-bottom: 18px;
+  border-top: 2px solid color-mix(in srgb, var(--primary) 70%, transparent);
+}
+.marketGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.riskStrip {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+.riskItem {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 12px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--input) 70%, transparent);
+  border-left: 3px solid var(--primary);
+  border-radius: 5px;
+  font-size: 12px;
+}
+.riskItem strong {
+  color: var(--text);
+  white-space: nowrap;
+}
+.riskdanger {
+  border-left-color: var(--danger);
+}
+.riskdanger strong {
+  color: var(--danger);
+}
+.riskwarning {
+  border-left-color: var(--accent);
+}
+.riskwarning strong {
+  color: var(--accent);
+}
+.riskwatch {
+  border-left-color: var(--primary);
+}
+.riskindex {
+  border-left-color: var(--muted);
+}
+.riskSafe {
+  border-left-color: var(--success);
+}
+.riskSafe strong {
+  color: var(--success);
+}
+.riskSettings {
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px solid var(--calc-line);
+}
+.riskSettings summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+.riskSettingsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.riskSettingsGrid label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.riskInputWrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 8px;
+  background: var(--input);
+  border: 1px solid var(--calc-line);
+  border-radius: 5px;
+}
+.riskInputWrap:focus-within {
+  border-color: var(--primary);
+}
+.riskInputWrap input {
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font:
+    600 13px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
+}
+.riskInputWrap em {
+  color: var(--muted);
+  font-style: normal;
 }
 .sectionTitle {
   display: flex;
@@ -203,13 +342,13 @@
 }
 .eyebrow {
   color: var(--primary);
-  font-size: 11PX;
+  font-size: 11px;
   font-weight: 800;
 }
 .sectionTitle h2 {
   display: inline;
   margin: 0;
-  font-size: 24PX;
+  font-size: 24px;
   letter-spacing: -0.03em;
 }
 .snapshotPanel h2 {
@@ -225,7 +364,7 @@
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
   border-radius: 6px;
-  font-size: 13PX;
+  font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -245,7 +384,7 @@
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
   border-radius: 6px;
-  font-size: 22PX;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1;
 }
@@ -256,14 +395,14 @@
 }
 .recoveryPanel h2 {
   margin: 0;
-  font-size: 26PX;
+  font-size: 26px;
   letter-spacing: -0.03em;
 }
 .sectionTitle p {
   display: inline;
   margin: 0 0 0 10px;
   color: var(--muted);
-  font-size: 13PX;
+  font-size: 13px;
   line-height: 1.5;
 }
 .fieldsGrid {
@@ -279,13 +418,13 @@
 }
 .field label {
   color: var(--text);
-  font-size: 13PX;
+  font-size: 13px;
   font-weight: 700;
 }
 .field small {
   min-height: 15px;
   color: var(--muted);
-  font-size: 11PX;
+  font-size: 11px;
   line-height: 1.35;
 }
 .inputWrap {
@@ -312,7 +451,7 @@
   border: 0;
   outline: 0;
   font:
-    600 16PX/1 ui-monospace,
+    600 16px/1 ui-monospace,
     SFMono-Regular,
     Menlo,
     Monaco,
@@ -322,7 +461,7 @@
 .inputWrap span,
 .tableInput span {
   color: var(--muted);
-  font-size: 12PX;
+  font-size: 12px;
 }
 .error {
   color: var(--danger) !important;
@@ -335,12 +474,12 @@
   padding-top: 15px;
   color: var(--muted);
   border-top: 1px solid var(--calc-line);
-  font-size: 11PX;
+  font-size: 11px;
 }
 .assumption strong {
   color: var(--text);
   font:
-    700 13PX ui-monospace,
+    700 13px ui-monospace,
     SFMono-Regular,
     Menlo,
     Monaco,
@@ -367,7 +506,10 @@
   background: color-mix(in srgb, var(--background) 54%, transparent);
   border: 1px solid var(--calc-line);
   border-radius: 10px;
-  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
 }
 .metric:hover {
   background: color-mix(in srgb, var(--background) 76%, var(--primary) 4%);
@@ -394,20 +536,20 @@
   padding: 0 7px;
 }
 .metricField .inputWrap input {
-  font-size: 16PX;
+  font-size: 16px;
 }
 .metric span,
 .metric small {
   display: block;
   color: var(--muted);
-  font-size: 11PX;
+  font-size: 11px;
 }
 .metric strong {
   display: block;
   margin: 11px 0 7px;
   color: var(--text);
   font:
-    700 clamp(18PX, 2vw, 24PX)/1 ui-monospace,
+    700 clamp(18px, 2vw, 24px)/1 ui-monospace,
     SFMono-Regular,
     Menlo,
     Monaco,
@@ -416,7 +558,7 @@
   letter-spacing: -0.06em;
 }
 .metric small {
-  font-size: 10PX;
+  font-size: 10px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -448,7 +590,7 @@
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: 14PX;
+  font-size: 14px;
 }
 .entryTable {
   min-width: 1076px;
@@ -501,7 +643,7 @@
   z-index: 1;
   color: var(--muted);
   background: var(--calc-surface);
-  font-size: 12PX;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.05em;
 }
@@ -521,7 +663,13 @@
   background: color-mix(in srgb, var(--input) 78%, transparent);
   border: 1px solid var(--calc-line);
   border-radius: 4px;
-  font: 600 11PX ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font:
+    600 11px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
 }
 .flowDateField input:focus-visible {
   color: var(--text);
@@ -564,7 +712,7 @@
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
   border-radius: 5px;
-  font-size: 10PX;
+  font-size: 10px;
   font-weight: 700;
 }
 .nodeIndex {
@@ -577,7 +725,7 @@
   background: color-mix(in srgb, var(--primary) 10%, transparent);
   border-radius: 5px;
   font:
-    700 10PX ui-monospace,
+    700 10px ui-monospace,
     SFMono-Regular,
     Menlo,
     Monaco,
@@ -608,7 +756,7 @@
   outline: 0;
   text-align: center;
   font:
-    600 16PX/1 ui-monospace,
+    600 16px/1 ui-monospace,
     SFMono-Regular,
     Menlo,
     Monaco,
@@ -629,7 +777,7 @@
 }
 .sign {
   font:
-    700 14PX/1 ui-monospace,
+    700 14px/1 ui-monospace,
     SFMono-Regular,
     Menlo,
     Monaco,
@@ -643,7 +791,7 @@
   background: color-mix(in srgb, var(--primary) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
   border-radius: 5px;
-  font-size: 10PX;
+  font-size: 10px;
 }
 .outAmount {
   color: var(--danger);
@@ -652,7 +800,7 @@
 .outSign {
   color: var(--danger);
   font:
-    700 14PX/1 ui-monospace,
+    700 14px/1 ui-monospace,
     SFMono-Regular,
     Menlo,
     Monaco,
@@ -677,7 +825,7 @@
 .recoveryPanel p {
   margin: 10px 0 0;
   color: var(--muted);
-  font-size: 13PX;
+  font-size: 13px;
 }
 .recoveryPanel p strong {
   color: var(--text);
@@ -692,7 +840,7 @@
 .recoveryNumber em {
   display: block;
   color: var(--muted);
-  font-size: 11PX;
+  font-size: 11px;
   font-style: normal;
 }
 .recoveryNumber strong {
@@ -700,7 +848,7 @@
   margin: 8px 0;
   color: var(--primary);
   font:
-    700 34PX/1 ui-monospace,
+    700 34px/1 ui-monospace,
     SFMono-Regular,
     Menlo,
     Monaco,
@@ -714,7 +862,7 @@
   gap: 16px;
   padding-top: 24px;
   color: var(--muted);
-  font-size: 9PX;
+  font-size: 9px;
 }
 .flowDialog {
   z-index: 10;
@@ -747,12 +895,12 @@
 .flowDialogHeader h2 {
   margin: 8px 0 0;
   color: var(--accent);
-  font-size: 24PX;
+  font-size: 24px;
 }
 .flowDialogHint {
   margin: 18px 0;
   color: var(--muted);
-  font-size: 14PX;
+  font-size: 14px;
   line-height: 1.5;
 }
 .flowDialogFields {
@@ -763,7 +911,7 @@
   display: grid;
   gap: 6px;
   color: var(--text);
-  font-size: 14PX;
+  font-size: 14px;
   font-weight: 700;
 }
 .dialogField input {
@@ -775,7 +923,7 @@
   border: 1px solid var(--calc-line);
   border-radius: 7px;
   outline: 0;
-  font-size: 16PX;
+  font-size: 16px;
 }
 .dialogField input:focus {
   border-color: var(--primary);
@@ -784,7 +932,7 @@
 .dialogError {
   margin: 12px 0 0;
   color: var(--danger);
-  font-size: 13PX;
+  font-size: 13px;
 }
 .flowDialogActions {
   display: flex;
@@ -801,7 +949,7 @@
   padding-top: 14px;
   border-top: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
   color: var(--muted);
-  font-size: 12PX;
+  font-size: 12px;
 }
 .pagination label {
   display: inline-flex;
@@ -816,7 +964,7 @@
   background: var(--input);
   border: 1px solid var(--calc-line);
   border-radius: 5px;
-  font-size: 12PX;
+  font-size: 12px;
 }
 .pagination button:disabled {
   cursor: not-allowed;
@@ -853,10 +1001,14 @@
     margin-bottom: 22px;
   }
   .hero h1 {
-    font-size: 40PX;
+    font-size: 40px;
   }
   .heroActions {
     margin-top: 20px;
+  }
+  .flowActions {
+    right: auto;
+    left: 0;
   }
   .secondaryButton {
     flex: 1;
@@ -885,12 +1037,16 @@
   .metricsGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .marketGrid,
+  .riskSettingsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .metric {
     min-height: 86px;
     padding: 12px 10px;
   }
   .metric strong {
-    font-size: 16PX;
+    font-size: 16px;
   }
   .tableScroll {
     margin: 0 -14px;
@@ -914,6 +1070,10 @@
   .footer {
     display: block;
     line-height: 1.8;
+  }
+  .riskItem {
+    display: grid;
+    gap: 4px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
