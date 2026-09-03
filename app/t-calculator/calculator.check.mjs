@@ -94,6 +94,24 @@ const manualFilledExitRows = calculateExitRows({
 });
 assert.ok(Math.abs(manualFilledExitRows[0].rebound - 10) < 0.0001);
 
+const datedEntryRows = calculateEntryRows({
+  capital: 1000,
+  baseNav: 10,
+  entries: [{ amount: 500, recordedAt: '2026-09-01T15:00' }],
+  navByDate: { '2026-09-01': 5 }
+});
+assert.equal(datedEntryRows[0].change, -50);
+const datedExitRows = calculateExitRows({
+  targetCapital: 1000,
+  baseNav: 10,
+  initialShares: 200,
+  exits: [{ amount: 100, recordedAt: '2026-09-02T15:00' }],
+  navByDate: { '2026-09-02': 12 }
+});
+assert.ok(Math.abs(datedExitRows[0].rebound - 20) < 0.0001);
+assert.ok(Math.abs(datedExitRows[0].soldShares - 100 / 12) < 0.0001);
+assert.equal(datedExitRows[0].cumulativeAmount, 100);
+
 const pendingEntryRows = calculateEntryRows({
   capital: 1000,
   baseNav: 10,
@@ -113,3 +131,13 @@ const pendingExitRows = calculateExitRows({
 assert.equal(pendingExitRows[0].pendingNav, true);
 assert.equal(pendingExitRows[0].soldShares, 0);
 assert.equal(pendingExitRows[0].remainingShares, 100);
+
+const missingDatedExitRows = calculateExitRows({
+  targetCapital: 1000,
+  baseNav: 10,
+  initialShares: 100,
+  exits: [{ amount: 100, recordedAt: '2026-09-02T15:00' }],
+  navByDate: {}
+});
+assert.equal(missingDatedExitRows[0].pendingNav, true);
+assert.equal(missingDatedExitRows[0].soldShares, 0);

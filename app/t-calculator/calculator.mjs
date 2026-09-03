@@ -6,32 +6,42 @@ export const DEFAULT_ENTRIES = [
 ];
 
 export const DEFAULT_EXITS = [
-  { id: 'up-10', label: '上涨 10%', rebound: 10, sellRatio: 10 },
-  { id: 'up-10-next', label: '再涨 10%', rebound: 10, sellRatio: 10 },
-  { id: 'up-10-third', label: '再涨 10%', rebound: 10, sellRatio: 10 }
+  { id: 'up-10', label: '上涨 10%', rebound: 10, amount: '' },
+  { id: 'up-10-next', label: '再涨 10%', rebound: 10, amount: '' },
+  { id: 'up-10-third', label: '再涨 10%', rebound: 10, amount: '' }
 ];
 
 const numberOr = (value, fallback = 0) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
 const hasNumericValue = (value) =>
   value !== '' && value !== null && value !== undefined && Number.isFinite(Number(value));
+const flowDate = (flow) => {
+  const value = String(flow?.recordedAt || '');
+  return /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : '';
+};
+const hasDateNav = (navByDate, date) => Boolean(date && Object.prototype.hasOwnProperty.call(navByDate, date));
 
-const navForEntry = (entry, baseNav) => {
+const navForEntry = (entry, baseNav, navByDate) => {
+  const date = flowDate(entry);
+  if (hasDateNav(navByDate, date)) return numberOr(navByDate[date]);
+  if (date) return entry?.manual ? numberOr(entry?.nav) : 0;
   const explicitNav = numberOr(entry?.nav);
   if (entry?.manual && !(explicitNav > 0)) return 0;
   if (explicitNav > 0) return explicitNav;
   return baseNav * (1 + numberOr(entry?.change) / 100);
 };
 
-export function calculateEntryRows({ capital = 0, baseNav = 0, entries = [] } = {}) {
+export function calculateEntryRows({ capital = 0, baseNav = 0, entries = [], navByDate = {} } = {}) {
   const startingCash = numberOr(capital);
   const safeBaseNav = numberOr(baseNav);
   let cash = startingCash;
   let shares = 0;
   let cumulativeInvested = 0;
+  let blocked = false;
   return entries.map((entry, index) => {
-    const nav = navForEntry(entry, safeBaseNav);
+    const nav = navForEntry(entry, safeBaseNav, navByDate);
     const amount = Math.max(0, numberOr(entry?.amount));
-    if (!(nav > 0))
+    if (blocked || !(nav > 0)) {
+      blocked = true;
       return {
         ...entry,
         index,
@@ -50,6 +60,7 @@ export function calculateEntryRows({ capital = 0, baseNav = 0, entries = [] } = 
         pendingNav: true,
         error: entry?.manual ? '等待补全净值' : '净值必须大于 0'
       };
+    }
     const buyAmount = Math.min(amount, Math.max(0, cash));
     const buyShares = buyAmount / nav;
     shares += buyShares;
@@ -62,7 +73,7 @@ export function calculateEntryRows({ capital = 0, baseNav = 0, entries = [] } = 
       ...entry,
       index,
       nav,
-      change: entry?.manual && safeBaseNav > 0 ? (nav / safeBaseNav - 1) * 100 : entry?.change,
+      change: (entry?.manual || flowDate(entry)) && safeBaseNav > 0 ? (nav / safeBaseNav - 1) * 100 : entry?.change,
       amount: buyAmount,
       requestedAmount: amount,
       buyShares,
@@ -114,6 +125,7 @@ export function calculateExitRows({
   initialShares,
   initialCash = 0,
   exits = [],
+  navByDate = {},
   redemptionFeePct = 0
 } = {}) {
   const capital = Math.max(0, numberOr(targetCapital));
@@ -125,16 +137,25 @@ export function calculateExitRows({
   let cash = hasNumericValue(initialCash) ? Math.max(0, numberOr(initialCash)) : 0;
   let previousNav = safeBaseNav;
   let blocked = false;
+  let cumulativeAmount = 0;
   return exits.map((exit, index) => {
+    const date = flowDate(exit);
+    const dateHasNav = hasDateNav(navByDate, date);
+    const dateNav = dateHasNav ? numberOr(navByDate[date]) : 0;
     const explicitNav = numberOr(exit?.nav);
     const referenceNav = previousNav;
     const beforeShares = remainingShares;
-    const triggerNav =
-      exit?.manual && !(explicitNav > 0)
-        ? 0
-        : explicitNav > 0
+    const triggerNav = dateHasNav
+      ? dateNav
+      : date
+        ? exit?.manual
           ? explicitNav
-          : previousNav * (1 + numberOr(exit?.rebound) / 100);
+          : 0
+        : exit?.manual && !(explicitNav > 0)
+          ? 0
+          : explicitNav > 0
+            ? explicitNav
+            : previousNav * (1 + numberOr(exit?.rebound) / 100);
     if (blocked || !(triggerNav > 0)) {
       blocked = true;
       return {
@@ -148,6 +169,8 @@ export function calculateExitRows({
         grossCash: 0,
         feeAmount: 0,
         netCash: 0,
+        requestedAmount: hasNumericValue(exit?.amount) ? Math.max(0, numberOr(exit.amount)) : 0,
+        cumulativeAmount,
         cash,
         remainingShares,
         holdingValue: 0,
@@ -157,22 +180,29 @@ export function calculateExitRows({
         error: '等待补全净值'
       };
     }
-    const requestedShares = hasNumericValue(exit?.sellShares)
-      ? Math.max(0, numberOr(exit?.sellShares))
-      : (beforeShares * Math.max(0, numberOr(exit?.sellRatio))) / 100;
+    const hasAmountField = Object.prototype.hasOwnProperty.call(exit, 'amount');
+    const requestedAmount = hasNumericValue(exit?.amount) ? Math.max(0, numberOr(exit.amount)) : NaN;
+    const requestedShares = Number.isFinite(requestedAmount)
+      ? requestedAmount / triggerNav
+      : hasAmountField
+        ? 0
+        : hasNumericValue(exit?.sellShares)
+          ? Math.max(0, numberOr(exit?.sellShares))
+          : (beforeShares * Math.max(0, numberOr(exit?.sellRatio))) / 100;
     const soldShares = Math.min(remainingShares, requestedShares);
     const grossCash = soldShares * triggerNav;
     const feeAmount = grossCash * fee;
     const netCash = grossCash - feeAmount;
     remainingShares -= soldShares;
     cash += netCash;
+    cumulativeAmount += netCash;
     previousNav = triggerNav;
     const holdingValue = remainingShares * triggerNav;
     const totalAssets = cash + holdingValue;
     return {
       ...exit,
       index,
-      rebound: exit?.manual && referenceNav > 0 ? (triggerNav / referenceNav - 1) * 100 : exit?.rebound,
+      rebound: (exit?.manual || date) && referenceNav > 0 ? (triggerNav / referenceNav - 1) * 100 : exit?.rebound,
       targetShares,
       triggerNav,
       beforeShares,
@@ -181,6 +211,8 @@ export function calculateExitRows({
       grossCash,
       feeAmount,
       netCash,
+      requestedAmount: Number.isFinite(requestedAmount) ? requestedAmount : grossCash,
+      cumulativeAmount,
       cash,
       remainingShares,
       holdingValue,

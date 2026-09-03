@@ -9,6 +9,7 @@ import {
   DEFAULT_EXITS,
   summarizeEntryPosition
 } from './calculator.mjs';
+import { fetchSmartFundNetValueBackward } from '../api/fund';
 import { storageStore } from '../stores/storageStore';
 import styles from './calculator.module.css';
 
@@ -33,8 +34,6 @@ const formatMoney = (value) =>
   Number.isFinite(value)
     ? `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : '--';
-const formatAmount = (value) =>
-  Number.isFinite(value) ? value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--';
 const formatInputAmount = (value) => (Number.isFinite(value) ? value.toFixed(2) : '');
 const formatNav = (value) => (Number.isFinite(value) && value > 0 ? value.toFixed(4) : '--');
 const formatNumber = (value) =>
@@ -50,11 +49,16 @@ const exitMoveLabel = (change, index) =>
   `${change >= 0 ? (index === 0 ? '上涨' : '再涨') : index === 0 ? '下跌' : '再跌'} ${absolutePercent(change)}%`;
 const entryLabel = (entry, row) => {
   if (entry.manual && hasNumericValue(row?.change) && !row?.pendingNav) return entryMoveLabel(row.change);
-  return entry.manual || entry.confirmation ? entry.label : entryMoveLabel(numericValue(entry.change));
+  if (entry.manual || entry.confirmation) return entry.label;
+  return entryMoveLabel(hasNumericValue(row?.change) && !row?.pendingNav ? row.change : numericValue(entry.change));
 };
 const exitLabel = (exit, index, row) => {
   if (exit.manual && hasNumericValue(row?.rebound) && !row?.pendingNav) return exitMoveLabel(row.rebound, index);
-  return exit.manual ? exit.label : exitMoveLabel(numericValue(exit.rebound), index);
+  if (exit.manual) return exit.label;
+  return exitMoveLabel(
+    hasNumericValue(row?.rebound) && !row?.pendingNav ? row.rebound : numericValue(exit.rebound),
+    index
+  );
 };
 const todayKey = () => {
   const date = new Date();
@@ -64,12 +68,8 @@ const localDateTimeValue = () => {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 };
-const formatFlowTime = (value) => {
-  if (!value) return '';
-  const [datePart, timePart = ''] = String(value).split('T');
-  const [, month, day] = datePart.split('-');
-  return month && day ? `${month}-${day} ${timePart.slice(0, 5)}` : '';
-};
+const flowDate = (value) => (/^\d{4}-\d{2}-\d{2}/.test(String(value || '')) ? String(value).slice(0, 10) : '');
+const hasDateNav = (navByDate, date) => Boolean(date && Object.prototype.hasOwnProperty.call(navByDate, date));
 const tomorrowKey = () => {
   const date = new Date();
   date.setDate(date.getDate() + 1);
@@ -121,6 +121,20 @@ function Metric({ label, value, note, tone = '' }) {
   );
 }
 
+function FlowDateField({ label, value, onChange }) {
+  return (
+    <label className={styles.flowDateField}>
+      <span className={styles.srOnly}>{label}发生时间</span>
+      <input
+        aria-label={`${label}发生时间`}
+        type="datetime-local"
+        value={value || ''}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
+}
+
 function SectionTitle({ id, eyebrow, title, detail, action }) {
   return (
     <div className={styles.sectionTitle}>
@@ -169,12 +183,13 @@ export default function TradingCalculatorPage() {
   const [isEditingSnapshot, setIsEditingSnapshot] = useState(false);
   const [pendingFlows, setPendingFlows] = useState({ entries: [], exits: [] });
   const [flowType, setFlowType] = useState(null);
-  const [flowDraft, setFlowDraft] = useState({ amount: '', nav: '', recordedAt: '' });
+  const [flowDraft, setFlowDraft] = useState({ amount: '', recordedAt: '' });
   const [flowError, setFlowError] = useState('');
   const [entryPage, setEntryPage] = useState(1);
   const [exitPage, setExitPage] = useState(1);
   const [entryPageSize, setEntryPageSize] = useState(5);
   const [exitPageSize, setExitPageSize] = useState(5);
+  const [navByDate, setNavByDate] = useState({});
   const flowsHydrated = useRef(false);
 
   const updateForm = (key, value) => setForm((current) => ({ ...current, [key]: value }));
@@ -182,6 +197,32 @@ export default function TradingCalculatorPage() {
     setEntries((current) => current.map((entry) => (entry.id === id ? { ...entry, [key]: value } : entry)));
   const updateExit = (id, key, value) =>
     setExits((current) => current.map((exit) => (exit.id === id ? { ...exit, [key]: value } : exit)));
+  const updateEntryAmount = (id, value) =>
+    setEntries((current) =>
+      current.map((entry) =>
+        entry.id === id
+          ? {
+              ...entry,
+              amount: value,
+              recordedAt: value === '' && !entry.manual ? '' : entry.recordedAt || localDateTimeValue()
+            }
+          : entry
+      )
+    );
+  const updateExitAmount = (id, value) =>
+    setExits((current) =>
+      current.map((exit) =>
+        exit.id === id
+          ? {
+              ...exit,
+              amount: value,
+              sellShares: '',
+              sellRatio: '',
+              recordedAt: value === '' && !exit.manual ? '' : exit.recordedAt || localDateTimeValue()
+            }
+          : exit
+      )
+    );
   const reset = () => {
     setForm(defaults.form);
     setEntries(defaults.entries.map((entry) => ({ ...entry })));
@@ -211,14 +252,48 @@ export default function TradingCalculatorPage() {
     if (flowsHydrated.current) storageStore.setItem(PENDING_FLOW_KEY, JSON.stringify(pendingFlows));
   }, [pendingFlows]);
 
+  const flowDateKey = useMemo(
+    () =>
+      [...entries, ...exits, ...pendingFlows.entries, ...pendingFlows.exits]
+        .map((flow) => flowDate(flow.recordedAt))
+        .filter(Boolean)
+        .filter((date, index, dates) => dates.indexOf(date) === index)
+        .join(','),
+    [entries, exits, pendingFlows.entries, pendingFlows.exits]
+  );
+  useEffect(() => {
+    const dates = flowDateKey ? flowDateKey.split(',') : [];
+    const missing = dates.filter((date) => !hasDateNav(navByDate, date));
+    if (!missing.length) return undefined;
+    let cancelled = false;
+    Promise.all(
+      missing.map(async (date) => {
+        try {
+          const result = await fetchSmartFundNetValueBackward('017811', date);
+          return [date, result?.value > 0 ? result.value : null];
+        } catch {
+          return [date, null];
+        }
+      })
+    ).then((results) => {
+      if (cancelled) return;
+      setNavByDate((current) => ({ ...current, ...Object.fromEntries(results) }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [flowDateKey, navByDate]);
+
   const plannedCapital = useMemo(
     () =>
       entries.reduce((sum, entry) => {
         const amount = numericValue(entry.amount);
-        const ready = !entry.manual || numericValue(entry.nav) > 0;
+        const date = flowDate(entry.recordedAt);
+        const ready =
+          !entry.manual || numericValue(entry.nav) > 0 || (date && hasDateNav(navByDate, date) && navByDate[date] > 0);
         return sum + (ready && Number.isFinite(amount) ? Math.max(0, amount) : 0);
       }, 0),
-    [entries]
+    [entries, navByDate]
   );
   const errors = {
     holdingValue: form.holdingValue === '' || isValidNonNegative(form.holdingValue) ? '' : '持仓市值不能为负数',
@@ -233,8 +308,8 @@ export default function TradingCalculatorPage() {
       Number.isFinite(numericValue(form.holdingDays)) && numericValue(form.holdingDays) >= 0 ? '' : '持有时间不能为负数'
   };
   const entryRows = useMemo(
-    () => calculateEntryRows({ capital: plannedCapital, baseNav: numericValue(form.baseNav), entries }),
-    [plannedCapital, form.baseNav, entries]
+    () => calculateEntryRows({ capital: plannedCapital, baseNav: numericValue(form.baseNav), entries, navByDate }),
+    [plannedCapital, form.baseNav, entries, navByDate]
   );
   const latestEntry = entryRows.at(-1);
   const position = useMemo(
@@ -268,9 +343,10 @@ export default function TradingCalculatorPage() {
         baseNav: numericValue(form.baseNav),
         initialShares: position.shares,
         initialCash: position.cash,
-        exits
+        exits,
+        navByDate
       }),
-    [plannedCapital, form.baseNav, position.shares, position.cash, exits]
+    [plannedCapital, form.baseNav, position.shares, position.cash, exits, navByDate]
   );
   const lastExit = exitRows.at(-1);
   const entryItems = useMemo(
@@ -304,36 +380,18 @@ export default function TradingCalculatorPage() {
     }, 86400000);
     return () => window.clearInterval(timer);
   }, [holdingActive]);
-  const updateExitRatio = (id, value) =>
-    setExits((current) =>
-      current.map((exit) => (exit.id === id ? { ...exit, sellRatio: value, sellShares: '' } : exit))
-    );
-  const updateExitShares = (id, index, value) => {
-    const beforeShares = exitRows[index]?.beforeShares || 0;
-    const shareValue = value === '' ? NaN : numericValue(value);
-    const boundedShareValue = Number.isFinite(shareValue) ? Math.min(beforeShares, Math.max(0, shareValue)) : NaN;
-    const ratio =
-      beforeShares > 0 && Number.isFinite(boundedShareValue)
-        ? ((boundedShareValue / beforeShares) * 100).toFixed(2)
-        : '';
-    const nextShares =
-      Number.isFinite(shareValue) && boundedShareValue !== shareValue ? boundedShareValue.toFixed(4) : value;
-    setExits((current) =>
-      current.map((exit) => (exit.id === id ? { ...exit, sellShares: nextShares, sellRatio: ratio } : exit))
-    );
-  };
   const updatePendingFlow = (type, id, key, value) =>
     setPendingFlows((current) => ({
       ...current,
       [type]: current[type].map((flow) => (flow.id === id ? { ...flow, [key]: value } : flow))
     }));
+  const updateFlowDate = (type, id, value, pending = false) => {
+    if (pending) return updatePendingFlow(type, id, 'recordedAt', value);
+    return type === 'entry' ? updateEntry(id, 'recordedAt', value) : updateExit(id, 'recordedAt', value);
+  };
   const openFlowDialog = (type) => {
     setFlowType(type);
-    setFlowDraft(
-      type === 'entry'
-        ? { amount: '', nav: '', recordedAt: localDateTimeValue() }
-        : { shares: '', nav: '', recordedAt: localDateTimeValue() }
-    );
+    setFlowDraft({ amount: '', recordedAt: localDateTimeValue() });
     setFlowError('');
   };
   const closeFlowDialog = () => {
@@ -342,15 +400,9 @@ export default function TradingCalculatorPage() {
   };
   const submitFlow = (event) => {
     event.preventDefault();
-    const nav = numericValue(flowDraft.nav);
-    const hasNav = flowDraft.nav !== '' && flowDraft.nav !== null && flowDraft.nav !== undefined;
-    const value = numericValue(flowType === 'entry' ? flowDraft.amount : flowDraft.shares);
-    if (!(value > 0) || (hasNav && !(nav > 0))) {
-      setFlowError(
-        flowType === 'entry'
-          ? '买入金额必须大于 0；净值可留空，填写时必须大于 0'
-          : '卖出份额必须大于 0；净值可留空，填写时必须大于 0'
-      );
+    const value = numericValue(flowDraft.amount);
+    if (!(value > 0)) {
+      setFlowError(flowType === 'entry' ? '买入金额必须大于 0' : '出仓金额必须大于 0');
       return;
     }
     const record = {
@@ -359,10 +411,9 @@ export default function TradingCalculatorPage() {
       manual: true,
       availableOn: tomorrowKey(),
       recordedAt: flowDraft.recordedAt || localDateTimeValue(),
-      nav: hasNav ? String(nav) : '',
       ...(flowType === 'entry'
         ? { amount: String(value), change: null, confirmation: true }
-        : { sellShares: String(value), sellRatio: '' })
+        : { amount: String(value) })
     };
     setPendingFlows((current) => ({
       ...current,
@@ -476,7 +527,7 @@ export default function TradingCalculatorPage() {
         <SectionTitle
           id="entry-title"
           title="入仓流水"
-          detail="下跌补仓与止跌确认加仓分开显示；最后一档净值可手工输入。"
+          detail="按添加时间取得净值；输入入仓金额后自动计算幅度、份额与后续资产。"
           action={
             <button
               type="button"
@@ -489,7 +540,7 @@ export default function TradingCalculatorPage() {
           }
         />
         <div id="entry-table-hint" className={styles.srOnly}>
-          可编辑触发幅度、执行净值和买入金额，数值变化会实时更新流水。
+          可编辑添加时间和买入金额，日期净值更新后自动计算幅度、份额与后续流水。
         </div>
         <div className={styles.tableScroll}>
           <table className={styles.entryTable}>
@@ -523,45 +574,42 @@ export default function TradingCalculatorPage() {
                 const index = (safeEntryPage - 1) * entryPageSize + visibleIndex;
                 const label = entryLabel(entry, row);
                 if (pending || row?.pendingNav) {
-                  const pendingStatus = pending ? '待次日计算' : '待补净值';
+                  const pendingStatus = pending ? '待次日计算' : '等待净值';
                   return (
                     <tr key={entry.id} className={styles.pendingRow}>
                       <th scope="row">
-                        {entry.recordedAt && (
-                          <time className={styles.flowTime} dateTime={entry.recordedAt}>
-                            {formatFlowTime(entry.recordedAt)}
-                          </time>
-                        )}
+                        <FlowDateField
+                          label={label}
+                          value={entry.recordedAt}
+                          onChange={(value) => updateFlowDate('entry', entry.id, value, pending)}
+                        />
                         <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
                         {label}
                         <span className={styles.pendingBadge}>{pendingStatus}</span>
                       </th>
                       <td>
-                        <span className={styles.pendingBadge}>待补净值</span>
+                        <span className={styles.pendingBadge}>自动更新</span>
                       </td>
                       <td>
-                        <span className={`${styles.tableInput} ${styles.inInput}`}>
+                        <label className={`${styles.tableInput} ${styles.inInput}`}>
                           <span className={styles.sign}>+</span>
-                          {formatAmount(numericValue(entry.amount))}
-                        </span>
-                      </td>
-                      <td colSpan="4">—</td>
-                      <td>
-                        <label className={styles.tableInput}>
                           <input
-                            aria-label={`${label}执行净值`}
-                            aria-describedby="entry-table-hint"
+                            aria-label={`${label}买入金额`}
                             type="number"
-                            value={asText(entry.nav)}
+                            value={asText(entry.amount)}
                             min="0"
-                            step="0.0001"
+                            step="0.01"
                             onChange={(event) =>
                               pending
-                                ? updatePendingFlow('entries', entry.id, 'nav', event.target.value)
-                                : updateEntry(entry.id, 'nav', event.target.value)
+                                ? updatePendingFlow('entries', entry.id, 'amount', event.target.value)
+                                : updateEntryAmount(entry.id, event.target.value)
                             }
                           />
                         </label>
+                      </td>
+                      <td colSpan="4">—</td>
+                      <td>
+                        <span className={styles.pendingBadge}>等待日期净值</span>
                       </td>
                       <td>待计算</td>
                     </tr>
@@ -570,19 +618,21 @@ export default function TradingCalculatorPage() {
                 return (
                   <tr key={entry.id}>
                     <th scope="row">
-                      {entry.recordedAt && (
-                        <time className={styles.flowTime} dateTime={entry.recordedAt}>
-                          {formatFlowTime(entry.recordedAt)}
-                        </time>
-                      )}
+                      <FlowDateField
+                        label={label}
+                        value={entry.recordedAt}
+                        onChange={(value) => updateFlowDate('entry', entry.id, value)}
+                      />
                       <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
                       {label}
                     </th>
                     <td>
-                      {entry.manual ? (
+                      {entry.recordedAt ? (
                         <span className={row.pendingNav ? styles.pendingBadge : styles.confirmBadge}>
-                          {row.pendingNav ? '待补净值' : formatPercent(numericValue(row.change) / 100)}
+                          {row.pendingNav ? '等待日期净值' : formatPercent(numericValue(row.change) / 100)}
                         </span>
+                      ) : entry.manual ? (
+                        <span className={styles.confirmBadge}>{formatPercent(numericValue(row.change) / 100)}</span>
                       ) : entry.confirmation ? (
                         <span className={styles.confirmBadge}>确认</span>
                       ) : (
@@ -613,7 +663,7 @@ export default function TradingCalculatorPage() {
                           value={asText(entry.amount)}
                           min="0"
                           step="0.01"
-                          onChange={(event) => updateEntry(entry.id, 'amount', event.target.value)}
+                          onChange={(event) => updateEntryAmount(entry.id, event.target.value)}
                         />
                       </label>
                     </td>
@@ -623,23 +673,7 @@ export default function TradingCalculatorPage() {
                     <td className={row.totalAssets < plannedCapital ? styles.down : styles.up}>
                       {formatMoney(row.totalAssets)}
                     </td>
-                    <td>
-                      {entry.manual || entry.confirmation ? (
-                        <label className={styles.tableInput}>
-                          <input
-                            aria-label={`${label}执行净值`}
-                            aria-describedby="entry-table-hint"
-                            type="number"
-                            value={asText(entry.nav)}
-                            min="0"
-                            step="0.0001"
-                            onChange={(event) => updateEntry(entry.id, 'nav', event.target.value)}
-                          />
-                        </label>
-                      ) : (
-                        <span>{formatNav(row.nav)}</span>
-                      )}
-                    </td>
+                    <td>{formatNav(row.nav)}</td>
                     <td className={row.returnRate >= 0 ? styles.up : styles.down}>{formatPercent(row.returnRate)}</td>
                   </tr>
                 );
@@ -665,7 +699,7 @@ export default function TradingCalculatorPage() {
         <SectionTitle
           id="exit-title"
           title="出仓流水"
-          detail="每轮涨幅作用于上一轮净值，每轮按当前持仓份额比例执行。"
+          detail="按添加时间取得净值；输入出仓金额后自动计算幅度、份额与后续资产。"
           action={
             <button
               type="button"
@@ -678,7 +712,7 @@ export default function TradingCalculatorPage() {
           }
         />
         <div id="exit-table-hint" className={styles.srOnly}>
-          可编辑上涨幅度、卖出比例或卖出份额，数值变化会实时更新出仓资金。
+          可编辑添加时间和出仓金额，日期净值更新后自动计算幅度、份额与后续资金。
         </div>
         <div className={styles.tableScroll}>
           <table className={styles.exitTable}>
@@ -686,9 +720,8 @@ export default function TradingCalculatorPage() {
             <colgroup>
               <col className={styles.exitNodeColumn} />
               <col className={styles.exitPercentColumn} />
-              <col className={styles.exitRatioColumn} />
-              <col className={styles.exitSharesColumn} />
               <col className={styles.exitAmountColumn} />
+              <col className={styles.exitValueColumn} />
               <col className={styles.exitValueColumn} />
               <col className={styles.exitValueColumn} />
               <col className={styles.exitValueColumn} />
@@ -699,10 +732,9 @@ export default function TradingCalculatorPage() {
               <tr>
                 <th>时间 / 节点</th>
                 <th>幅度</th>
-                <th>卖比例</th>
-                <th>卖出份额</th>
                 <th>出仓金额</th>
                 <th>累计</th>
+                <th>份额</th>
                 <th>持仓市值</th>
                 <th>总资产</th>
                 <th>净值</th>
@@ -714,46 +746,42 @@ export default function TradingCalculatorPage() {
                 const index = (safeExitPage - 1) * exitPageSize + visibleIndex;
                 const label = exitLabel(exit, index, row);
                 if (pending || row?.pendingNav) {
-                  const pendingStatus = pending ? '待次日计算' : '待补净值';
+                  const pendingStatus = pending ? '待次日计算' : '等待净值';
                   return (
                     <tr key={exit.id} className={styles.pendingRow}>
                       <th scope="row">
-                        {exit.recordedAt && (
-                          <time className={styles.flowTime} dateTime={exit.recordedAt}>
-                            {formatFlowTime(exit.recordedAt)}
-                          </time>
-                        )}
+                        <FlowDateField
+                          label={label}
+                          value={exit.recordedAt}
+                          onChange={(value) => updateFlowDate('exit', exit.id, value, pending)}
+                        />
                         <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
                         {label}
                         <span className={styles.pendingBadge}>{pendingStatus}</span>
                       </th>
                       <td>
-                        <span className={styles.pendingBadge}>待补净值</span>
+                        <span className={styles.pendingBadge}>自动更新</span>
                       </td>
-                      <td>—</td>
-                      <td>{formatNumber(numericValue(exit.sellShares))}</td>
                       <td>
-                        <span className={`${styles.tableInput} ${styles.outAmount}`}>
-                          <span className={styles.outSign}>−</span>待计算
-                        </span>
-                      </td>
-                      <td colSpan="3">—</td>
-                      <td>
-                        <label className={styles.tableInput}>
+                        <label className={`${styles.tableInput} ${styles.outAmount}`}>
+                          <span className={styles.outSign}>−</span>
                           <input
-                            aria-label={`${label}执行净值`}
-                            aria-describedby="exit-table-hint"
+                            aria-label={`${label}出仓金额`}
                             type="number"
-                            value={asText(exit.nav)}
+                            value={asText(exit.amount)}
                             min="0"
-                            step="0.0001"
+                            step="0.01"
                             onChange={(event) =>
                               pending
-                                ? updatePendingFlow('exits', exit.id, 'nav', event.target.value)
-                                : updateExit(exit.id, 'nav', event.target.value)
+                                ? updatePendingFlow('exits', exit.id, 'amount', event.target.value)
+                                : updateExitAmount(exit.id, event.target.value)
                             }
                           />
                         </label>
+                      </td>
+                      <td colSpan="4">—</td>
+                      <td>
+                        <span className={styles.pendingBadge}>等待日期净值</span>
                       </td>
                       <td>待计算</td>
                     </tr>
@@ -762,16 +790,16 @@ export default function TradingCalculatorPage() {
                 return (
                   <tr key={exit.id}>
                     <th scope="row">
-                      {exit.recordedAt && (
-                        <time className={styles.flowTime} dateTime={exit.recordedAt}>
-                          {formatFlowTime(exit.recordedAt)}
-                        </time>
-                      )}
+                      <FlowDateField
+                        label={label}
+                        value={exit.recordedAt}
+                        onChange={(value) => updateFlowDate('exit', exit.id, value)}
+                      />
                       <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
                       {label}
                     </th>
                     <td>
-                      {exit.manual ? (
+                      {exit.recordedAt || exit.manual ? (
                         <span className={styles.confirmBadge}>{formatPercent(numericValue(row.rebound) / 100)}</span>
                       ) : (
                         <label className={styles.tableInput}>
@@ -790,71 +818,23 @@ export default function TradingCalculatorPage() {
                       )}
                     </td>
                     <td>
-                      <label className={styles.tableInput}>
+                      <label className={`${styles.tableInput} ${styles.outAmount}`}>
+                        <span className={styles.outSign}>−</span>
                         <input
-                          aria-label={`${label}卖出比例`}
-                          aria-describedby="exit-table-hint"
+                          aria-label={`${label}出仓金额`}
                           type="number"
-                          value={asText(exit.sellRatio)}
+                          value={asText(exit.amount)}
                           min="0"
-                          max="100"
-                          step="1"
-                          onChange={(event) => updateExitRatio(exit.id, event.target.value)}
-                        />
-                        <span>%</span>
-                      </label>
-                    </td>
-                    <td>
-                      <label className={styles.tableInput}>
-                        <input
-                          aria-label={`${label}卖出份额`}
-                          aria-describedby="exit-table-hint"
-                          type="number"
-                          value={asText(
-                            row.beforeShares > 0
-                              ? exit.sellShares === '' || exit.sellShares === undefined
-                                ? row.soldShares.toFixed(4)
-                                : exit.sellShares
-                              : ''
-                          )}
-                          min="0"
-                          max={row.beforeShares || undefined}
-                          step="0.0001"
-                          onChange={(event) => updateExitShares(exit.id, index, event.target.value)}
+                          step="0.01"
+                          onChange={(event) => updateExitAmount(exit.id, event.target.value)}
                         />
                       </label>
                     </td>
-                    <td>
-                      {row.beforeShares > 0 && (
-                        <output
-                          className={`${styles.tableInput} ${styles.outAmount}`}
-                          aria-label={`${label}参考出仓金额`}
-                        >
-                          <span className={styles.outSign}>−</span>
-                          {formatAmount(row.netCash)}
-                        </output>
-                      )}
-                    </td>
-                    <td>{formatMoney(row.cash)}</td>
+                    <td>{formatMoney(row.cumulativeAmount)}</td>
+                    <td>{formatNumber(row.soldShares)}</td>
                     <td>{formatMoney(row.holdingValue)}</td>
                     <td>{formatMoney(row.totalAssets)}</td>
-                    <td>
-                      {exit.manual ? (
-                        <label className={styles.tableInput}>
-                          <input
-                            aria-label={`${label}执行净值`}
-                            aria-describedby="exit-table-hint"
-                            type="number"
-                            value={asText(exit.nav)}
-                            min="0"
-                            step="0.0001"
-                            onChange={(event) => updateExit(exit.id, 'nav', event.target.value)}
-                          />
-                        </label>
-                      ) : (
-                        formatNav(row.triggerNav)
-                      )}
-                    </td>
+                    <td>{formatNav(row.triggerNav)}</td>
                     <td className={row.totalReturn >= 0 ? styles.up : styles.down}>{formatPercent(row.totalReturn)}</td>
                   </tr>
                 );
@@ -895,20 +875,22 @@ export default function TradingCalculatorPage() {
                 关闭
               </button>
             </div>
-            <p className={styles.flowDialogHint}>金额或份额必填；发生时间默认当天，可修改；执行净值可先留空。</p>
+            <p className={styles.flowDialogHint}>
+              入仓和出仓都填写金额；发生时间默认当天，可修改，日期净值会自动更新。
+            </p>
             <div className={styles.flowDialogFields}>
               <label className={styles.dialogField}>
-                <span>{flowType === 'entry' ? '买入金额' : '卖出份额'}</span>
+                <span>{flowType === 'entry' ? '买入金额' : '出仓金额'}</span>
                 <input
                   autoFocus
                   type="number"
                   min="0"
-                  step={flowType === 'entry' ? '0.01' : '0.0001'}
-                  value={flowType === 'entry' ? flowDraft.amount : flowDraft.shares}
+                  step="0.01"
+                  value={flowDraft.amount}
                   onChange={(event) =>
                     setFlowDraft((current) => ({
                       ...current,
-                      [flowType === 'entry' ? 'amount' : 'shares']: event.target.value
+                      amount: event.target.value
                     }))
                   }
                 />
@@ -919,17 +901,6 @@ export default function TradingCalculatorPage() {
                   type="datetime-local"
                   value={flowDraft.recordedAt}
                   onChange={(event) => setFlowDraft((current) => ({ ...current, recordedAt: event.target.value }))}
-                />
-              </label>
-              <label className={styles.dialogField}>
-                <span>执行净值</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.0001"
-                  placeholder="可稍后补填"
-                  value={flowDraft.nav}
-                  onChange={(event) => setFlowDraft((current) => ({ ...current, nav: event.target.value }))}
                 />
               </label>
             </div>

@@ -454,7 +454,7 @@
   min-width: 1076px;
 }
 .exitTable {
-  min-width: 1182px;
+  min-width: 1076px;
 }
 .entryNodeColumn {
   width: 178px;
@@ -473,22 +473,16 @@
   width: 100px;
 }
 .exitNodeColumn {
-  width: 148px;
+  width: 178px;
 }
 .exitPercentColumn {
-  width: 100px;
-}
-.exitRatioColumn {
-  width: 106px;
-}
-.exitSharesColumn {
-  width: 136px;
+  width: 96px;
 }
 .exitAmountColumn {
   width: 142px;
 }
 .exitValueColumn {
-  width: 120px;
+  width: 110px;
 }
 .exitNavColumn,
 .exitReturnColumn {
@@ -516,13 +510,24 @@
   font-weight: 700;
   text-align: center;
 }
-.flowTime {
+.flowDateField {
   display: block;
   margin-bottom: 5px;
+}
+.flowDateField input {
+  width: 148px;
+  padding: 3px 4px;
   color: var(--muted);
-  font-size: 11PX;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  background: color-mix(in srgb, var(--input) 78%, transparent);
+  border: 1px solid var(--calc-line);
+  border-radius: 4px;
+  font: 600 11PX ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+.flowDateField input:focus-visible {
+  color: var(--text);
+  border-color: var(--primary);
+  outline: 2px solid color-mix(in srgb, var(--primary) 18%, transparent);
+  outline-offset: 1px;
 }
 .tableScroll tbody tr:last-child th,
 .tableScroll tbody tr:last-child td {
