@@ -173,6 +173,19 @@ assert.equal(accountSummary.profit, 100);
 assert.equal(accountSummary.profitRate, 0.1);
 assert.ok(Math.abs(accountSummary.maxDrawdown + 0.0833333333) < 0.0001);
 
+for (const currentNav of [0, 'invalid']) {
+  const historicalOnlySummary = summarizeAccountPosition({
+    entryRows: [{ recordedAt: '2026-09-01', cumulativeInvested: 1000, shares: 100, cash: 0, totalAssets: 1000 }],
+    currentNav,
+    equityHistory: [
+      { date: '2026-09-01', totalAssets: 1000 },
+      { date: '2026-09-02', totalAssets: 1200 },
+      { date: '2026-09-03', totalAssets: 1100 }
+    ]
+  });
+  assert.ok(Math.abs(historicalOnlySummary.maxDrawdown + 0.0833333333) < 0.0001);
+}
+
 assert.deepEqual(calculateRiskSignals({ fundDailyChange: -8 }), [
   { id: 'fund-down-entry', level: 'warning', source: '基金', action: '建议补仓', message: '基金日跌幅达到补仓线' }
 ]);
@@ -228,10 +241,13 @@ const missingDailyEntryRows = calculateEntryRows({
 });
 assert.equal(missingDailyEntryRows[0].dailyChange, null);
 assert.equal(missingDailyEntryRows[0].pendingDailyChange, true);
-assert.equal(missingDailyEntryRows[0].buyShares, 0);
-assert.equal(missingDailyEntryRows[0].cumulativeInvested, 0);
-assert.equal(missingDailyEntryRows[0].shares, 0);
-assert.equal(missingDailyEntryRows[0].cash, 1000);
+assert.equal(missingDailyEntryRows[0].nav, 9);
+assert.equal(missingDailyEntryRows[0].amount, 100);
+assert.ok(Math.abs(missingDailyEntryRows[0].buyShares - 100 / 9) < 0.0001);
+assert.ok(Math.abs(missingDailyEntryRows[0].cumulativeInvested - 100) < 0.0001);
+assert.ok(Math.abs(missingDailyEntryRows[0].shares - 100 / 9) < 0.0001);
+assert.equal(missingDailyEntryRows[0].cash, 900);
+assert.notEqual(missingDailyEntryRows[0].pendingNav, true);
 
 const datedDailyExitRows = calculateExitRows({
   targetCapital: 1000,
@@ -253,6 +269,9 @@ const missingDailyExitRows = calculateExitRows({
 });
 assert.equal(missingDailyExitRows[0].pendingDailyChange, true);
 assert.equal(missingDailyExitRows[0].dailyChange, null);
-assert.equal(missingDailyExitRows[0].soldShares, 0);
-assert.equal(missingDailyExitRows[0].cumulativeAmount, 0);
-assert.equal(missingDailyExitRows[0].remainingShares, 100);
+assert.equal(missingDailyExitRows[0].triggerNav, 11);
+assert.ok(Math.abs(missingDailyExitRows[0].soldShares - 100 / 11) < 0.0001);
+assert.ok(Math.abs(missingDailyExitRows[0].netCash - 100) < 0.0001);
+assert.ok(Math.abs(missingDailyExitRows[0].cumulativeAmount - 100) < 0.0001);
+assert.ok(Math.abs(missingDailyExitRows[0].remainingShares - (100 - 100 / 11)) < 0.0001);
+assert.notEqual(missingDailyExitRows[0].pendingNav, true);

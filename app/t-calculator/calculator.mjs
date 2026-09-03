@@ -37,11 +37,6 @@ const dailyFields = (flow, dailyChangeByDate) => {
   const ready = hasNumericValue(value);
   return { dailyChange: ready ? numberOr(value) : null, pendingDailyChange: !ready };
 };
-const hasDailyChange = (flow, dailyChangeByDate) => {
-  const date = flowDate(flow);
-  return !date || hasNumericValue(dailyChangeByDate?.[date]);
-};
-
 const navForEntry = (entry, baseNav, navByDate) => {
   const date = flowDate(entry);
   if (hasDateNav(navByDate, date)) return numberOr(navByDate[date]);
@@ -62,7 +57,7 @@ export function calculateEntryRows({ capital = 0, baseNav = 0, entries = [], nav
   return entries.map((entry, index) => {
     const nav = navForEntry(entry, safeBaseNav, navByDate);
     const amount = Math.max(0, numberOr(entry?.amount));
-    if (blocked || !(nav > 0) || !hasDailyChange(entry, dailyChangeByDate)) {
+    if (blocked || !(nav > 0)) {
       blocked = true;
       return {
         ...entry,
@@ -181,7 +176,7 @@ export function calculateExitRows({
           : explicitNav > 0
             ? explicitNav
             : previousNav * (1 + numberOr(exit?.rebound) / 100);
-    if (blocked || !(triggerNav > 0) || !hasDailyChange(exit, dailyChangeByDate)) {
+    if (blocked || !(triggerNav > 0)) {
       blocked = true;
       return {
         ...exit,
@@ -281,7 +276,7 @@ export function summarizeAccountPosition({ entryRows = [], exitRows = [], curren
     .map((row) => ({ date: row?.recordedAt || row?.date || '', totalAssets: row?.totalAssets }))
     .filter((row) => hasNumericValue(row.totalAssets) && numberOr(row.totalAssets) >= 0)
     .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  points.push({ date: 'current', totalAssets });
+  if (totalAssets > 0) points.push({ date: 'current', totalAssets });
   let highWater = 0;
   let maxDrawdown = 0;
   for (const point of points) {
