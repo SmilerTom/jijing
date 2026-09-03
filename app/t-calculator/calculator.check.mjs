@@ -159,7 +159,8 @@ const accountSummary = summarizeAccountPosition({
   equityHistory: [
     { date: '2026-09-01', totalAssets: 1000 },
     { date: '2026-09-02', totalAssets: 1200 },
-    { date: '2026-09-03', totalAssets: 1100 }
+    { date: '2026-09-03', totalAssets: 1100 },
+    { date: '2026-09-04', totalAssets: 0, pendingNav: true }
   ]
 });
 assert.equal(accountSummary.invested, 1000);

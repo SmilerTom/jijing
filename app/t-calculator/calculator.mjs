@@ -277,6 +277,7 @@ export function summarizeAccountPosition({ entryRows = [], exitRows = [], curren
   const profit = totalAssets - invested;
   const profitRate = invested > 0 ? profit / invested : 0;
   const points = [...equityHistory, ...entryRows, ...exitRows]
+    .filter((row) => !row?.pendingNav)
     .map((row) => ({ date: row?.recordedAt || row?.date || '', totalAssets: row?.totalAssets }))
     .filter((row) => hasNumericValue(row.totalAssets) && numberOr(row.totalAssets) >= 0)
     .sort((a, b) => String(a.date).localeCompare(String(b.date)));
