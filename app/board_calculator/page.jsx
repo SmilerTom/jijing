@@ -247,7 +247,7 @@ function PreviewA() {
               <tr key={`${row.date}-${index}`}>
                 <td>{row.date}</td>
                 <td>待更新</td>
-                <td className={row.type === 'buy' ? styles.up : styles.down}>
+                <td className={row.type === 'buy' ? styles.down : styles.up}>
                   {row.type === 'buy' ? '+' : '−'}
                   {row.amount.toFixed(2)}
                 </td>

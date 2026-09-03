@@ -368,11 +368,11 @@
 }
 .flowForm select.buy,
 .flowForm input.buy {
-  color: #75e6c1;
+  color: #ff8d8d;
 }
 .flowForm select.sell,
 .flowForm input.sell {
-  color: #ff8d8d;
+  color: #75e6c1;
 }
 .flowBox small {
   display: block;
