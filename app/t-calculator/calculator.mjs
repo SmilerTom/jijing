@@ -37,6 +37,10 @@ const dailyFields = (flow, dailyChangeByDate) => {
   const ready = hasNumericValue(value);
   return { dailyChange: ready ? numberOr(value) : null, pendingDailyChange: !ready };
 };
+const hasDailyChange = (flow, dailyChangeByDate) => {
+  const date = flowDate(flow);
+  return !date || hasNumericValue(dailyChangeByDate?.[date]);
+};
 
 const navForEntry = (entry, baseNav, navByDate) => {
   const date = flowDate(entry);
@@ -58,7 +62,7 @@ export function calculateEntryRows({ capital = 0, baseNav = 0, entries = [], nav
   return entries.map((entry, index) => {
     const nav = navForEntry(entry, safeBaseNav, navByDate);
     const amount = Math.max(0, numberOr(entry?.amount));
-    if (blocked || !(nav > 0)) {
+    if (blocked || !(nav > 0) || !hasDailyChange(entry, dailyChangeByDate)) {
       blocked = true;
       return {
         ...entry,
@@ -177,7 +181,7 @@ export function calculateExitRows({
           : explicitNav > 0
             ? explicitNav
             : previousNav * (1 + numberOr(exit?.rebound) / 100);
-    if (blocked || !(triggerNav > 0)) {
+    if (blocked || !(triggerNav > 0) || !hasDailyChange(exit, dailyChangeByDate)) {
       blocked = true;
       return {
         ...exit,

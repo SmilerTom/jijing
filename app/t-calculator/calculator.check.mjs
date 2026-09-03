@@ -4,6 +4,7 @@ import {
   calculateExitRows,
   calculateRecovery,
   calculateRiskSignals,
+  DEFAULT_RISK_RULES,
   summarizeAccountPosition,
   summarizeEntryPosition
 } from './calculator.mjs';
@@ -105,7 +106,8 @@ const datedEntryRows = calculateEntryRows({
   capital: 1000,
   baseNav: 10,
   entries: [{ amount: 500, recordedAt: '2026-09-01T15:00' }],
-  navByDate: { '2026-09-01': 5 }
+  navByDate: { '2026-09-01': 5 },
+  dailyChangeByDate: { '2026-09-01': -50 }
 });
 assert.equal(datedEntryRows[0].change, -50);
 const datedExitRows = calculateExitRows({
@@ -113,7 +115,8 @@ const datedExitRows = calculateExitRows({
   baseNav: 10,
   initialShares: 200,
   exits: [{ amount: 100, recordedAt: '2026-09-02T15:00' }],
-  navByDate: { '2026-09-02': 12 }
+  navByDate: { '2026-09-02': 12 },
+  dailyChangeByDate: { '2026-09-02': 20 }
 });
 assert.ok(Math.abs(datedExitRows[0].rebound - 20) < 0.0001);
 assert.ok(Math.abs(datedExitRows[0].soldShares - 100 / 12) < 0.0001);
@@ -182,6 +185,39 @@ assert.deepEqual(calculateRiskSignals({ maxDrawdown: -20 }), [
   { id: 'drawdown-stop', level: 'danger', source: '账户回撤', action: '暂停补仓', message: '最大回撤达到暂停线' }
 ]);
 
+assert.equal(DEFAULT_RISK_RULES.fundDownWatch, -5);
+assert.deepEqual(calculateRiskSignals({ fundDailyChange: -5 }).map(({ action, level }) => ({ action, level })), [
+  { action: '观察', level: 'watch' }
+]);
+assert.equal(DEFAULT_RISK_RULES.fundDownEntry, -8);
+assert.deepEqual(calculateRiskSignals({ fundDailyChange: -8 }).map(({ action, level }) => ({ action, level })), [
+  { action: '建议补仓', level: 'warning' }
+]);
+assert.equal(DEFAULT_RISK_RULES.fundDownStop, -12);
+assert.deepEqual(calculateRiskSignals({ fundDailyChange: -12 }).map(({ action, level }) => ({ action, level })), [
+  { action: '暂停补仓', level: 'danger' }
+]);
+assert.equal(DEFAULT_RISK_RULES.fundUpWatch, 5);
+assert.deepEqual(calculateRiskSignals({ fundDailyChange: 5 }).map(({ action, level }) => ({ action, level })), [
+  { action: '观察', level: 'watch' }
+]);
+assert.equal(DEFAULT_RISK_RULES.fundUpExit, 8);
+assert.deepEqual(calculateRiskSignals({ fundDailyChange: 8 }).map(({ action, level }) => ({ action, level })), [
+  { action: '建议出仓', level: 'warning' }
+]);
+assert.equal(DEFAULT_RISK_RULES.fundUpStrong, 12);
+assert.deepEqual(calculateRiskSignals({ fundDailyChange: 12 }).map(({ action, level }) => ({ action, level })), [
+  { action: '分批出仓', level: 'danger' }
+]);
+assert.equal(DEFAULT_RISK_RULES.drawdownWarn, -10);
+assert.deepEqual(calculateRiskSignals({ maxDrawdown: -10 }).map(({ action, level }) => ({ action, level })), [
+  { action: '风险提醒', level: 'warning' }
+]);
+assert.equal(DEFAULT_RISK_RULES.drawdownStop, -20);
+assert.deepEqual(calculateRiskSignals({ maxDrawdown: -20 }).map(({ action, level }) => ({ action, level })), [
+  { action: '暂停补仓', level: 'danger' }
+]);
+
 const missingDailyEntryRows = calculateEntryRows({
   capital: 1000,
   baseNav: 10,
@@ -191,6 +227,10 @@ const missingDailyEntryRows = calculateEntryRows({
 });
 assert.equal(missingDailyEntryRows[0].dailyChange, null);
 assert.equal(missingDailyEntryRows[0].pendingDailyChange, true);
+assert.equal(missingDailyEntryRows[0].buyShares, 0);
+assert.equal(missingDailyEntryRows[0].cumulativeInvested, 0);
+assert.equal(missingDailyEntryRows[0].shares, 0);
+assert.equal(missingDailyEntryRows[0].cash, 1000);
 
 const datedDailyExitRows = calculateExitRows({
   targetCapital: 1000,
@@ -201,3 +241,17 @@ const datedDailyExitRows = calculateExitRows({
   dailyChangeByDate: { '2026-09-03': 2.5 }
 });
 assert.equal(datedDailyExitRows[0].dailyChange, 2.5);
+
+const missingDailyExitRows = calculateExitRows({
+  targetCapital: 1000,
+  baseNav: 10,
+  initialShares: 100,
+  exits: [{ amount: 100, recordedAt: '2026-09-03T15:00' }],
+  navByDate: { '2026-09-03': 11 },
+  dailyChangeByDate: {}
+});
+assert.equal(missingDailyExitRows[0].pendingDailyChange, true);
+assert.equal(missingDailyExitRows[0].dailyChange, null);
+assert.equal(missingDailyExitRows[0].soldShares, 0);
+assert.equal(missingDailyExitRows[0].cumulativeAmount, 0);
+assert.equal(missingDailyExitRows[0].remainingShares, 100);
