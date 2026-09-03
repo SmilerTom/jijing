@@ -6,8 +6,6 @@ import {
   calculateEntryRows,
   calculateExitRows,
   calculateRiskSignals,
-  DEFAULT_ENTRIES,
-  DEFAULT_EXITS,
   DEFAULT_RISK_RULES,
   summarizeAccountPosition,
   summarizeEntryPosition
@@ -28,7 +26,7 @@ const DEFAULT_FORM = {
   holdingDays: '30'
 };
 const PAGE_SIZE_OPTIONS = [5, 10];
-const PENDING_FLOW_KEY = 'fundTradingCalculatorPendingFlows';
+const PENDING_FLOW_KEY = 'fundTradingCalculatorPendingFlowsV2';
 const RISK_SETTINGS_KEY = 'fundTradingCalculatorRiskSettings';
 const BENCHMARK_INDEX = { secid: '2.930713', name: '中证人工智能主题指数', weight: 80 };
 const RISK_FIELDS = [
@@ -112,8 +110,8 @@ const tomorrowKey = () => {
 };
 const cloneDefaults = () => ({
   form: { ...DEFAULT_FORM },
-  entries: DEFAULT_ENTRIES.map((entry) => ({ ...entry })),
-  exits: DEFAULT_EXITS.map((exit) => ({ ...exit }))
+  entries: [],
+  exits: []
 });
 
 function Field({ id, label, value, onChange, min = '0', max, step = '0.01', suffix, hint, error, placeholder }) {
@@ -784,122 +782,134 @@ export default function TradingCalculatorPage() {
               </tr>
             </thead>
             <tbody>
-              {visibleEntryItems.map(({ entry, row, pending }, visibleIndex) => {
-                const index = (safeEntryPage - 1) * entryPageSize + visibleIndex;
-                const label = entryLabel(entry, row);
-                if (pending || row?.pendingNav) {
-                  const pendingStatus = pending ? '待次日计算' : '等待净值';
+              {visibleEntryItems.length ? (
+                visibleEntryItems.map(({ entry, row, pending }, visibleIndex) => {
+                  const index = (safeEntryPage - 1) * entryPageSize + visibleIndex;
+                  const label = entryLabel(entry, row);
+                  if (pending || row?.pendingNav) {
+                    const pendingStatus = pending ? '待次日计算' : '等待净值';
+                    return (
+                      <tr key={entry.id} className={styles.pendingRow}>
+                        <th scope="row">
+                          <FlowDateField
+                            label={label}
+                            value={entry.recordedAt}
+                            onChange={(value) => updateFlowDate('entry', entry.id, value, pending)}
+                          />
+                          <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
+                          {label}
+                          <span className={styles.pendingBadge}>{pendingStatus}</span>
+                        </th>
+                        <td>
+                          <span className={styles.pendingBadge}>自动更新</span>
+                        </td>
+                        <td>
+                          <label className={`${styles.tableInput} ${styles.inInput}`}>
+                            <span className={styles.sign}>+</span>
+                            <input
+                              aria-label={`${label}买入金额`}
+                              type="number"
+                              value={asText(entry.amount)}
+                              min="0"
+                              step="0.01"
+                              onChange={(event) =>
+                                pending
+                                  ? updatePendingFlow('entries', entry.id, 'amount', event.target.value)
+                                  : updateEntryAmount(entry.id, event.target.value)
+                              }
+                            />
+                          </label>
+                        </td>
+                        <td colSpan="4">—</td>
+                        <td>
+                          <span className={styles.pendingBadge}>等待日期净值</span>
+                        </td>
+                        <td>待计算</td>
+                      </tr>
+                    );
+                  }
                   return (
-                    <tr key={entry.id} className={styles.pendingRow}>
+                    <tr key={entry.id}>
                       <th scope="row">
                         <FlowDateField
                           label={label}
                           value={entry.recordedAt}
-                          onChange={(value) => updateFlowDate('entry', entry.id, value, pending)}
+                          onChange={(value) => updateFlowDate('entry', entry.id, value)}
                         />
                         <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
                         {label}
-                        <span className={styles.pendingBadge}>{pendingStatus}</span>
                       </th>
                       <td>
-                        <span className={styles.pendingBadge}>自动更新</span>
+                        {entry.recordedAt ? (
+                          <span
+                            className={
+                              row.pendingNav || row.pendingDailyChange
+                                ? styles.pendingBadge
+                                : row.dailyChange >= 0
+                                  ? styles.up
+                                  : styles.down
+                            }
+                          >
+                            {row.pendingNav ? '等待日期净值' : dailyChangeLabel(row)}
+                          </span>
+                        ) : entry.manual ? (
+                          <span className={styles.confirmBadge}>{formatPercent(numericValue(row.change) / 100)}</span>
+                        ) : entry.confirmation ? (
+                          <span className={styles.confirmBadge}>确认</span>
+                        ) : (
+                          <label className={styles.tableInput}>
+                            <input
+                              aria-label={`${label}触发幅度`}
+                              aria-describedby="entry-table-hint"
+                              type="number"
+                              value={asText(absolutePercent(entry.change))}
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              onChange={(event) =>
+                                updateEntry(
+                                  entry.id,
+                                  'change',
+                                  event.target.value === '' ? '' : `-${event.target.value}`
+                                )
+                              }
+                            />
+                            <span>%</span>
+                          </label>
+                        )}
                       </td>
                       <td>
                         <label className={`${styles.tableInput} ${styles.inInput}`}>
                           <span className={styles.sign}>+</span>
                           <input
                             aria-label={`${label}买入金额`}
+                            aria-describedby="entry-table-hint"
                             type="number"
                             value={asText(entry.amount)}
                             min="0"
                             step="0.01"
-                            onChange={(event) =>
-                              pending
-                                ? updatePendingFlow('entries', entry.id, 'amount', event.target.value)
-                                : updateEntryAmount(entry.id, event.target.value)
-                            }
+                            onChange={(event) => updateEntryAmount(entry.id, event.target.value)}
                           />
                         </label>
                       </td>
-                      <td colSpan="4">—</td>
-                      <td>
-                        <span className={styles.pendingBadge}>等待日期净值</span>
+                      <td>{formatMoney(row.cumulativeInvested)}</td>
+                      <td>{formatNumber(row.buyShares)}</td>
+                      <td>{formatMoney(row.holdingValue)}</td>
+                      <td className={row.totalAssets < plannedCapital ? styles.down : styles.up}>
+                        {formatMoney(row.totalAssets)}
                       </td>
-                      <td>待计算</td>
+                      <td>{formatNav(row.nav)}</td>
+                      <td className={row.returnRate >= 0 ? styles.up : styles.down}>{formatPercent(row.returnRate)}</td>
                     </tr>
                   );
-                }
-                return (
-                  <tr key={entry.id}>
-                    <th scope="row">
-                      <FlowDateField
-                        label={label}
-                        value={entry.recordedAt}
-                        onChange={(value) => updateFlowDate('entry', entry.id, value)}
-                      />
-                      <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
-                      {label}
-                    </th>
-                    <td>
-                      {entry.recordedAt ? (
-                        <span
-                          className={
-                            row.pendingNav || row.pendingDailyChange
-                              ? styles.pendingBadge
-                              : row.dailyChange >= 0
-                                ? styles.up
-                                : styles.down
-                          }
-                        >
-                          {row.pendingNav ? '等待日期净值' : dailyChangeLabel(row)}
-                        </span>
-                      ) : entry.manual ? (
-                        <span className={styles.confirmBadge}>{formatPercent(numericValue(row.change) / 100)}</span>
-                      ) : entry.confirmation ? (
-                        <span className={styles.confirmBadge}>确认</span>
-                      ) : (
-                        <label className={styles.tableInput}>
-                          <input
-                            aria-label={`${label}触发幅度`}
-                            aria-describedby="entry-table-hint"
-                            type="number"
-                            value={asText(absolutePercent(entry.change))}
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            onChange={(event) =>
-                              updateEntry(entry.id, 'change', event.target.value === '' ? '' : `-${event.target.value}`)
-                            }
-                          />
-                          <span>%</span>
-                        </label>
-                      )}
-                    </td>
-                    <td>
-                      <label className={`${styles.tableInput} ${styles.inInput}`}>
-                        <span className={styles.sign}>+</span>
-                        <input
-                          aria-label={`${label}买入金额`}
-                          aria-describedby="entry-table-hint"
-                          type="number"
-                          value={asText(entry.amount)}
-                          min="0"
-                          step="0.01"
-                          onChange={(event) => updateEntryAmount(entry.id, event.target.value)}
-                        />
-                      </label>
-                    </td>
-                    <td>{formatMoney(row.cumulativeInvested)}</td>
-                    <td>{formatNumber(row.buyShares)}</td>
-                    <td>{formatMoney(row.holdingValue)}</td>
-                    <td className={row.totalAssets < plannedCapital ? styles.down : styles.up}>
-                      {formatMoney(row.totalAssets)}
-                    </td>
-                    <td>{formatNav(row.nav)}</td>
-                    <td className={row.returnRate >= 0 ? styles.up : styles.down}>{formatPercent(row.returnRate)}</td>
-                  </tr>
-                );
-              })}
+                })
+              ) : (
+                <tr>
+                  <td colSpan="9" className={styles.emptyCell}>
+                    暂无入仓流水，点击右上角 + 添加
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -954,25 +964,91 @@ export default function TradingCalculatorPage() {
               </tr>
             </thead>
             <tbody>
-              {visibleExitItems.map(({ exit, row, pending }, visibleIndex) => {
-                const index = (safeExitPage - 1) * exitPageSize + visibleIndex;
-                const label = exitLabel(exit, index, row);
-                if (pending || row?.pendingNav) {
-                  const pendingStatus = pending ? '待次日计算' : '等待净值';
+              {visibleExitItems.length ? (
+                visibleExitItems.map(({ exit, row, pending }, visibleIndex) => {
+                  const index = (safeExitPage - 1) * exitPageSize + visibleIndex;
+                  const label = exitLabel(exit, index, row);
+                  if (pending || row?.pendingNav) {
+                    const pendingStatus = pending ? '待次日计算' : '等待净值';
+                    return (
+                      <tr key={exit.id} className={styles.pendingRow}>
+                        <th scope="row">
+                          <FlowDateField
+                            label={label}
+                            value={exit.recordedAt}
+                            onChange={(value) => updateFlowDate('exit', exit.id, value, pending)}
+                          />
+                          <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
+                          {label}
+                          <span className={styles.pendingBadge}>{pendingStatus}</span>
+                        </th>
+                        <td>
+                          <span className={styles.pendingBadge}>自动更新</span>
+                        </td>
+                        <td>
+                          <label className={`${styles.tableInput} ${styles.outAmount}`}>
+                            <span className={styles.outSign}>−</span>
+                            <input
+                              aria-label={`${label}出仓金额`}
+                              type="number"
+                              value={asText(exit.amount)}
+                              min="0"
+                              step="0.01"
+                              onChange={(event) =>
+                                pending
+                                  ? updatePendingFlow('exits', exit.id, 'amount', event.target.value)
+                                  : updateExitAmount(exit.id, event.target.value)
+                              }
+                            />
+                          </label>
+                        </td>
+                        <td colSpan="4">—</td>
+                        <td>
+                          <span className={styles.pendingBadge}>等待日期净值</span>
+                        </td>
+                        <td>待计算</td>
+                      </tr>
+                    );
+                  }
                   return (
-                    <tr key={exit.id} className={styles.pendingRow}>
+                    <tr key={exit.id}>
                       <th scope="row">
                         <FlowDateField
                           label={label}
                           value={exit.recordedAt}
-                          onChange={(value) => updateFlowDate('exit', exit.id, value, pending)}
+                          onChange={(value) => updateFlowDate('exit', exit.id, value)}
                         />
                         <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
                         {label}
-                        <span className={styles.pendingBadge}>{pendingStatus}</span>
                       </th>
                       <td>
-                        <span className={styles.pendingBadge}>自动更新</span>
+                        {exit.recordedAt || exit.manual ? (
+                          <span
+                            className={
+                              row.pendingDailyChange
+                                ? styles.pendingBadge
+                                : row.dailyChange >= 0
+                                  ? styles.up
+                                  : styles.down
+                            }
+                          >
+                            {exit.recordedAt ? dailyChangeLabel(row) : formatPercent(numericValue(row.rebound) / 100)}
+                          </span>
+                        ) : (
+                          <label className={styles.tableInput}>
+                            <input
+                              aria-label={`${label}上涨幅度`}
+                              aria-describedby="exit-table-hint"
+                              type="number"
+                              value={asText(absolutePercent(exit.rebound))}
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              onChange={(event) => updateExit(exit.id, 'rebound', event.target.value)}
+                            />
+                            <span>%</span>
+                          </label>
+                        )}
                       </td>
                       <td>
                         <label className={`${styles.tableInput} ${styles.outAmount}`}>
@@ -983,84 +1059,28 @@ export default function TradingCalculatorPage() {
                             value={asText(exit.amount)}
                             min="0"
                             step="0.01"
-                            onChange={(event) =>
-                              pending
-                                ? updatePendingFlow('exits', exit.id, 'amount', event.target.value)
-                                : updateExitAmount(exit.id, event.target.value)
-                            }
+                            onChange={(event) => updateExitAmount(exit.id, event.target.value)}
                           />
                         </label>
                       </td>
-                      <td colSpan="4">—</td>
-                      <td>
-                        <span className={styles.pendingBadge}>等待日期净值</span>
+                      <td>{formatMoney(row.cumulativeAmount)}</td>
+                      <td>{formatNumber(row.soldShares)}</td>
+                      <td>{formatMoney(row.holdingValue)}</td>
+                      <td>{formatMoney(row.totalAssets)}</td>
+                      <td>{formatNav(row.triggerNav)}</td>
+                      <td className={row.totalReturn >= 0 ? styles.up : styles.down}>
+                        {formatPercent(row.totalReturn)}
                       </td>
-                      <td>待计算</td>
                     </tr>
                   );
-                }
-                return (
-                  <tr key={exit.id}>
-                    <th scope="row">
-                      <FlowDateField
-                        label={label}
-                        value={exit.recordedAt}
-                        onChange={(value) => updateFlowDate('exit', exit.id, value)}
-                      />
-                      <span className={styles.nodeIndex}>{String(index + 1).padStart(2, '0')}</span>
-                      {label}
-                    </th>
-                    <td>
-                      {exit.recordedAt || exit.manual ? (
-                        <span
-                          className={
-                            row.pendingDailyChange
-                              ? styles.pendingBadge
-                              : row.dailyChange >= 0
-                                ? styles.up
-                                : styles.down
-                          }
-                        >
-                          {exit.recordedAt ? dailyChangeLabel(row) : formatPercent(numericValue(row.rebound) / 100)}
-                        </span>
-                      ) : (
-                        <label className={styles.tableInput}>
-                          <input
-                            aria-label={`${label}上涨幅度`}
-                            aria-describedby="exit-table-hint"
-                            type="number"
-                            value={asText(absolutePercent(exit.rebound))}
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            onChange={(event) => updateExit(exit.id, 'rebound', event.target.value)}
-                          />
-                          <span>%</span>
-                        </label>
-                      )}
-                    </td>
-                    <td>
-                      <label className={`${styles.tableInput} ${styles.outAmount}`}>
-                        <span className={styles.outSign}>−</span>
-                        <input
-                          aria-label={`${label}出仓金额`}
-                          type="number"
-                          value={asText(exit.amount)}
-                          min="0"
-                          step="0.01"
-                          onChange={(event) => updateExitAmount(exit.id, event.target.value)}
-                        />
-                      </label>
-                    </td>
-                    <td>{formatMoney(row.cumulativeAmount)}</td>
-                    <td>{formatNumber(row.soldShares)}</td>
-                    <td>{formatMoney(row.holdingValue)}</td>
-                    <td>{formatMoney(row.totalAssets)}</td>
-                    <td>{formatNav(row.triggerNav)}</td>
-                    <td className={row.totalReturn >= 0 ? styles.up : styles.down}>{formatPercent(row.totalReturn)}</td>
-                  </tr>
-                );
-              })}
+                })
+              ) : (
+                <tr>
+                  <td colSpan="9" className={styles.emptyCell}>
+                    暂无出仓流水，点击右上角 + 添加
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

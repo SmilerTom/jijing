@@ -748,6 +748,11 @@
 .tableScroll tbody tr:last-child td {
   border-bottom: 0;
 }
+.emptyCell {
+  padding: 28px 8px !important;
+  color: var(--muted);
+  text-align: center;
+}
 .tableScroll tbody tr:hover {
   background: color-mix(in srgb, var(--primary) 5%, transparent);
 }
