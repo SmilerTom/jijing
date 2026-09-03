@@ -30,10 +30,10 @@
   .risk b { font-size:11px; }
   .risk-state { color:#ffdfb5; font-size:9px; }
   .risk-controls { display:flex; align-items:center; gap:6px; }
-  .risk-group { display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin:0; padding:0; border:0; }
-  .risk-group legend { margin-right:2px; color:#ffdfb5; font-size:9px; }
+  .risk-group { display:block; margin:0; padding:0; border:0; white-space:nowrap; }
+  .risk-group legend { display:inline; float:left; margin:0 2px 0 0; color:#ffdfb5; font-size:9px; line-height:16px; }
   .risk-group legend::after { content:"："; }
-  .risk-chip { padding:3px 6px; color:#ffdfb5; background:#2b2118; border:1px solid #6b5135; border-radius:4px; font:9px ui-monospace,SFMono-Regular,Menlo,monospace; cursor:pointer; }
+  .risk-chip { display:inline-block; padding:3px 6px; color:#ffdfb5; background:#2b2118; border:1px solid #6b5135; border-radius:4px; font:9px ui-monospace,SFMono-Regular,Menlo,monospace; cursor:pointer; vertical-align:middle; }
   .risk-chip.selected { color:#75e6c1; background:#10271f; border-color:#408d78; }
   .risk-chip:hover,.risk-chip:focus-visible { border-color:#ffdfb5; }
   .risk-panel { display:contents; }
