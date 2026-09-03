@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict';
-import { calculateEntryRows, calculateExitRows, calculateRecovery, summarizeEntryPosition } from './calculator.mjs';
+import {
+  calculateEntryRows,
+  calculateExitRows,
+  calculateRecovery,
+  calculateRiskSignals,
+  summarizeAccountPosition,
+  summarizeEntryPosition
+} from './calculator.mjs';
 
 const entries = [
   { label: '首次建仓', change: 0, amount: 2000 },
@@ -141,3 +148,56 @@ const missingDatedExitRows = calculateExitRows({
 });
 assert.equal(missingDatedExitRows[0].pendingNav, true);
 assert.equal(missingDatedExitRows[0].soldShares, 0);
+
+const accountSummary = summarizeAccountPosition({
+  entryRows: [{ recordedAt: '2026-09-01', cumulativeInvested: 1000, shares: 100, cash: 0, totalAssets: 1000 }],
+  exitRows: [{ recordedAt: '2026-09-02', cumulativeAmount: 200, cash: 200, remainingShares: 90, totalAssets: 1100 }],
+  currentNav: 10,
+  equityHistory: [
+    { date: '2026-09-01', totalAssets: 1000 },
+    { date: '2026-09-02', totalAssets: 1200 },
+    { date: '2026-09-03', totalAssets: 1100 }
+  ]
+});
+assert.equal(accountSummary.invested, 1000);
+assert.equal(accountSummary.realizedAmount, 200);
+assert.equal(accountSummary.shares, 90);
+assert.equal(accountSummary.cash, 200);
+assert.equal(accountSummary.holdingValue, 900);
+assert.equal(accountSummary.totalAssets, 1100);
+assert.equal(accountSummary.profit, 100);
+assert.equal(accountSummary.profitRate, 0.1);
+assert.ok(Math.abs(accountSummary.maxDrawdown + 0.0833333333) < 0.0001);
+
+assert.deepEqual(calculateRiskSignals({ fundDailyChange: -8 }), [
+  { id: 'fund-down-entry', level: 'warning', source: '基金', action: '建议补仓', message: '基金日跌幅达到补仓线' }
+]);
+assert.deepEqual(calculateRiskSignals({ fundDailyChange: 8 }), [
+  { id: 'fund-up-exit', level: 'warning', source: '基金', action: '建议出仓', message: '基金日涨幅达到出仓线' }
+]);
+assert.deepEqual(calculateRiskSignals({ benchmarkChange: -9 }), [
+  { id: 'benchmark', level: 'index', source: '业绩基准指数', action: '指数预警', message: '指数达到预警线，基金净值待更新' }
+]);
+assert.deepEqual(calculateRiskSignals({ maxDrawdown: -20 }), [
+  { id: 'drawdown-stop', level: 'danger', source: '账户回撤', action: '暂停补仓', message: '最大回撤达到暂停线' }
+]);
+
+const missingDailyEntryRows = calculateEntryRows({
+  capital: 1000,
+  baseNav: 10,
+  entries: [{ amount: 100, recordedAt: '2026-09-03T15:00' }],
+  navByDate: { '2026-09-03': 9 },
+  dailyChangeByDate: {}
+});
+assert.equal(missingDailyEntryRows[0].dailyChange, null);
+assert.equal(missingDailyEntryRows[0].pendingDailyChange, true);
+
+const datedDailyExitRows = calculateExitRows({
+  targetCapital: 1000,
+  baseNav: 10,
+  initialShares: 100,
+  exits: [{ amount: 100, recordedAt: '2026-09-03T15:00' }],
+  navByDate: { '2026-09-03': 11 },
+  dailyChangeByDate: { '2026-09-03': 2.5 }
+});
+assert.equal(datedDailyExitRows[0].dailyChange, 2.5);
