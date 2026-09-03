@@ -221,9 +221,13 @@ const connectedDrawdownSummary = summarizeAccountPosition({
   ]
 });
 assert.ok(Math.abs(connectedDrawdownSummary.maxDrawdown + 0.2) < 0.0001);
-assert.deepEqual(calculateRiskSignals({ maxDrawdown: connectedDrawdownSummary.maxDrawdown }).map(({ action, level }) => ({ action, level })), [
-  { action: '暂停补仓', level: 'danger' }
-]);
+assert.deepEqual(
+  calculateRiskSignals({ maxDrawdown: connectedDrawdownSummary.maxDrawdown }).map(({ action, level }) => ({
+    action,
+    level
+  })),
+  [{ action: '暂停补仓', level: 'danger' }]
+);
 
 assert.deepEqual(calculateRiskSignals({ fundDailyChange: -8 }), [
   { id: 'fund-down-entry', level: 'warning', source: '基金', action: '建议补仓', message: '基金日跌幅达到补仓线' }
@@ -232,44 +236,58 @@ assert.deepEqual(calculateRiskSignals({ fundDailyChange: 8 }), [
   { id: 'fund-up-exit', level: 'warning', source: '基金', action: '建议出仓', message: '基金日涨幅达到出仓线' }
 ]);
 assert.deepEqual(calculateRiskSignals({ benchmarkChange: -9 }), [
-  { id: 'benchmark', level: 'index', source: '业绩基准指数', action: '指数预警', message: '指数达到预警线，基金净值待更新' }
+  {
+    id: 'benchmark',
+    level: 'index',
+    source: '业绩基准指数',
+    action: '指数预警',
+    message: '指数达到预警线，基金净值待更新'
+  }
 ]);
 assert.deepEqual(calculateRiskSignals({ maxDrawdown: -20 }), [
   { id: 'drawdown-stop', level: 'danger', source: '账户回撤', action: '暂停补仓', message: '最大回撤达到暂停线' }
 ]);
 
 assert.equal(DEFAULT_RISK_RULES.fundDownWatch, -5);
-assert.deepEqual(calculateRiskSignals({ fundDailyChange: -5 }).map(({ action, level }) => ({ action, level })), [
-  { action: '观察', level: 'watch' }
-]);
+assert.deepEqual(
+  calculateRiskSignals({ fundDailyChange: -5 }).map(({ action, level }) => ({ action, level })),
+  [{ action: '观察', level: 'watch' }]
+);
 assert.equal(DEFAULT_RISK_RULES.fundDownEntry, -8);
-assert.deepEqual(calculateRiskSignals({ fundDailyChange: -8 }).map(({ action, level }) => ({ action, level })), [
-  { action: '建议补仓', level: 'warning' }
-]);
+assert.deepEqual(
+  calculateRiskSignals({ fundDailyChange: -8 }).map(({ action, level }) => ({ action, level })),
+  [{ action: '建议补仓', level: 'warning' }]
+);
 assert.equal(DEFAULT_RISK_RULES.fundDownStop, -12);
-assert.deepEqual(calculateRiskSignals({ fundDailyChange: -12 }).map(({ action, level }) => ({ action, level })), [
-  { action: '暂停补仓', level: 'danger' }
-]);
+assert.deepEqual(
+  calculateRiskSignals({ fundDailyChange: -12 }).map(({ action, level }) => ({ action, level })),
+  [{ action: '暂停补仓', level: 'danger' }]
+);
 assert.equal(DEFAULT_RISK_RULES.fundUpWatch, 5);
-assert.deepEqual(calculateRiskSignals({ fundDailyChange: 5 }).map(({ action, level }) => ({ action, level })), [
-  { action: '观察', level: 'watch' }
-]);
+assert.deepEqual(
+  calculateRiskSignals({ fundDailyChange: 5 }).map(({ action, level }) => ({ action, level })),
+  [{ action: '观察', level: 'watch' }]
+);
 assert.equal(DEFAULT_RISK_RULES.fundUpExit, 8);
-assert.deepEqual(calculateRiskSignals({ fundDailyChange: 8 }).map(({ action, level }) => ({ action, level })), [
-  { action: '建议出仓', level: 'warning' }
-]);
+assert.deepEqual(
+  calculateRiskSignals({ fundDailyChange: 8 }).map(({ action, level }) => ({ action, level })),
+  [{ action: '建议出仓', level: 'warning' }]
+);
 assert.equal(DEFAULT_RISK_RULES.fundUpStrong, 12);
-assert.deepEqual(calculateRiskSignals({ fundDailyChange: 12 }).map(({ action, level }) => ({ action, level })), [
-  { action: '分批出仓', level: 'danger' }
-]);
+assert.deepEqual(
+  calculateRiskSignals({ fundDailyChange: 12 }).map(({ action, level }) => ({ action, level })),
+  [{ action: '分批出仓', level: 'danger' }]
+);
 assert.equal(DEFAULT_RISK_RULES.drawdownWarn, -10);
-assert.deepEqual(calculateRiskSignals({ maxDrawdown: -10 }).map(({ action, level }) => ({ action, level })), [
-  { action: '风险提醒', level: 'warning' }
-]);
+assert.deepEqual(
+  calculateRiskSignals({ maxDrawdown: -10 }).map(({ action, level }) => ({ action, level })),
+  [{ action: '风险提醒', level: 'warning' }]
+);
 assert.equal(DEFAULT_RISK_RULES.drawdownStop, -20);
-assert.deepEqual(calculateRiskSignals({ maxDrawdown: -20 }).map(({ action, level }) => ({ action, level })), [
-  { action: '暂停补仓', level: 'danger' }
-]);
+assert.deepEqual(
+  calculateRiskSignals({ maxDrawdown: -20 }).map(({ action, level }) => ({ action, level })),
+  [{ action: '暂停补仓', level: 'danger' }]
+);
 
 const missingDailyEntryRows = calculateEntryRows({
   capital: 1000,

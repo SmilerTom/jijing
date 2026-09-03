@@ -47,7 +47,13 @@ const navForEntry = (entry, baseNav, navByDate) => {
   return baseNav * (1 + numberOr(entry?.change) / 100);
 };
 
-export function calculateEntryRows({ capital = 0, baseNav = 0, entries = [], navByDate = {}, dailyChangeByDate = {} } = {}) {
+export function calculateEntryRows({
+  capital = 0,
+  baseNav = 0,
+  entries = [],
+  navByDate = {},
+  dailyChangeByDate = {}
+} = {}) {
   const startingCash = numberOr(capital);
   const safeBaseNav = numberOr(baseNav);
   let cash = startingCash;
@@ -283,22 +289,91 @@ export function summarizeAccountPosition({ entryRows = [], exitRows = [], curren
   return { invested, realizedAmount, shares, cash, holdingValue, totalAssets, profit, profitRate, maxDrawdown };
 }
 
-export function calculateRiskSignals({ fundDailyChange = null, benchmarkChange = null, maxDrawdown = 0, rules = DEFAULT_RISK_RULES } = {}) {
+export function calculateRiskSignals({
+  fundDailyChange = null,
+  benchmarkChange = null,
+  maxDrawdown = 0,
+  rules = DEFAULT_RISK_RULES
+} = {}) {
   const signals = [];
-  const drawdown = Number.isFinite(maxDrawdown) && Math.abs(maxDrawdown) <= 1 ? Number((maxDrawdown * 100).toFixed(8)) : maxDrawdown;
+  const drawdown =
+    Number.isFinite(maxDrawdown) && Math.abs(maxDrawdown) <= 1 ? Number((maxDrawdown * 100).toFixed(8)) : maxDrawdown;
   if (Number.isFinite(fundDailyChange)) {
-    if (fundDailyChange <= rules.fundDownStop) signals.push({ id: 'fund-down-stop', level: 'danger', source: '基金', action: '暂停补仓', message: '基金日跌幅达到强风控线' });
-    else if (fundDailyChange <= rules.fundDownEntry) signals.push({ id: 'fund-down-entry', level: 'warning', source: '基金', action: '建议补仓', message: '基金日跌幅达到补仓线' });
-    else if (fundDailyChange <= rules.fundDownWatch) signals.push({ id: 'fund-down-watch', level: 'watch', source: '基金', action: '观察', message: '基金日跌幅进入观察区' });
-    else if (fundDailyChange >= rules.fundUpStrong) signals.push({ id: 'fund-up-strong', level: 'danger', source: '基金', action: '分批出仓', message: '基金日涨幅达到强提醒线' });
-    else if (fundDailyChange >= rules.fundUpExit) signals.push({ id: 'fund-up-exit', level: 'warning', source: '基金', action: '建议出仓', message: '基金日涨幅达到出仓线' });
-    else if (fundDailyChange >= rules.fundUpWatch) signals.push({ id: 'fund-up-watch', level: 'watch', source: '基金', action: '观察', message: '基金日涨幅进入观察区' });
+    if (fundDailyChange <= rules.fundDownStop)
+      signals.push({
+        id: 'fund-down-stop',
+        level: 'danger',
+        source: '基金',
+        action: '暂停补仓',
+        message: '基金日跌幅达到强风控线'
+      });
+    else if (fundDailyChange <= rules.fundDownEntry)
+      signals.push({
+        id: 'fund-down-entry',
+        level: 'warning',
+        source: '基金',
+        action: '建议补仓',
+        message: '基金日跌幅达到补仓线'
+      });
+    else if (fundDailyChange <= rules.fundDownWatch)
+      signals.push({
+        id: 'fund-down-watch',
+        level: 'watch',
+        source: '基金',
+        action: '观察',
+        message: '基金日跌幅进入观察区'
+      });
+    else if (fundDailyChange >= rules.fundUpStrong)
+      signals.push({
+        id: 'fund-up-strong',
+        level: 'danger',
+        source: '基金',
+        action: '分批出仓',
+        message: '基金日涨幅达到强提醒线'
+      });
+    else if (fundDailyChange >= rules.fundUpExit)
+      signals.push({
+        id: 'fund-up-exit',
+        level: 'warning',
+        source: '基金',
+        action: '建议出仓',
+        message: '基金日涨幅达到出仓线'
+      });
+    else if (fundDailyChange >= rules.fundUpWatch)
+      signals.push({
+        id: 'fund-up-watch',
+        level: 'watch',
+        source: '基金',
+        action: '观察',
+        message: '基金日涨幅进入观察区'
+      });
   }
-  if (Number.isFinite(benchmarkChange) && (benchmarkChange <= rules.fundDownEntry || benchmarkChange >= rules.fundUpExit))
-    signals.push({ id: 'benchmark', level: 'index', source: '业绩基准指数', action: '指数预警', message: '指数达到预警线，基金净值待更新' });
+  if (
+    Number.isFinite(benchmarkChange) &&
+    (benchmarkChange <= rules.fundDownEntry || benchmarkChange >= rules.fundUpExit)
+  )
+    signals.push({
+      id: 'benchmark',
+      level: 'index',
+      source: '业绩基准指数',
+      action: '指数预警',
+      message: '指数达到预警线，基金净值待更新'
+    });
   if (Number.isFinite(drawdown) && drawdown <= rules.drawdownStop)
-    signals.push({ id: 'drawdown-stop', level: 'danger', source: '账户回撤', action: '暂停补仓', message: '最大回撤达到暂停线' });
+    signals.push({
+      id: 'drawdown-stop',
+      level: 'danger',
+      source: '账户回撤',
+      action: '暂停补仓',
+      message: '最大回撤达到暂停线'
+    });
   else if (Number.isFinite(drawdown) && drawdown <= rules.drawdownWarn)
-    signals.push({ id: 'drawdown-warn', level: 'warning', source: '账户回撤', action: '风险提醒', message: '最大回撤达到提醒线' });
+    signals.push({
+      id: 'drawdown-warn',
+      level: 'warning',
+      source: '账户回撤',
+      action: '风险提醒',
+      message: '最大回撤达到提醒线'
+    });
   return signals;
 }
