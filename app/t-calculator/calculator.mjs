@@ -201,15 +201,12 @@ export function calculateExitRows({
         ...dailyFields(exit, dailyChangeByDate)
       };
     }
-    const hasAmountField = Object.prototype.hasOwnProperty.call(exit, 'amount');
     const requestedAmount = hasNumericValue(exit?.amount) ? Math.max(0, numberOr(exit.amount)) : NaN;
     const requestedShares = Number.isFinite(requestedAmount)
       ? requestedAmount / triggerNav
-      : hasAmountField
-        ? 0
-        : hasNumericValue(exit?.sellShares)
-          ? Math.max(0, numberOr(exit?.sellShares))
-          : (beforeShares * Math.max(0, numberOr(exit?.sellRatio))) / 100;
+      : hasNumericValue(exit?.sellShares)
+        ? Math.max(0, numberOr(exit?.sellShares))
+        : (beforeShares * Math.max(0, numberOr(exit?.sellRatio))) / 100;
     const soldShares = Math.min(remainingShares, requestedShares);
     const grossCash = soldShares * triggerNav;
     const feeAmount = grossCash * fee;
@@ -276,7 +273,7 @@ export function summarizeAccountPosition({ entryRows = [], exitRows = [], curren
     .map((row) => ({ date: row?.recordedAt || row?.date || '', totalAssets: row?.totalAssets }))
     .filter((row) => hasNumericValue(row.totalAssets) && numberOr(row.totalAssets) >= 0)
     .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  if (totalAssets > 0) points.push({ date: 'current', totalAssets });
+  if (nav > 0) points.push({ date: 'current', totalAssets });
   let highWater = 0;
   let maxDrawdown = 0;
   for (const point of points) {
@@ -288,6 +285,7 @@ export function summarizeAccountPosition({ entryRows = [], exitRows = [], curren
 
 export function calculateRiskSignals({ fundDailyChange = null, benchmarkChange = null, maxDrawdown = 0, rules = DEFAULT_RISK_RULES } = {}) {
   const signals = [];
+  const drawdown = Number.isFinite(maxDrawdown) && Math.abs(maxDrawdown) <= 1 ? Number((maxDrawdown * 100).toFixed(8)) : maxDrawdown;
   if (Number.isFinite(fundDailyChange)) {
     if (fundDailyChange <= rules.fundDownStop) signals.push({ id: 'fund-down-stop', level: 'danger', source: '基金', action: '暂停补仓', message: '基金日跌幅达到强风控线' });
     else if (fundDailyChange <= rules.fundDownEntry) signals.push({ id: 'fund-down-entry', level: 'warning', source: '基金', action: '建议补仓', message: '基金日跌幅达到补仓线' });
@@ -298,9 +296,9 @@ export function calculateRiskSignals({ fundDailyChange = null, benchmarkChange =
   }
   if (Number.isFinite(benchmarkChange) && (benchmarkChange <= rules.fundDownEntry || benchmarkChange >= rules.fundUpExit))
     signals.push({ id: 'benchmark', level: 'index', source: '业绩基准指数', action: '指数预警', message: '指数达到预警线，基金净值待更新' });
-  if (Number.isFinite(maxDrawdown) && maxDrawdown <= rules.drawdownStop)
+  if (Number.isFinite(drawdown) && drawdown <= rules.drawdownStop)
     signals.push({ id: 'drawdown-stop', level: 'danger', source: '账户回撤', action: '暂停补仓', message: '最大回撤达到暂停线' });
-  else if (Number.isFinite(maxDrawdown) && maxDrawdown <= rules.drawdownWarn)
+  else if (Number.isFinite(drawdown) && drawdown <= rules.drawdownWarn)
     signals.push({ id: 'drawdown-warn', level: 'warning', source: '账户回撤', action: '风险提醒', message: '最大回撤达到提醒线' });
   return signals;
 }

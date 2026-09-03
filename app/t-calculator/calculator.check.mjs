@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  DEFAULT_EXITS,
   calculateEntryRows,
   calculateExitRows,
   calculateRecovery,
@@ -52,6 +53,30 @@ assert.ok(Math.abs(rollingExitRows[1].triggerNav - rollingExitRows[0].triggerNav
 assert.ok(Math.abs(rollingExitRows[1].netCash - 1089) < 0.01);
 assert.ok(Math.abs(rollingExitRows[1].holdingValue - 9801) < 0.01);
 assert.ok(Math.abs(rollingExitRows[1].totalAssets - 11990) < 0.01);
+
+const legacyEmptyAmountRatioExitRows = calculateExitRows({
+  targetCapital: 1000,
+  baseNav: 10,
+  initialShares: 100,
+  exits: [{ amount: '', sellRatio: 10 }]
+});
+assert.equal(legacyEmptyAmountRatioExitRows[0].soldShares, 10);
+
+const legacyEmptyAmountSharesExitRows = calculateExitRows({
+  targetCapital: 1000,
+  baseNav: 10,
+  initialShares: 100,
+  exits: [{ amount: '', sellShares: 10 }]
+});
+assert.equal(legacyEmptyAmountSharesExitRows[0].soldShares, 10);
+
+const emptyAmountExitRows = calculateExitRows({
+  targetCapital: 1000,
+  baseNav: 10,
+  initialShares: 100,
+  exits: [DEFAULT_EXITS[0]]
+});
+assert.equal(emptyAmountExitRows[0].soldShares, 0);
 
 const manualShareExitRows = calculateExitRows({
   targetCapital: 3.2743 * 42000,
@@ -175,7 +200,7 @@ assert.ok(Math.abs(accountSummary.maxDrawdown + 0.0833333333) < 0.0001);
 
 for (const currentNav of [0, 'invalid']) {
   const historicalOnlySummary = summarizeAccountPosition({
-    entryRows: [{ recordedAt: '2026-09-01', cumulativeInvested: 1000, shares: 100, cash: 0, totalAssets: 1000 }],
+    entryRows: [{ recordedAt: '2026-09-01', cumulativeInvested: 1000, shares: 100, cash: 200, totalAssets: 1200 }],
     currentNav,
     equityHistory: [
       { date: '2026-09-01', totalAssets: 1000 },
@@ -185,6 +210,20 @@ for (const currentNav of [0, 'invalid']) {
   });
   assert.ok(Math.abs(historicalOnlySummary.maxDrawdown + 0.0833333333) < 0.0001);
 }
+
+const connectedDrawdownSummary = summarizeAccountPosition({
+  entryRows: [{ recordedAt: '2026-09-01', cumulativeInvested: 1000, shares: 100, cash: 0, totalAssets: 1000 }],
+  currentNav: 9.6,
+  equityHistory: [
+    { date: '2026-09-01', totalAssets: 1000 },
+    { date: '2026-09-02', totalAssets: 1200 },
+    { date: '2026-09-03', totalAssets: 1100 }
+  ]
+});
+assert.ok(Math.abs(connectedDrawdownSummary.maxDrawdown + 0.2) < 0.0001);
+assert.deepEqual(calculateRiskSignals({ maxDrawdown: connectedDrawdownSummary.maxDrawdown }).map(({ action, level }) => ({ action, level })), [
+  { action: '暂停补仓', level: 'danger' }
+]);
 
 assert.deepEqual(calculateRiskSignals({ fundDailyChange: -8 }), [
   { id: 'fund-down-entry', level: 'warning', source: '基金', action: '建议补仓', message: '基金日跌幅达到补仓线' }
