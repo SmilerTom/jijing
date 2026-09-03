@@ -69,7 +69,6 @@ function RiskSettings() {
 function PreviewA() {
   const [editing, setEditing] = useState(false);
   const [amount, setAmount] = useState('');
-  const [profit, setProfit] = useState('');
   const [rate, setRate] = useState('');
   const [flowType, setFlowType] = useState('buy');
   const [flowAmount, setFlowAmount] = useState('');
@@ -78,9 +77,9 @@ function PreviewA() {
   const amountValue = Number(amount);
   const rateValue = Number(rate);
   const flowValue = Number(flowAmount);
-  const profitValue = Number(profit);
   const rateFactor = 1 + rateValue / 100;
   const totalValue = rateFactor !== 0 ? amountValue / rateFactor : NaN;
+  const profitValue = Number.isFinite(totalValue) ? amountValue - totalValue : NaN;
   const saveSnapshot = () => setEditing(false);
   const addFlow = () => {
     if (!(flowValue > 0) || !flowDate) return;
@@ -132,19 +131,9 @@ function PreviewA() {
         </div>
         <div className={styles.stat}>
           <i>持有收益</i>
-          {editing ? (
-            <input
-              className={styles.statEdit}
-              type="number"
-              step="0.01"
-              value={profit}
-              onChange={(event) => setProfit(event.target.value)}
-              aria-label="编辑持有收益"
-              placeholder="输入持有收益"
-            />
-          ) : (
-            <b className={styles.statValue}>{hasNumber(profit) ? formatMoney(profitValue) : '--'}</b>
-          )}
+          <b className={styles.statValue}>
+            {hasNumber(amount) && hasNumber(rate) && Number.isFinite(profitValue) ? formatMoney(profitValue) : '--'}
+          </b>
         </div>
         <div className={styles.stat}>
           <i>持有收益率</i>
