@@ -206,6 +206,79 @@
   border-top: 0;
   box-shadow: none;
 }
+.cockpitPanel {
+  padding: 16px;
+}
+.cockpitHeading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-end;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--board-border);
+}
+.cockpitTitle {
+  min-width: 0;
+}
+.cockpitTitle h2 {
+  display: inline;
+  margin: 0 8px 0 0;
+  color: var(--foreground);
+  font-size: 20px;
+  letter-spacing: -0.04em;
+}
+.cockpitTitle p {
+  display: inline;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.cockpitRisk {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  margin-top: 10px;
+  padding: 9px 10px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--input) 70%, transparent);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.cockpitRiskState {
+  flex: 0 0 auto;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+}
+.cockpitRiskMessage {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.riskTriggered {
+  background: color-mix(in srgb, var(--danger) 12%, var(--input));
+}
+.riskTriggered .cockpitRiskState,
+.riskTriggered .cockpitRiskMessage {
+  color: var(--danger);
+}
+.cockpitPanel .riskSettings {
+  margin: 10px 0 12px;
+  padding: 0;
+  border: 0;
+}
+.cockpitMeta {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.cockpitMeta .field {
+  max-width: 220px;
+}
 .marketPanel {
   margin-bottom: 18px;
   border-top: 1px solid var(--board-border);
@@ -999,6 +1072,16 @@
   }
   .heroActions {
     margin-top: 20px;
+  }
+  .cockpitHeading {
+    align-items: flex-start;
+  }
+  .cockpitTitle h2,
+  .cockpitTitle p {
+    display: block;
+  }
+  .cockpitTitle h2 {
+    margin: 5px 0 4px;
   }
   .flowActions {
     right: auto;

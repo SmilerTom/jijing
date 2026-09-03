@@ -54,6 +54,10 @@ const formatMoney = (value) =>
   Number.isFinite(value)
     ? `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : '--';
+const formatSignedMoney = (value) =>
+  Number.isFinite(value)
+    ? `${value >= 0 ? '+' : '-'}¥${Math.abs(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : '--';
 const formatInputAmount = (value) => (Number.isFinite(value) ? value.toFixed(2) : '');
 const formatNav = (value) => (Number.isFinite(value) && value > 0 ? value.toFixed(4) : '--');
 const formatNumber = (value) =>
@@ -416,7 +420,7 @@ export default function TradingCalculatorPage() {
     [entryRows, form.baseNav]
   );
   const toggleSnapshotEdit = () => {
-    if (!isEditingSnapshot && form.holdingValue === '')
+    if (!isEditingSnapshot && form.holdingValue === '' && position.holdingValue > 0)
       updateForm('holdingValue', formatInputAmount(position.holdingValue));
     setIsEditingSnapshot((current) => !current);
   };
@@ -441,6 +445,14 @@ export default function TradingCalculatorPage() {
   );
   const hasManualHoldingValue = isValidNonNegative(form.holdingValue);
   const currentHoldingValue = hasManualHoldingValue ? numericValue(form.holdingValue) : accountSummary.holdingValue;
+  const currentShares = lastExit?.remainingShares ?? position.shares;
+  const currentCost = position.averageCost > 0 ? position.averageCost * currentShares : 0;
+  const holdingProfit = currentCost > 0 && currentHoldingValue > 0 ? currentHoldingValue - currentCost : null;
+  const holdingProfitRate = Number.isFinite(holdingProfit) && currentCost > 0 ? holdingProfit / currentCost : null;
+  const yesterdayProfit =
+    Number.isFinite(fundQuote.dailyChangePct) && currentHoldingValue > 0
+      ? (currentHoldingValue * fundQuote.dailyChangePct) / 100
+      : null;
   const calculatedProfitRate = accountSummary.profitRate;
   const hasManualProfitRate =
     form.profitRate !== '' &&
@@ -545,8 +557,8 @@ export default function TradingCalculatorPage() {
             <span className={styles.liveDot} />
             LIVE <span>/</span> 017811
           </div>
-          <h1>东方人工智能主题混合 C</h1>
-          <p>分批入仓 · 回撤补仓 · 确认加仓 · 反弹出仓</p>
+          <h1>单只基金 T 看板</h1>
+          <p>东方人工智能主题混合 C · 分批入仓 · 回撤补仓 · 确认加仓 · 反弹出仓</p>
         </div>
         <div className={styles.heroActions}>
           <div className={styles.flowMenu}>
@@ -578,171 +590,162 @@ export default function TradingCalculatorPage() {
       </header>
 
       <div className={styles.workspace}>
-        <section className={`${styles.panel} ${styles.snapshotPanel}`} aria-labelledby="results-title">
-          <div>
-            <SectionTitle
-              id="results-title"
-              title="账户快照"
-              detail="单只基金持仓结果。"
-              action={
-                <button
-                  type="button"
-                  className={styles.editButton}
-                  aria-pressed={isEditingSnapshot}
-                  onClick={toggleSnapshotEdit}
-                >
-                  {isEditingSnapshot ? '完成' : '编辑'}
-                </button>
-              }
-            />
-            <div className={styles.metricsGrid}>
-              {isEditingSnapshot ? (
-                <div className={`${styles.metric} ${styles.metricField}`}>
-                  <Field
-                    id="holdingValue"
-                    label="持仓市值"
-                    value={form.holdingValue}
-                    onChange={(value) => updateForm('holdingValue', value)}
-                    step="0.01"
-                    suffix="元"
-                    hint="只修改看板显示，不参与流水计算。"
-                    error={errors.holdingValue}
-                  />
-                </div>
-              ) : (
-                <Metric label="持仓市值" value={formatMoney(currentHoldingValue)} note="当前持仓市值" />
-              )}
-              {isEditingSnapshot ? (
-                <div className={`${styles.metric} ${styles.metricField} ${profitTone ? styles[profitTone] : ''}`}>
-                  <Field
-                    id="profitRate"
-                    label="盈利率"
-                    value={profitRateInput}
-                    onChange={(value) => updateForm('profitRate', value)}
-                    min="-100"
-                    max="100"
-                    step="0.01"
-                    suffix="%"
-                    hint="只修改看板显示，不参与流水计算。"
-                    error={errors.profitRate}
-                    placeholder="自动计算"
-                  />
-                </div>
-              ) : (
-                <Metric label="盈利率" value={formatPercent(profitRate)} tone={profitTone} note="当前账户盈利率" />
-              )}
-              <Metric label="持仓份额" value={formatNumber(latestEntry?.shares || 0)} note="当前持仓份额" />
-              <Metric label="平均成本" value={formatNav(position.averageCost)} note="累计投入 ÷ 累计份额" />
+        <section
+          className={`${styles.panel} ${styles.snapshotPanel} ${styles.cockpitPanel}`}
+          aria-labelledby="results-title"
+        >
+          <div className={styles.cockpitHeading}>
+            <div className={styles.cockpitTitle}>
+              <span className={styles.eyebrow}>账户快照</span>
+              <h2 id="results-title">东方人工智能主题混合 C</h2>
+              <p>· 分批入仓 · 回撤补仓 · 确认加仓 · 反弹出仓</p>
+            </div>
+            <button
+              type="button"
+              className={styles.editButton}
+              aria-pressed={isEditingSnapshot}
+              onClick={toggleSnapshotEdit}
+            >
+              {isEditingSnapshot ? '完成' : '编辑'}
+            </button>
+          </div>
+          <div
+            className={`${styles.cockpitRisk} ${riskSignals.length ? styles.riskTriggered : ''}`}
+            role="status"
+            aria-live="polite"
+          >
+            <span className={styles.cockpitRiskState}>
+              {riskSignals.length ? '已触发' : fundQuote.status === 'pending' ? '待更新' : '监测中'}
+            </span>
+            <span className={styles.cockpitRiskMessage}>
+              {riskSignals.length
+                ? riskSignals.map((signal) => `${signal.action}：${signal.source}，${signal.message}`).join(' · ')
+                : fundQuote.status === 'pending'
+                  ? '基金日行情待更新，指数只作预警参考'
+                  : '基金和账户数据未达到已设置的提醒线'}
+            </span>
+          </div>
+          <details className={styles.riskSettings}>
+            <summary>风控设置</summary>
+            <div className={styles.riskSettingsGrid}>
+              {RISK_FIELDS.map(([key, label]) => (
+                <label key={key}>
+                  <span>{label}</span>
+                  <span className={styles.riskInputWrap}>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={riskRules[key]}
+                      onChange={(event) =>
+                        setRiskRules((current) => ({
+                          ...current,
+                          [key]: event.target.value === '' ? '' : numericValue(event.target.value)
+                        }))
+                      }
+                    />
+                    <em>%</em>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </details>
+          <div className={styles.metricsGrid}>
+            {isEditingSnapshot ? (
+              <div className={`${styles.metric} ${styles.metricField}`}>
+                <Field
+                  id="holdingValue"
+                  label="金额"
+                  value={form.holdingValue}
+                  onChange={(value) => updateForm('holdingValue', value)}
+                  step="0.01"
+                  hint="只修改看板显示，不参与流水计算。"
+                  error={errors.holdingValue}
+                />
+              </div>
+            ) : (
               <Metric
-                label="回本净值"
-                value={formatNav(position.breakEvenNav)}
-                tone="accent"
-                note={`当前还需 ${formatPercent(position.requiredRise)}`}
+                label="金额"
+                value={currentHoldingValue > 0 ? formatMoney(currentHoldingValue) : '--'}
+                note="当前持仓市值"
               />
-              {isEditingSnapshot ? (
-                <div className={`${styles.metric} ${styles.metricField}`}>
-                  <Field
-                    id="holdingDays"
-                    label="持有时间"
-                    value={form.holdingDays}
-                    onChange={(value) => updateForm('holdingDays', value)}
-                    step="1"
-                    suffix="天"
-                    hint="只修改看板显示。"
-                    error={errors.holdingDays}
-                  />
-                </div>
-              ) : (
-                <Metric label="持有时间" value={`${form.holdingDays} 天`} note="未清仓时每天自动增加 1 天" />
+            )}
+            <Metric
+              label="持有收益"
+              value={formatSignedMoney(holdingProfit)}
+              tone={Number.isFinite(holdingProfit) ? (holdingProfit >= 0 ? 'positive' : 'negative') : ''}
+              note="当前持仓浮动盈亏"
+            />
+            {isEditingSnapshot ? (
+              <div className={`${styles.metric} ${styles.metricField} ${profitTone ? styles[profitTone] : ''}`}>
+                <Field
+                  id="profitRate"
+                  label="持有收益率"
+                  value={profitRateInput}
+                  onChange={(value) => updateForm('profitRate', value)}
+                  min="-100"
+                  max="100"
+                  step="0.01"
+                  suffix="%"
+                  hint="只修改看板显示，不参与流水计算。"
+                  error={errors.profitRate}
+                  placeholder="自动计算"
+                />
+              </div>
+            ) : (
+              <Metric
+                label="持有收益率"
+                value={formatPercent(hasManualProfitRate ? profitRate : holdingProfitRate)}
+                tone={
+                  Number.isFinite(hasManualProfitRate ? profitRate : holdingProfitRate)
+                    ? (hasManualProfitRate ? profitRate : holdingProfitRate) >= 0
+                      ? 'positive'
+                      : 'negative'
+                    : ''
+                }
+                note="基于当前持仓成本"
+              />
+            )}
+            <Metric
+              label="昨日收益"
+              value={formatSignedMoney(yesterdayProfit)}
+              tone={Number.isFinite(yesterdayProfit) ? (yesterdayProfit >= 0 ? 'positive' : 'negative') : ''}
+              note={fundQuote.dailyChangePct === null ? '基金日行情待更新' : '按基金日涨跌幅估算'}
+            />
+            <Metric
+              label="最新净值"
+              value={formatNav(fundQuote.nav)}
+              note={fundQuote.date ? `净值日期 ${fundQuote.date}` : '净值待更新'}
+            />
+            <Metric
+              label="跟踪指数"
+              value={formatPointPercent(
+                hasNumericValue(benchmarkQuote.pct) ? numericValue(benchmarkQuote.pct) * 100 : null
               )}
-            </div>
-            <div className={styles.riskStrip} role="status" aria-live="polite">
-              {riskSignals.length ? (
-                riskSignals.map((signal) => (
-                  <div key={signal.id} className={`${styles.riskItem} ${styles[`risk${signal.level}`]}`}>
-                    <strong>{signal.action}</strong>
-                    <span>
-                      {signal.source}：{signal.message}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <div className={`${styles.riskItem} ${styles.riskSafe}`}>
-                  <strong>暂无风控触发</strong>
-                  <span>基金和账户数据未达到已设置的提醒线</span>
-                </div>
-              )}
-            </div>
+              tone={hasNumericValue(benchmarkQuote.pct) ? (benchmarkQuote.pct >= 0 ? 'positive' : 'negative') : ''}
+              note="仅作预警参考"
+            />
+          </div>
+          <div className={styles.cockpitMeta}>
+            {isEditingSnapshot ? (
+              <Field
+                id="holdingDays"
+                label="持有时间"
+                value={form.holdingDays}
+                onChange={(value) => updateForm('holdingDays', value)}
+                step="1"
+                suffix="天"
+                hint="未清仓时每天自动增加 1 天。"
+                error={errors.holdingDays}
+              />
+            ) : (
+              <span>
+                持有时间：{form.holdingDays} 天 · 当前份额：{formatNumber(currentShares)} · 平均成本：
+                {formatNav(position.averageCost)}
+              </span>
+            )}
           </div>
         </section>
       </div>
-
-      <section className={`${styles.panel} ${styles.marketPanel}`} aria-labelledby="market-title">
-        <SectionTitle id="market-title" title="今日行情" detail="基金净值更新后，流水中的待更新节点会自动补全。" />
-        <div className={styles.marketGrid}>
-          <Metric
-            label="基金净值"
-            value={formatNav(fundQuote.nav)}
-            note={
-              fundQuote.date ? `净值日期 ${fundQuote.date}` : fundQuote.status === 'loading' ? '正在获取' : '暂无数据'
-            }
-          />
-          <Metric
-            label="基金日涨跌幅"
-            value={formatPointPercent(fundQuote.dailyChangePct)}
-            tone={
-              hasNumericValue(fundQuote.dailyChangePct) ? (fundQuote.dailyChangePct >= 0 ? 'positive' : 'negative') : ''
-            }
-            note={fundQuote.status === 'pending' ? '今日净值尚未更新' : '以基金净值为准'}
-          />
-          <Metric
-            label="业绩基准指数参考"
-            value={formatPointPercent(
-              hasNumericValue(benchmarkQuote.pct) ? numericValue(benchmarkQuote.pct) * 100 : null
-            )}
-            tone={hasNumericValue(benchmarkQuote.pct) ? (benchmarkQuote.pct >= 0 ? 'positive' : 'negative') : ''}
-            note={`${BENCHMARK_INDEX.name} · 参考权重 ${BENCHMARK_INDEX.weight}%`}
-          />
-          <Metric
-            label="行情状态"
-            value={
-              fundQuote.status === 'updated'
-                ? '已更新'
-                : fundQuote.status === 'pending'
-                  ? '待更新'
-                  : fundQuote.status === 'loading'
-                    ? '获取中'
-                    : '暂不可用'
-            }
-            tone={fundQuote.status === 'updated' ? 'positive' : 'accent'}
-            note="指数仅作预警参考"
-          />
-        </div>
-        <details className={styles.riskSettings}>
-          <summary>风控设置</summary>
-          <div className={styles.riskSettingsGrid}>
-            {RISK_FIELDS.map(([key, label]) => (
-              <label key={key}>
-                <span>{label}</span>
-                <span className={styles.riskInputWrap}>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={riskRules[key]}
-                    onChange={(event) =>
-                      setRiskRules((current) => ({
-                        ...current,
-                        [key]: event.target.value === '' ? '' : numericValue(event.target.value)
-                      }))
-                    }
-                  />
-                  <em>%</em>
-                </span>
-              </label>
-            ))}
-          </div>
-        </details>
-      </section>
 
       <section className={`${styles.panel} ${styles.flowPanel}`} aria-labelledby="entry-title">
         <SectionTitle
