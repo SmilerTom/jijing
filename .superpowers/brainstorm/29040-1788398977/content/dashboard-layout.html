@@ -5,6 +5,7 @@
   .board-option .mockup { height:100%; }
   .board-option .mockup-body { padding:0; }
   .board-preview { min-height:370px; padding:16px; background:#0b1220; color:#dbeafe; font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  .cockpit-preview { display:flex; flex-direction:column; }
   .preview-head { display:flex; align-items:end; justify-content:space-between; padding-bottom:14px; border-bottom:1px solid #27364e; }
   .preview-head strong { color:#f8fafc; font:700 22px/1.1 Georgia,serif; }
   .preview-tools { display:flex; align-items:center; gap:8px; }
@@ -12,6 +13,8 @@
   .preview-edit,.flow-submit { padding:5px 8px; color:#dbeafe; background:#16243a; border:1px solid #365070; border-radius:5px; font:inherit; font-size:10px; cursor:pointer; }
   .preview-edit:hover,.preview-edit:focus-visible,.flow-submit:hover,.flow-submit:focus-visible { border-color:#75e6c1; color:#75e6c1; }
   .stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:12px 0; }
+  .cockpit-preview .preview-head { order:0; }
+  .cockpit-preview .stats { order:2; }
   .stat { padding:10px; border:1px solid #263752; border-radius:6px; background:#101b2d; }
   .stat i { display:block; margin-bottom:5px; color:#8ca2bf; font-style:normal; font-size:9px; }
   .stat b { color:#75e6c1; font-size:16px; }
@@ -21,6 +24,7 @@
   .board-preview.editing .stat-value { display:none; }
   .board-preview.editing .stat-edit { display:block; }
   .risk { display:grid; gap:8px; margin:10px 0; padding:9px 10px; border-left:3px solid #ffbd77; background:#2b2118; color:#ffdfb5; }
+  .cockpit-preview .risk { order:1; margin:10px 0 0; }
   .risk.ok { border-left-color:#75e6c1; background:#10271f; color:#b7f5df; }
   .risk-top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .risk b { font-size:11px; }
@@ -35,6 +39,7 @@
   .risk.triggered .risk-message { animation:risk-scroll 8s linear infinite; }
   @keyframes risk-scroll { from { transform:translateX(100%); } to { transform:translateX(-100%); } }
   .mini-table { width:100%; border-collapse:collapse; margin-top:13px; }
+  .cockpit-preview .mini-table { order:3; }
   .mini-table th,.mini-table td { padding:8px 4px; border-bottom:1px solid #1f2c42; text-align:right; white-space:nowrap; }
   .mini-table th:first-child,.mini-table td:first-child { text-align:left; }
   .mini-table th { color:#8195b1; font-size:9px; font-weight:400; }
@@ -46,6 +51,7 @@
   .signal small { display:block; color:#8ca2bf; }
   .signal strong { display:block; margin-top:5px; color:#f8fafc; }
   .flow-box { margin-top:13px; padding:10px; border:1px solid #263752; border-radius:6px; background:#101b2d; }
+  .cockpit-preview .flow-box { order:4; }
   .flow-box-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
   .flow-box-head b { color:#f8fafc; font-size:11px; }
   .flow-box-head span,.flow-box small { color:#8ca2bf; font-size:9px; }
@@ -62,7 +68,7 @@
 <p class="subtitle">三种方案都保留：时间、日涨跌幅、出入金金额、累计金额、收益率与风控提示。</p>
 <div class="board-options">
   <div class="board-option card" data-choice="cockpit" onclick="toggleSelect(this)">
-    <div class="card-image"><div class="mockup"><div class="mockup-header">A · 交易驾驶舱</div><div class="mockup-body"><div class="board-preview"><div class="preview-head"><strong>AI C</strong><div class="preview-tools"><span>● LIVE / 017811</span><button type="button" class="preview-edit" onclick="event.stopPropagation();togglePreviewEdit(this)">编辑</button></div></div><div class="stats"><div class="stat"><i>金额</i><b class="stat-value">¥10,240</b><input class="stat-edit" type="number" data-edit-key="amount" aria-label="编辑金额" value=""></div><div class="stat"><i>持有收益</i><b class="stat-value">+¥240.00</b></div><div class="stat"><i>持有收益率</i><b class="stat-value">+2.40%</b><input class="stat-edit" type="number" data-edit-key="rate" aria-label="编辑持有收益率" value=""></div><div class="stat"><i>昨日收益</i><b class="stat-value down">-¥614.40</b></div><div class="stat warn"><i>最新净值</i><b>3.2308</b></div><div class="stat stat-index"><i>跟踪指数</i><b>AI 主题</b></div></div><div class="risk" data-profit-value="2.4" data-index-value="-6"><div class="risk-top"><b>⚠ 风险提示</b><span class="risk-state" data-risk-state>监测中</span></div><div class="risk-controls"><label>总资产盈利率 <select data-profit-operator><option value="lte" selected>≤</option><option value="gte">≥</option></select><select data-profit-threshold><option value="-10">-10%</option><option value="-5" selected>-5%</option><option value="0">0%</option><option value="5">+5%</option><option value="10">+10%</option></select></label><label>当天跟踪指数 <select data-index-operator><option value="lte" selected>≤</option><option value="gte">≥</option></select><select data-index-threshold><option value="-10">-10%</option><option value="-5" selected>-5%</option><option value="0">0%</option><option value="5">+5%</option><option value="10">+10%</option></select></label></div><div class="risk-ticker"><span class="risk-message" data-risk-message>总资产盈利率与当天跟踪指数均达到设定值时滚动提示</span></div></div><table class="mini-table"><thead><tr><th>时间</th><th>日涨跌幅</th><th>金额</th><th>累计</th><th>收益率</th></tr></thead><tbody><tr><td>09-03 10:20</td><td class="down">-6.00%</td><td class="up">+200</td><td>2,200</td><td class="down">-6.00%</td></tr><tr><td>09-05 14:10</td><td class="up">+10.00%</td><td class="down">-200</td><td>2,000</td><td class="up">+10.00%</td></tr></tbody></table><div class="flow-box"><div class="flow-box-head"><b>出入金</b><span>净值更新后自动计算</span></div><div class="flow-form"><label>操作<select><option value="buy">买入</option><option value="sell">卖出</option></select></label><label>金额<input class="flow-amount" type="number" min="0" step="0.01" placeholder="输入金额"></label><label>日期<input class="flow-date" type="datetime-local" data-default-now></label><button type="button" class="flow-submit" onclick="event.stopPropagation();addPreviewFlow(this)">添加</button></div><small>发生时间显示为 MM-DD HH:MM，默认当天，可手动选择日期。</small></div></div></div></div>
+    <div class="card-image"><div class="mockup"><div class="mockup-header">A · 交易驾驶舱</div><div class="mockup-body"><div class="board-preview cockpit-preview"><div class="preview-head"><strong>AI C</strong><div class="preview-tools"><span>● LIVE / 017811</span><button type="button" class="preview-edit" onclick="event.stopPropagation();togglePreviewEdit(this)">编辑</button></div></div><div class="stats"><div class="stat"><i>金额</i><b class="stat-value">¥10,240</b><input class="stat-edit" type="number" data-edit-key="amount" aria-label="编辑金额" value=""></div><div class="stat"><i>持有收益</i><b class="stat-value">+¥240.00</b></div><div class="stat"><i>持有收益率</i><b class="stat-value">+2.40%</b><input class="stat-edit" type="number" data-edit-key="rate" aria-label="编辑持有收益率" value=""></div><div class="stat"><i>昨日收益</i><b class="stat-value down">-¥614.40</b></div><div class="stat warn"><i>最新净值</i><b>3.2308</b></div><div class="stat stat-index"><i>跟踪指数</i><b>AI 主题</b></div></div><div class="risk" data-profit-value="2.4" data-index-value="-6"><div class="risk-top"><b>⚠ 风险提示</b><span class="risk-state" data-risk-state>监测中</span></div><div class="risk-controls"><label>总资产盈利率 <select data-profit-operator><option value="lte" selected>≤</option><option value="gte">≥</option></select><select data-profit-threshold><option value="-10">-10%</option><option value="-5" selected>-5%</option><option value="0">0%</option><option value="5">+5%</option><option value="10">+10%</option></select></label><label>当天跟踪指数 <select data-index-operator><option value="lte" selected>≤</option><option value="gte">≥</option></select><select data-index-threshold><option value="-10">-10%</option><option value="-5" selected>-5%</option><option value="0">0%</option><option value="5">+5%</option><option value="10">+10%</option></select></label></div><div class="risk-ticker"><span class="risk-message" data-risk-message>总资产盈利率与当天跟踪指数均达到设定值时滚动提示</span></div></div><table class="mini-table"><thead><tr><th>时间</th><th>日涨跌幅</th><th>金额</th><th>累计</th><th>收益率</th></tr></thead><tbody><tr><td>09-03 10:20</td><td class="down">-6.00%</td><td class="up">+200</td><td>2,200</td><td class="down">-6.00%</td></tr><tr><td>09-05 14:10</td><td class="up">+10.00%</td><td class="down">-200</td><td>2,000</td><td class="up">+10.00%</td></tr></tbody></table><div class="flow-box"><div class="flow-box-head"><b>出入金</b><span>净值更新后自动计算</span></div><div class="flow-form"><label>操作<select><option value="buy">买入</option><option value="sell">卖出</option></select></label><label>金额<input class="flow-amount" type="number" min="0" step="0.01" placeholder="输入金额"></label><label>日期<input class="flow-date" type="datetime-local" data-default-now></label><button type="button" class="flow-submit" onclick="event.stopPropagation();addPreviewFlow(this)">添加</button></div><small>发生时间显示为 MM-DD HH:MM，默认当天，可手动选择日期。</small></div></div></div></div>
     <div class="card-body"><h3>交易驾驶舱</h3><p>先看仓位、收益和风控状态，再看流水。适合每天快速决定是否补仓或做 T。</p></div>
   </div>
   <div class="board-option card" data-choice="ledger" onclick="toggleSelect(this)">
