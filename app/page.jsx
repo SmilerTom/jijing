@@ -108,6 +108,18 @@ import { dedupeByCode, normalizeCode, cleanCodeArray } from './lib/normalize';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn, formatMoney } from '@/lib/utils';
 
+const SEARCH_RESULTS_STORAGE_KEY = 'rtf_search_results';
+const normalizeSearchResults = (value) =>
+  isArray(value)
+    ? value
+        .filter((fund) => fund && String(fund.CODE || '').trim() && String(fund.NAME || '').trim())
+        .map((fund) => ({
+          CODE: String(fund.CODE).trim(),
+          NAME: String(fund.NAME).trim(),
+          TYPE: String(fund.TYPE || '')
+        }))
+    : [];
+
 export default function HomePage() {
   const {
     funds,
@@ -278,6 +290,7 @@ export default function HomePage() {
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
+  const [searchResultsRestored, setSearchResultsRestored] = useState(false);
   const [selectedFunds, setSelectedFunds] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const dropdownRef = useRef(null);
@@ -2932,18 +2945,29 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    const val = String(deferredSearchTerm ?? '').trim();
-    if (!val) {
+    try {
+      setSearchResults(normalizeSearchResults(JSON.parse(localStorage.getItem(SEARCH_RESULTS_STORAGE_KEY) || '[]')));
+    } catch {
       setSearchResults([]);
-      return;
     }
+    setSearchResultsRestored(true);
+  }, []);
+
+  useEffect(() => {
+    if (!searchResultsRestored) return;
+    const val = String(deferredSearchTerm ?? '').trim();
+    if (!val) return;
 
     if (val.length < 2) return;
 
     setIsSearching(true);
     searchFunds(val)
       .then((results) => {
-        setSearchResults(results);
+        const normalized = normalizeSearchResults(results);
+        setSearchResults(normalized);
+        try {
+          localStorage.setItem(SEARCH_RESULTS_STORAGE_KEY, JSON.stringify(normalized));
+        } catch {}
       })
       .catch((e) => {
         console.error('搜索失败', e);
@@ -2951,7 +2975,7 @@ export default function HomePage() {
       .finally(() => {
         setIsSearching(false);
       });
-  }, [deferredSearchTerm]);
+  }, [deferredSearchTerm, searchResultsRestored]);
 
   const handleSearchInput = (e) => {
     setSearchTerm(e.target.value);
