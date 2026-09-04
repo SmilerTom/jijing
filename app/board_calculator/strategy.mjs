@@ -9,11 +9,13 @@ export function calculateStrategyState({ holdingRate = null, currentHoldingAmoun
   const rate = Number(holdingRate);
   const amount = Number(currentHoldingAmount);
   const nav = Number(currentNav);
+  const hasCurrentNav = currentNav !== null && currentNav !== '' && Number.isFinite(nav);
+  const hasLastSellNav = lastSellNav !== null && lastSellNav !== '' && Number.isFinite(Number(lastSellNav));
   const sellTriggered = holdingRate !== null && Number.isFinite(rate) && rate >= strategy.targetRate;
   const suggestedSellAmount = sellTriggered && currentHoldingAmount !== null && Number.isFinite(amount) ? (amount * strategy.sellRatio) / 100 : null;
   const movingAverage = calculateMovingAverage(navHistory, strategy.maPeriod);
-  const locked = currentNav !== null && lastSellNav !== null && Number.isFinite(nav) && Number.isFinite(Number(lastSellNav)) && nav >= Number(lastSellNav) * (1 + strategy.lockRiseRate / 100);
-  const canSuggestBuy = !locked && Number.isFinite(nav) && movingAverage !== null && nav < movingAverage && Number(soldAmount) > 0;
+  const locked = hasCurrentNav && hasLastSellNav && nav >= Number(lastSellNav) * (1 + strategy.lockRiseRate / 100);
+  const canSuggestBuy = !locked && hasCurrentNav && movingAverage !== null && nav < movingAverage && Number(soldAmount) > 0;
   // 踏空锁定只影响补仓，不能抑制止盈卖出建议。
-  return { status: sellTriggered ? 'sell' : locked ? 'locked' : canSuggestBuy ? 'buy' : movingAverage === null ? 'pending' : 'watch', sellTriggered, suggestedSellAmount, movingAverage, locked, cashPerTranche: Number(soldAmount) > 0 ? Number(soldAmount) / strategy.cashTranches : 0 };
+  return { status: sellTriggered ? 'sell' : locked ? 'locked' : canSuggestBuy ? 'buy' : movingAverage === null || !hasCurrentNav ? 'pending' : 'watch', sellTriggered, suggestedSellAmount, movingAverage, locked, cashPerTranche: Number(soldAmount) > 0 ? Number(soldAmount) / strategy.cashTranches : 0 };
 }
