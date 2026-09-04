@@ -13,6 +13,7 @@ export function calculateStrategyState({ holdingRate = null, currentHoldingAmoun
   const suggestedSellAmount = sellTriggered && currentHoldingAmount !== null && Number.isFinite(amount) ? (amount * strategy.sellRatio) / 100 : null;
   const movingAverage = calculateMovingAverage(navHistory, strategy.maPeriod);
   const locked = currentNav !== null && lastSellNav !== null && Number.isFinite(nav) && Number.isFinite(Number(lastSellNav)) && nav >= Number(lastSellNav) * (1 + strategy.lockRiseRate / 100);
-  const canSuggestBuy = !locked && Number.isFinite(nav) && movingAverage !== null && nav <= movingAverage && Number(soldAmount) > 0;
-  return { status: locked ? 'locked' : canSuggestBuy ? 'buy' : sellTriggered ? 'sell' : movingAverage === null ? 'pending' : 'watch', sellTriggered, suggestedSellAmount, movingAverage, locked, cashPerTranche: Number(soldAmount) > 0 ? Number(soldAmount) / strategy.cashTranches : 0 };
+  const canSuggestBuy = !locked && Number.isFinite(nav) && movingAverage !== null && nav < movingAverage && Number(soldAmount) > 0;
+  // 踏空锁定只影响补仓，不能抑制止盈卖出建议。
+  return { status: sellTriggered ? 'sell' : locked ? 'locked' : canSuggestBuy ? 'buy' : movingAverage === null ? 'pending' : 'watch', sellTriggered, suggestedSellAmount, movingAverage, locked, cashPerTranche: Number(soldAmount) > 0 ? Number(soldAmount) / strategy.cashTranches : 0 };
 }
