@@ -6,9 +6,13 @@ assert.equal(calculateMovingAverage(Array.from({ length: 20 }, (_, index) => ind
 assert.equal(calculateMovingAverage([1, 2, 3], 20), null);
 assert.equal(calculateMovingAverage([1, 'bad', 2, Infinity], 2), 1.5);
 assert.equal(calculateStrategyState({ currentNav: 1, navHistory: Array(20).fill(1), soldAmount: 3000 }).status, 'watch');
+assert.equal(calculateStrategyState({ currentNav: 9, navHistory: Array(20).fill(10), soldAmount: 3000 }).status, 'buy');
 assert.equal(calculateStrategyState({ currentNav: null, navHistory: Array(20).fill(1), soldAmount: 3000 }).status, 'pending');
+assert.equal(calculateStrategyState({ currentNav: '', navHistory: Array(20).fill(1), soldAmount: 3000 }).status, 'pending');
 assert.equal(calculateStrategyState({ holdingRate: 20, currentHoldingAmount: 10000 }).suggestedSellAmount, 3000);
 assert.equal(calculateStrategyState({ soldAmount: 3000 }).cashPerTranche, 1000);
 assert.equal(calculateStrategyState({ currentNav: 1.1, lastSellNav: 1 }).locked, true);
+assert.equal(calculateStrategyState({ currentNav: 1.1, lastSellNav: null }).locked, false);
+assert.equal(calculateStrategyState({ currentNav: 1.1, lastSellNav: '' }).locked, false);
 assert.deepEqual(calculateStrategyState({ holdingRate: 20, currentHoldingAmount: 10000, currentNav: 1.1, lastSellNav: 1 }), { status: 'sell', sellTriggered: true, suggestedSellAmount: 3000, movingAverage: null, locked: true, cashPerTranche: 0 });
 assert.equal(calculateStrategyState({}).status, 'pending');
