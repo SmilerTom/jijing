@@ -1344,6 +1344,14 @@ const PcFundTable = memo(function PcFundTable({
     columnVisibility?.period1y !== false;
   const periodReturnsCacheRef = useRef(new Map());
   const [periodReturnsByCode, setPeriodReturnsByCode] = useState({});
+  const periodReturnsRefreshKey = useMemo(
+    () => (data || []).map((row) => `${row.code}:${row.latestNavDate || ''}:${row.latestNav || ''}`).join('|'),
+    [data]
+  );
+
+  useEffect(() => {
+    periodReturnsCacheRef.current.clear();
+  }, [periodReturnsRefreshKey]);
 
   useEffect(() => {
     if (!periodReturnsEnabled) return;
@@ -1634,56 +1642,23 @@ const PcFundTable = memo(function PcFundTable({
           const original = info.row.original || {};
           const code = original.code;
           const value = (code && (relatedSectorByCode?.[code] ?? relatedSectorCacheRef.current.get(code))) || '';
-          const display = value || '—';
           const labelKey = value ? String(value).trim() : '';
           const quote = labelKey ? sectorQuoteByLabel?.[labelKey] : null;
-          const nameFromQuote = quote?.name != null ? String(quote.name).trim() : '';
-          const firstLine = nameFromQuote || display;
           const pct = quote?.pct;
           const pctText = pct != null ? `${pct > 0 ? '+' : ''}${pct.toFixed(2)}%` : null;
           const pctCls = pct != null ? (pct > 0 ? 'up' : pct < 0 ? 'down' : '') : '';
           return (
-            <div
+            <span
+              className={pctCls}
               style={{
-                width: '100%',
-                minWidth: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'stretch',
-                gap: 2
+                display: 'block',
+                fontWeight: 700,
+                textAlign: 'right',
+                whiteSpace: 'nowrap'
               }}
             >
-              {pctText != null ? (
-                <span
-                  className={pctCls}
-                  style={{
-                    fontWeight: 700,
-                    textAlign: 'right',
-                    fontSize: 'clamp(10px, 1.2vw, 14px)',
-                    display: 'block',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}
-                >
-                  {pctText}
-                </span>
-              ) : null}
-              <span
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  minWidth: 0,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  textAlign: 'right',
-                  fontSize: pctText != null ? '11px' : '14px'
-                }}
-              >
-                {firstLine}
-              </span>
-            </div>
+              {pctText || '—'}
+            </span>
           );
         },
         meta: {
@@ -2512,17 +2487,22 @@ const PcFundTable = memo(function PcFundTable({
           return (
             <div className="row" style={{ justifyContent: 'center', gap: 4, padding: '8px 0' }}>
               <button
-                className="icon-button danger"
+                className="icon-button danger delete-x-button"
+                aria-label={`删除${original.fundName || original.name || '基金'}`}
                 title="删除"
                 onClick={handleClick}
                 style={{
                   width: '28px',
                   height: '28px',
                   opacity: 1,
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  color: 'var(--danger)',
+                  background: 'transparent',
+                  borderColor: 'transparent',
+                  boxShadow: 'none'
                 }}
               >
-                <TrashIcon width="14" height="14" />
+                <CloseIcon width="14" height="14" />
               </button>
             </div>
           );
@@ -3345,7 +3325,7 @@ function FundDetailDialog({ blockDialogClose, cardDialogRow, getFundCardProps, s
       }}
     >
       <DialogContent
-        className="sm:max-w-2xl max-h-[88vh] flex flex-col p-0 overflow-hidden"
+        className="w-[calc(100vw-2rem)] sm:max-w-[1200px] h-[92dvh] max-h-[960px] flex flex-col gap-0 p-0 overflow-hidden"
         onPointerDownOutside={(e) => {
           if (document.body.hasAttribute('data-photo-viewer-open')) {
             e.preventDefault();
@@ -3359,10 +3339,10 @@ function FundDetailDialog({ blockDialogClose, cardDialogRow, getFundCardProps, s
           }
         }}
       >
-        <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between gap-2 space-y-0 px-6 pb-4 pt-6 text-left border-b border-[var(--border)]">
+        <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between gap-2 space-y-0 px-6 py-4 pr-14 text-left border-b border-[var(--border)]">
           <DialogTitle className="text-base font-semibold text-[var(--text)]">基金详情</DialogTitle>
         </DialogHeader>
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 scrollbar-y-styled">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-4 scrollbar-y-styled">
           {cardDialogRow && getFundCardProps ? (
             <FundCard {...getFundCardProps(cardDialogRow)} layoutMode="drawer" />
           ) : null}

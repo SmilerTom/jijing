@@ -40,7 +40,7 @@ export default function MobileFundCardDrawer({
     >
       <DrawerTrigger asChild>{children}</DrawerTrigger>
       <DrawerContent
-        className="h-[85vh] max-h-[90vh] mt-0 flex flex-col"
+        className="h-[94vh] max-h-[96vh] mt-0 flex flex-col"
         onPointerDownOutside={(e) => {
           if (blockDrawerClose) return;
           if (typeof document !== 'undefined' && document.body.hasAttribute('data-photo-viewer-open')) {
@@ -63,13 +63,14 @@ export default function MobileFundCardDrawer({
           <DrawerTitle className="text-base font-semibold text-[var(--text)]">基金详情</DrawerTitle>
           <DrawerClose
             className="icon-button border-none bg-transparent p-1"
+            aria-label="关闭基金详情"
             style={{ borderColor: 'transparent', backgroundColor: 'transparent' }}
           >
             <CloseIcon width="20" height="20" />
           </DrawerClose>
         </DrawerHeader>
         <div
-          className="flex-1 min-h-0 overflow-y-auto px-5 pb-8 pt-0 scrollbar-y-styled"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 pb-8 pt-3 scrollbar-y-styled"
           style={{ paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 0px))' }}
         >
           {cardSheetRow && getFundCardProps ? (

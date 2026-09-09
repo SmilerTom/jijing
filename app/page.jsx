@@ -105,6 +105,8 @@ import {
 } from './lib/fundHelpers';
 
 import { dedupeByCode, normalizeCode, cleanCodeArray } from './lib/normalize';
+import { shouldShowTradingSessionData } from './lib/fundValuation.mjs';
+import { buildFundDeleteConfirmation } from './lib/fundDeletion.mjs';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn, formatMoney } from '@/lib/utils';
 
@@ -779,6 +781,13 @@ export default function HomePage() {
 
   const [fundExtraDataByCode, setFundExtraDataByCode] = useState({});
   const fundExtraDataCacheRef = useRef(new Map());
+  const fundExtraDataRefreshKey = scopedFunds
+    .map((fund) => `${fund.code}:${fund.jzrq || ''}:${fund.dwjz || ''}`)
+    .join('|');
+
+  useEffect(() => {
+    fundExtraDataCacheRef.current.clear();
+  }, [fundExtraDataRefreshKey]);
 
   useEffect(() => {
     // 始终尝试为当前列表基金获取额外数据（阶段涨跌幅、连涨连跌），用于展示图标或排序
@@ -1198,11 +1207,29 @@ export default function HomePage() {
 
   // PC 端表格数据（用于 PcFundTable）
   const pcFundTableData = useMemo(() => {
+    const now = nowInTz();
+    const currentMinutes = now.hour() * 60 + now.minute();
     return displayFunds.map((f) => {
       const hasTodayData = isNavUpdated(f.jzrq, todayStr, f.confirmDays);
+      const showLatestChange = shouldShowTradingSessionData({
+        dataDate: f.jzrq,
+        todayStr,
+        isTradingDay,
+        currentMinutes
+      });
+      const hasTodayEstimate = !f.noValuation && isString(f.gztime) && f.gztime.startsWith(todayStr);
+      const showEstimate =
+        !f.noValuation &&
+        shouldShowTradingSessionData({
+          dataDate: f.gztime || f.time,
+          todayStr,
+          isTradingDay,
+          currentMinutes
+        });
       const latestNav =
         f.dwjz != null && f.dwjz !== '' ? (isNumber(f.dwjz) ? Number(f.dwjz).toFixed(4) : String(f.dwjz)) : '—';
-      const estimateNav = f.noValuation
+      const latestNavDate = f.jzrq || '-';
+      const estimateNav = !showEstimate
         ? '—'
         : f.gsz != null
           ? isNumber(f.gsz)
@@ -1211,18 +1238,17 @@ export default function HomePage() {
           : '—';
 
       const yesterdayChangePercent =
-        f.zzl != null && f.zzl !== '' ? `${f.zzl > 0 ? '+' : ''}${Number(f.zzl).toFixed(2)}%` : '—';
-      const yesterdayChangeValue = f.zzl != null && f.zzl !== '' ? Number(f.zzl) : null;
-      const yesterdayDate = f.jzrq || '-';
+        showLatestChange && f.zzl != null && f.zzl !== '' ? `${f.zzl > 0 ? '+' : ''}${Number(f.zzl).toFixed(2)}%` : '—';
+      const yesterdayChangeValue = showLatestChange && f.zzl != null && f.zzl !== '' ? Number(f.zzl) : null;
+      const yesterdayDate = showLatestChange ? f.jzrq || '-' : '-';
 
-      const estimateChangePercent = f.noValuation
+      const estimateChangePercent = !showEstimate
         ? '—'
         : isNumber(f.gszzl)
           ? `${f.gszzl > 0 ? '+' : ''}${Number(f.gszzl).toFixed(2)}%`
           : (f.gszzl ?? '—');
-      const estimateChangeValue = f.noValuation ? null : isNumber(f.gszzl) ? Number(f.gszzl) : null;
-      const estimateTime = f.noValuation ? f.jzrq || '-' : f.gztime || f.time || '-';
-      const hasTodayEstimate = !f.noValuation && isString(f.gztime) && f.gztime.startsWith(todayStr);
+      const estimateChangeValue = showEstimate && isNumber(f.gszzl) ? Number(f.gszzl) : null;
+      const estimateTime = showEstimate ? f.gztime || f.time || '-' : '-';
 
       const holding = holdingsForTabWithLinked[f.code];
       const isHoldingLinked =
@@ -1401,7 +1427,7 @@ export default function HomePage() {
         hasDca: isHoldingLinked ? allEnabledDcaCodes.has(f.code) : dcaPlansForTab[f.code]?.enabled === true,
         hasPending: pendingCodesForTab.has(f.code),
         latestNav,
-        latestNavDate: yesterdayDate,
+        latestNavDate,
         estimateNav,
         estimateNavDate: estimateTime,
         yesterdayChangePercent,
@@ -2996,21 +3022,7 @@ export default function HomePage() {
       currentTab !== 'all' && currentTab !== 'fav' && groups.some((g) => g.id === currentTab) ? currentTab : null;
 
     if (gid) {
-      const gh = groupHoldings[gid]?.[fund.code];
-      const hasGroupHolding = !isNil(gh) && isNumber(gh.share) && gh.share >= 0;
-      const hasGroupPending = pendingTrades.some((t) => t.fundCode === fund.code && t.groupId === gid);
-      const scoped = migrateDcaPlansToScoped(dcaPlans);
-      const hasGroupDca = !!scoped[gid]?.[fund.code];
-      const txList = transactions[fund.code] || [];
-      const hasGroupTx = txList.some((t) => t.groupId === gid);
-      const needsConfirm = hasGroupHolding || hasGroupPending || hasGroupDca || hasGroupTx;
-      if (needsConfirm) {
-        setFundDeleteConfirm({ code: fund.code, name: fund.name, scope: 'group', groupId: gid });
-      } else {
-        fundDetailDrawerCloseRef.current?.();
-        fundDetailDialogCloseRef.current?.();
-        stripFundFromGroupScope(fund.code, gid);
-      }
+      setFundDeleteConfirm(buildFundDeleteConfirmation(fund, { groupId: gid }));
       return;
     }
 
@@ -3021,13 +3033,7 @@ export default function HomePage() {
     );
     const hasHolding = hasGlobalHolding || hasGroupHolding;
     const otherGroups = groups.filter((g) => g.codes.includes(fund.code)).map((g) => g.name);
-    if (hasHolding || otherGroups.length > 0) {
-      setFundDeleteConfirm({ code: fund.code, name: fund.name, scope: 'global', otherGroups });
-    } else {
-      fundDetailDrawerCloseRef.current?.();
-      fundDetailDialogCloseRef.current?.();
-      removeFund(fund.code);
-    }
+    setFundDeleteConfirm(buildFundDeleteConfirmation(fund, { hasHolding, otherGroups }));
   };
 
   /** @returns {boolean|void} false 表示已弹出二次确认，由确认成功回调再清空选中；true 表示已立即执行，调用方可清空多选 */
@@ -4655,7 +4661,7 @@ export default function HomePage() {
                   alt="项目Github地址"
                   src={githubImg}
                   style={{ width: '30px', height: '30px', cursor: 'pointer' }}
-                  onClick={() => window.open('https://github.com/hzm0321/real-time-fund')}
+                  onClick={() => window.open('https://github.com/SmilerTom/jijing')}
                 />
               </span>
               {isMobile && (

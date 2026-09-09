@@ -21,7 +21,8 @@ import FundTrendChart from '../FundTrendChart';
 import FundValuationTrendChart from '../FundValuationTrendChart';
 import FundIntradayChart from '../FundIntradayChart';
 import FundDailyEarnings from '../FundDailyEarnings';
-import { ChevronIcon, SettingsIcon, StarIcon, SwitchIcon, TrashIcon, LinkIcon } from '../Icons';
+import FundTradingBoard from '@/app/board_calculator/FundTradingBoard';
+import { ChevronIcon, CloseIcon, PencilIcon, SettingsIcon, StarIcon, SwitchIcon, LinkIcon } from '../Icons';
 import { getTagThemeBadgeProps } from '../AddTagDialog';
 
 dayjs.extend(utc);
@@ -30,6 +31,7 @@ dayjs.extend(isSameOrAfter);
 
 import { DEFAULT_TZ } from '@/app/constants';
 import { isNavUpdated } from '@/app/lib/fundHelpers';
+import { shouldShowTradingSessionData } from '@/app/lib/fundValuation.mjs';
 const getBrowserTimeZone = () => {
   if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -362,9 +364,23 @@ export default function Index({
   if (!f) return null;
 
   const showFavoriteButton = currentTab === 'all' || currentTab === 'fav';
-  const relatedSectorRaw = f?.relatedSector != null ? String(f.relatedSector).trim() : '';
-  const relatedSectorQuoteName = f?.relatedSectorQuoteName != null ? String(f.relatedSectorQuoteName).trim() : '';
-  const relatedSectorDisplay = relatedSectorQuoteName || relatedSectorRaw;
+  const now = dayjs().tz(TZ);
+  const currentMinutes = now.hour() * 60 + now.minute();
+  const showLatestChange = shouldShowTradingSessionData({
+    dataDate: f.jzrq,
+    todayStr,
+    isTradingDay,
+    currentMinutes
+  });
+  const showEstimate =
+    !f.noValuation &&
+    shouldShowTradingSessionData({
+      dataDate: f.gztime || f.time,
+      todayStr,
+      isTradingDay,
+      currentMinutes
+    });
+  const navUpdatedForDisplay = showLatestChange && isNavUpdated(f.jzrq, todayStr, f.confirmDays);
   const relatedSectorPctValue = f?.relatedSectorQuotePct == null ? null : Number(f.relatedSectorQuotePct);
   const hasRelatedSectorPct = relatedSectorPctValue != null && Number.isFinite(relatedSectorPctValue);
   const relatedSectorPctText = hasRelatedSectorPct
@@ -474,18 +490,47 @@ export default function Index({
                     </Tooltip>
                   ) : null}
                   <ConsecutiveTrendBadge trend={fundExtraData?.consecutiveTrend} />
-                  {f.name}
+                  {layoutMode === 'drawer' ? (
+                    <a
+                      className="fund-dashboard-link"
+                      href={`/board_calculator?fundCode=${encodeURIComponent(f.code)}&fundName=${encodeURIComponent(f.name)}`}
+                      aria-label={`打开${f.name}交易看板`}
+                    >
+                      {f.name}
+                    </a>
+                  ) : (
+                    f.name
+                  )}
+                  {layoutMode === 'drawer' && isAdded ? (
+                    <Tooltip delayDuration={150}>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="icon-button"
+                          aria-label="编辑持仓金额和收益率"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onHoldingClick?.(f);
+                          }}
+                          style={{ width: 24, height: 24, marginLeft: 6, verticalAlign: 'middle' }}
+                        >
+                          <PencilIcon width="13" height="13" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>编辑持仓金额和收益率</TooltipContent>
+                    </Tooltip>
+                  ) : null}
                 </span>
               </TooltipTrigger>
               <TooltipContent>
-                <p>{isNavUpdated(f.jzrq, todayStr, f.confirmDays) ? '今日净值已更新' : ''}</p>
+                <p>{navUpdatedForDisplay ? '净值已更新' : ''}</p>
               </TooltipContent>
             </Tooltip>
             <span className="muted">
               #{f.code}
               {hasPending && <span className="pending-indicator">待</span>}
               {(hasDca || dcaPlans?.[f.code]?.enabled === true) && <span className="dca-indicator">定</span>}
-              {isNavUpdated(f.jzrq, todayStr, f.confirmDays) && <span className="updated-indicator">✓</span>}
+              {navUpdatedForDisplay && <span className="updated-indicator">✓</span>}
               {fundTags.length > 0 && (
                 <span
                   style={{
@@ -567,16 +612,21 @@ export default function Index({
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  className="icon-button danger"
+                  className="icon-button danger delete-x-button"
+                  aria-label="删除基金"
                   onClick={() => onRemoveFund?.(f)}
                   style={{
                     width: '28px',
                     height: '28px',
                     opacity: 1,
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    color: 'var(--danger)',
+                    background: 'transparent',
+                    borderColor: 'transparent',
+                    boxShadow: 'none'
                   }}
                 >
-                  <TrashIcon width="14" height="14" />
+                  <CloseIcon width="14" height="14" />
                 </button>
               </TooltipTrigger>
               <TooltipContent>
@@ -595,81 +645,40 @@ export default function Index({
         {f.noValuation ? (
           <Stat
             label="涨跌幅"
-            value={f.zzl !== undefined && f.zzl !== null ? `${f.zzl > 0 ? '+' : ''}${Number(f.zzl).toFixed(2)}%` : '—'}
-            delta={f.zzl}
+            value={
+              showLatestChange && f.zzl !== undefined && f.zzl !== null
+                ? `${f.zzl > 0 ? '+' : ''}${Number(f.zzl).toFixed(2)}%`
+                : '—'
+            }
+            delta={showLatestChange ? f.zzl : null}
           />
         ) : (
           <>
-            {(() => {
-              const hasTodayData = isNavUpdated(f.jzrq, todayStr, f.confirmDays);
-              let isYesterdayChange = false;
-              let isPreviousTradingDay = false;
-              if (!hasTodayData && isString(f.jzrq)) {
-                const today = toTz(todayStr).startOf('day');
-                const jzDate = toTz(f.jzrq).startOf('day');
-                const yesterday = today.clone().subtract(1, 'day');
-                if (jzDate.isSame(yesterday, 'day')) {
-                  isYesterdayChange = true;
-                } else if (jzDate.isBefore(yesterday, 'day')) {
-                  isPreviousTradingDay = true;
-                }
+            <Stat
+              label={f.jzrq === todayStr ? '涨跌幅' : '最新涨幅'}
+              value={
+                showLatestChange && f.zzl !== undefined && f.zzl !== null
+                  ? `${f.zzl > 0 ? '+' : ''}${Number(f.zzl).toFixed(2)}%`
+                  : '—'
               }
-              const shouldHideChange = isTradingDay && !hasTodayData && !isYesterdayChange && !isPreviousTradingDay;
-
-              if (shouldHideChange) return null;
-
-              const changeLabel = hasTodayData ? '涨跌幅' : '最新涨幅';
-              return (
-                <Stat
-                  label={changeLabel}
-                  value={f.zzl !== undefined ? `${f.zzl > 0 ? '+' : ''}${Number(f.zzl).toFixed(2)}%` : ''}
-                  delta={f.zzl}
-                />
-              );
-            })()}
+              delta={showLatestChange ? f.zzl : null}
+            />
             <Stat
               label="估算净值"
-              value={f.gsz != null && !isNaN(Number(f.gsz)) ? Number(f.gsz).toFixed(4) : (f.gsz ?? '—')}
+              value={showEstimate && f.gsz != null && !isNaN(Number(f.gsz)) ? Number(f.gsz).toFixed(4) : '—'}
             />
             <Stat
               label="估算涨幅"
-              value={isNumber(f.gszzl) ? `${f.gszzl > 0 ? '+' : ''}${f.gszzl.toFixed(2)}%` : (f.gszzl ?? '—')}
-              delta={Number(f.gszzl) || 0}
+              value={showEstimate && isNumber(f.gszzl) ? `${f.gszzl > 0 ? '+' : ''}${f.gszzl.toFixed(2)}%` : '—'}
+              delta={showEstimate ? Number(f.gszzl) || 0 : null}
             />
           </>
         )}
       </div>
 
-      {(relatedSectorDisplay || hasRelatedSectorPct) && (
+      {hasRelatedSectorPct && (
         <div className="row" style={{ marginBottom: 12 }}>
-          {relatedSectorDisplay ? (
-            <div className="stat" style={{ flexDirection: 'column', gap: 4, minWidth: 0 }}>
-              <span className="label">关联板块</span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span
-                    className="value"
-                    style={{
-                      fontSize: '15px',
-                      lineHeight: 1.2,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      maxWidth: '100%'
-                    }}
-                  >
-                    {relatedSectorDisplay}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{relatedSectorDisplay}</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          ) : null}
-          {hasRelatedSectorPct ? (
-            <Stat label="关联涨幅" value={relatedSectorPctText} delta={relatedSectorPctValue} />
-          ) : null}
+          <Stat label="关联板块" value={relatedSectorPctText} delta={relatedSectorPctValue} />
         </div>
       )}
 
@@ -740,103 +749,118 @@ export default function Index({
                     </div>
                   );
                 })()}
-              <div
-                className="stat"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (profit.profitToday != null) {
-                    onTodayPercentModeToggle?.(f.code);
-                  }
-                }}
-                style={{
-                  cursor: profit.profitToday != null ? 'pointer' : 'default',
-                  flexDirection: 'column',
-                  gap: 4
-                }}
-              >
-                <span className="label" style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  当日收益{todayPercentModes?.[f.code] ? '(%)' : ''}
-                  {profit.profitToday != null && <SwitchIcon />}
-                </span>
-                {profit.profitToday != null ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span
-                        className={`value ${
-                          masked ? '' : profit.profitToday > 0 ? 'up' : profit.profitToday < 0 ? 'down' : ''
-                        }`}
-                        style={{ display: 'inline-block' }}
-                      >
-                        {masked ? (
-                          '******'
-                        ) : (
-                          <>
-                            {profit.profitToday > 0 ? '+' : profit.profitToday < 0 ? '-' : ''}
-                            {todayPercentModes?.[f.code]
-                              ? `${Math.abs(
-                                  holding?.cost * holding?.share
-                                    ? (profit.profitToday / (holding.cost * holding.share)) * 100
-                                    : 0
-                                ).toFixed(2)}%`
-                              : `${formatMoney(Math.abs(profit.profitToday))}`}
-                          </>
-                        )}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>点击切换金额/百分比</p>
-                    </TooltipContent>
-                  </Tooltip>
-                ) : (
-                  <span className="value muted" style={{ display: 'inline-block' }}>
-                    --
-                  </span>
-                )}
-              </div>
-              {profit.profitTotal !== null && (
+              {layoutMode !== 'drawer' && (
                 <div
                   className="stat"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onPercentModeToggle?.(f.code);
+                    if (profit.profitToday != null) {
+                      onTodayPercentModeToggle?.(f.code);
+                    }
                   }}
-                  style={{ cursor: 'pointer', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}
+                  style={{
+                    cursor: profit.profitToday != null ? 'pointer' : 'default',
+                    flexDirection: 'column',
+                    gap: 4
+                  }}
+                >
+                  <span className="label" style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    当日收益{todayPercentModes?.[f.code] ? '(%)' : ''}
+                    {profit.profitToday != null && <SwitchIcon />}
+                  </span>
+                  {profit.profitToday != null ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          className={`value ${
+                            masked ? '' : profit.profitToday > 0 ? 'up' : profit.profitToday < 0 ? 'down' : ''
+                          }`}
+                          style={{ display: 'inline-block' }}
+                        >
+                          {masked ? (
+                            '******'
+                          ) : (
+                            <>
+                              {profit.profitToday > 0 ? '+' : profit.profitToday < 0 ? '-' : ''}
+                              {todayPercentModes?.[f.code]
+                                ? `${Math.abs(
+                                    holding?.cost * holding?.share
+                                      ? (profit.profitToday / (holding.cost * holding.share)) * 100
+                                      : 0
+                                  ).toFixed(2)}%`
+                                : `${formatMoney(Math.abs(profit.profitToday))}`}
+                            </>
+                          )}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>点击切换金额/百分比</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <span className="value muted" style={{ display: 'inline-block' }}>
+                      --
+                    </span>
+                  )}
+                </div>
+              )}
+              {(layoutMode === 'drawer' || profit.profitTotal !== null) && (
+                <div
+                  className="stat"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (profit.profitTotal !== null) {
+                      onPercentModeToggle?.(f.code);
+                    }
+                  }}
+                  style={{
+                    cursor: profit.profitTotal !== null ? 'pointer' : 'default',
+                    flexDirection: 'column',
+                    gap: 4,
+                    alignItems: 'flex-end'
+                  }}
                 >
                   <span
                     className="label"
                     style={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'flex-end' }}
                   >
-                    持有收益{percentModes?.[f.code] ? '(%)' : ''}
-                    <SwitchIcon />
+                    持有收益{profit.profitTotal !== null && percentModes?.[f.code] ? '(%)' : ''}
+                    {profit.profitTotal !== null && <SwitchIcon />}
                   </span>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span
-                        className={`value ${
-                          masked ? '' : profit.profitTotal > 0 ? 'up' : profit.profitTotal < 0 ? 'down' : ''
-                        }`}
-                        style={{ display: 'inline-block' }}
-                      >
-                        {masked ? (
-                          '******'
-                        ) : (
-                          <>
-                            {profit.profitTotal > 0 ? '+' : profit.profitTotal < 0 ? '-' : ''}
-                            {percentModes?.[f.code]
-                              ? `${Math.abs(
-                                  holding?.cost * holding?.share
-                                    ? (profit.profitTotal / (holding.cost * holding.share)) * 100
-                                    : 0
-                                ).toFixed(2)}%`
-                              : `${formatMoney(Math.abs(profit.profitTotal))}`}
-                          </>
-                        )}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>点击切换金额/百分比</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  {profit.profitTotal !== null ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          className={`value ${
+                            masked ? '' : profit.profitTotal > 0 ? 'up' : profit.profitTotal < 0 ? 'down' : ''
+                          }`}
+                          style={{ display: 'inline-block' }}
+                        >
+                          {masked ? (
+                            '******'
+                          ) : (
+                            <>
+                              {profit.profitTotal > 0 ? '+' : profit.profitTotal < 0 ? '-' : ''}
+                              {percentModes?.[f.code]
+                                ? `${Math.abs(
+                                    holding?.cost * holding?.share
+                                      ? (profit.profitTotal / (holding.cost * holding.share)) * 100
+                                      : 0
+                                  ).toFixed(2)}%`
+                                : `${formatMoney(Math.abs(profit.profitTotal))}`}
+                            </>
+                          )}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>点击切换金额/百分比</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <span className="value muted" style={{ display: 'inline-block' }}>
+                      —
+                    </span>
+                  )}
                 </div>
               )}
             </>
@@ -886,14 +910,22 @@ export default function Index({
       })()}
 
       {layoutMode === 'drawer' ? (
-        <Tabs defaultValue={hasHoldings ? 'holdings' : 'trend'} className="w-full">
+        <Tabs defaultValue="trade" className="w-full">
           <TabsList className="w-full flex">
-            {hasHoldings && <TabsTrigger value="holdings">前10重仓</TabsTrigger>}
+            <TabsTrigger value="trade">交易</TabsTrigger>
             <TabsTrigger value="trend">业绩走势</TabsTrigger>
             {showValuationTrend && <TabsTrigger value="valuation_trend">估值走势</TabsTrigger>}
-            {hasHoldingAmount && <TabsTrigger value="earnings">我的收益</TabsTrigger>}
+            <TabsTrigger value="earnings">我的收益</TabsTrigger>
+            <TabsTrigger value="holdings">前10重仓</TabsTrigger>
           </TabsList>
-          {hasHoldings && (
+          <TabsContent value="trade" className="mt-3 outline-none">
+            {masked ? (
+              <p className="py-6 text-sm text-[var(--muted)]">金额已隐藏，取消隐藏后可查看策略与交易。</p>
+            ) : (
+              <FundTradingBoard key={f.code} fundId={f.code} fundName={f.name} embedded />
+            )}
+          </TabsContent>
+          {hasHoldings ? (
             <TabsContent value="holdings" className="mt-3 outline-none">
               {topHoldings.assetAllocation && topHoldings.assetAllocation.length > 0 && (
                 <div className="row" style={{ marginBottom: 12 }}>
@@ -941,6 +973,15 @@ export default function Index({
                 ))}
               </div>
             </TabsContent>
+          ) : (
+            <TabsContent value="holdings" className="mt-3 outline-none">
+              <Empty className="py-8 border-none bg-transparent">
+                <EmptyHeader>
+                  <EmptyTitle>暂无重仓数据</EmptyTitle>
+                  <EmptyDescription>该基金暂无可用的最新季度重仓数据</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            </TabsContent>
           )}
           <TabsContent value="trend" className="mt-3 outline-none">
             <FundTrendChart
@@ -959,20 +1000,20 @@ export default function Index({
               <FundValuationTrendChart code={f.code} isExpanded theme={theme} userId={userId} hideHeader />
             </TabsContent>
           )}
-          {hasHoldingAmount && (
-            <TabsContent value="earnings" className="mt-3 outline-none">
-              {displayDailyEarningsSeries.length > 0 ? (
-                <FundDailyEarnings series={displayDailyEarningsSeries} theme={theme} masked={masked} />
-              ) : (
-                <Empty className="py-8 border-none bg-transparent">
-                  <EmptyHeader>
-                    <EmptyTitle>暂无收益数据</EmptyTitle>
-                    <EmptyDescription>该基金暂无历史收益记录</EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
-              )}
-            </TabsContent>
-          )}
+          <TabsContent value="earnings" className="mt-3 outline-none">
+            {displayDailyEarningsSeries.length > 0 ? (
+              <FundDailyEarnings series={displayDailyEarningsSeries} theme={theme} masked={masked} />
+            ) : (
+              <Empty className="py-8 border-none bg-transparent">
+                <EmptyHeader>
+                  <EmptyTitle>暂无收益数据</EmptyTitle>
+                  <EmptyDescription>
+                    {hasHoldingShare ? '该基金暂无历史收益记录' : '设置持仓后即可查看每日收益'}
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
+          </TabsContent>
         </Tabs>
       ) : (
         <>

@@ -5,6 +5,8 @@ import { isArray, isNil, isNumber, isObject, isString } from 'lodash';
 import { storageStore } from '../stores';
 import { withRetry } from '../lib/asyncHelper';
 import { getQueryClient } from '../lib/get-query-client';
+import { getFreshQueryData } from '../lib/fundRefreshCache.mjs';
+import { hasFundEstimate } from '../lib/fundValuation.mjs';
 import * as qk from '../lib/query-keys';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { isTradingDay } from '../lib/tradingCalendar';
@@ -25,6 +27,41 @@ const TZ = getBrowserTimeZone();
 dayjs.tz.setDefault(TZ);
 const nowInTz = () => dayjs().tz(TZ);
 const toTz = (input) => (input ? dayjs.tz(input, TZ) : nowInTz());
+
+let staticRelatedSectorDataPromise = null;
+const parseStaticCsvMap = (text) =>
+  new Map(
+    String(text || '')
+      .replace(/^\uFEFF/, '')
+      .trim()
+      .split(/\r?\n/)
+      .slice(1)
+      .map((line) => line.split(','))
+      .filter(([key, value]) => key && value)
+  );
+const loadStaticRelatedSectorData = () => {
+  if (staticRelatedSectorDataPromise) return staticRelatedSectorDataPromise;
+  if (typeof document === 'undefined') {
+    return Promise.resolve({ fundByCode: new Map(), secidBySector: new Map() });
+  }
+
+  staticRelatedSectorDataPromise = Promise.all([
+    fetch(new URL('data/fund_tracking_targets.csv', document.baseURI)).then((response) => {
+      if (!response.ok) throw new Error('基金板块映射加载失败');
+      return response.text();
+    }),
+    fetch(new URL('data/related_sector_secid.csv', document.baseURI)).then((response) => {
+      if (!response.ok) throw new Error('板块代码映射加载失败');
+      return response.text();
+    })
+  ])
+    .then(([fundText, secidText]) => ({
+      fundByCode: parseStaticCsvMap(fundText),
+      secidBySector: parseStaticCsvMap(secidText)
+    }))
+    .catch(() => ({ fundByCode: new Map(), secidBySector: new Map() }));
+  return staticRelatedSectorDataPromise;
+};
 
 /**
  * 获取单位净值的缓存时长（单位：毫秒）
@@ -79,19 +116,25 @@ const processRelatedSectorsQueue = async () => {
     if (missingCodes.length === 0) continue;
 
     try {
-      const { data, error } = await withRetry(() =>
-        supabase.from('fund_related').select('fund_code, related_sector').in('fund_code', missingCodes)
-      );
-
-      if (error) throw error;
-
       const foundMap = new Map();
-      if (isArray(data)) {
-        data.forEach((item) => {
-          const c = String(item.fund_code).trim();
-          const v = item.related_sector != null ? String(item.related_sector).trim() : '';
-          foundMap.set(c, v);
-        });
+      if (isSupabaseConfigured) {
+        try {
+          const { data, error } = await withRetry(() =>
+            supabase.from('fund_related').select('fund_code, related_sector').in('fund_code', missingCodes)
+          );
+          if (!error && isArray(data)) {
+            data.forEach((item) => {
+              const code = String(item.fund_code).trim();
+              const value = item.related_sector != null ? String(item.related_sector).trim() : '';
+              foundMap.set(code, value);
+            });
+          }
+        } catch {}
+      }
+
+      const { fundByCode } = await loadStaticRelatedSectorData();
+      for (const code of missingCodes) {
+        if (!foundMap.get(code)) foundMap.set(code, fundByCode.get(code) || '');
       }
 
       const qc = getQueryClient();
@@ -127,19 +170,25 @@ const processFundSecidsQueue = async () => {
   fundSecidsTimeout = null;
 
   try {
-    const { data, error } = await withRetry(() =>
-      supabase.from('fund_secid').select('related_sector, secid').in('related_sector', missingLabels)
-    );
-
-    if (error) throw error;
-
     const foundMap = new Map();
-    if (isArray(data)) {
-      data.forEach((item) => {
-        const l = String(item.related_sector).trim();
-        const s = item.secid != null ? String(item.secid).trim() : '';
-        foundMap.set(l, s);
-      });
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await withRetry(() =>
+          supabase.from('fund_secid').select('related_sector, secid').in('related_sector', missingLabels)
+        );
+        if (!error && isArray(data)) {
+          data.forEach((item) => {
+            const label = String(item.related_sector).trim();
+            const secid = item.secid != null ? String(item.secid).trim() : '';
+            foundMap.set(label, secid);
+          });
+        }
+      } catch {}
+    }
+
+    const { secidBySector } = await loadStaticRelatedSectorData();
+    for (const label of missingLabels) {
+      if (!foundMap.get(label)) foundMap.set(label, secidBySector.get(label) || '');
     }
 
     const qc = getQueryClient();
@@ -170,7 +219,6 @@ const processFundSecidsQueue = async () => {
  */
 export const fetchRelatedSectorsBatch = async (codes, { cacheTime = ONE_DAY_MS, authSegment = 'anon' } = {}) => {
   if (!isArray(codes) || codes.length === 0) return {};
-  if (!isSupabaseConfigured) return {};
 
   const seg = authSegment != null && authSegment !== '' ? String(authSegment) : 'anon';
   const qc = getQueryClient();
@@ -183,7 +231,7 @@ export const fetchRelatedSectorsBatch = async (codes, { cacheTime = ONE_DAY_MS, 
     if (!normalized) continue;
 
     // 优先从 React Query 同步缓存中取
-    const cached = qc.getQueryData(qk.relatedSectors(normalized, seg));
+    const cached = getFreshQueryData(qc, qk.relatedSectors(normalized, seg), cacheTime);
     if (cached !== undefined) {
       results[normalized] = cached;
       continue;
@@ -238,7 +286,6 @@ const SECTOR_QUOTE_CACHE_MS = 60 * 1000;
  */
 export const fetchFundSecidsBatch = async (labels, { cacheTime = ONE_DAY_MS } = {}) => {
   if (!isArray(labels) || labels.length === 0) return {};
-  if (!isSupabaseConfigured) return {};
 
   const qc = getQueryClient();
   const results = {};
@@ -250,7 +297,7 @@ export const fetchFundSecidsBatch = async (labels, { cacheTime = ONE_DAY_MS } = 
     if (!normalized) continue;
 
     // 优先从 React Query 同步缓存中取
-    const cached = qc.getQueryData(qk.fundSecid(normalized));
+    const cached = getFreshQueryData(qc, qk.fundSecid(normalized), cacheTime);
     if (cached !== undefined) {
       results[normalized] = cached;
       continue;
@@ -309,7 +356,7 @@ export const fetchEastmoneySectorQuotesBatch = async (secids, { cacheTime = SECT
   for (const secid of secids) {
     const s = secid != null ? String(secid).trim() : '';
     if (!s) continue;
-    const cached = qc.getQueryData(qk.eastSectorQuote(s));
+    const cached = getFreshQueryData(qc, qk.eastSectorQuote(s), cacheTime);
     if (cached !== undefined) {
       results[s] = cached;
     } else {
@@ -1024,7 +1071,7 @@ const fetchFundValuationLastBatched = (code) => {
 
   // 优先读 TanStack Query 缓存
   const qc = getQueryClient();
-  const cached = qc.getQueryData(qk.fundValuationLast(c));
+  const cached = getFreshQueryData(qc, qk.fundValuationLast(c), FUND_VALUATION_LAST_STALE_TIME);
   if (cached !== undefined) {
     return Promise.resolve(cached);
   }
@@ -1201,7 +1248,7 @@ export async function fetchBestValuationSource(code, jzrq, actualZzl) {
 
   const qc = getQueryClient();
   const cacheKey = qk.bestValuationSource(c, jzrq, actualZzl);
-  const cached = qc.getQueryData(cacheKey);
+  const cached = getFreshQueryData(qc, cacheKey, 60 * 60 * 1000);
   if (cached !== undefined) {
     return cached;
   }
@@ -1236,7 +1283,7 @@ export async function fetchFundBestSource(fundCode) {
 
   const qc = getQueryClient();
   const cacheKey = qk.fundBestSource(code);
-  const cached = qc.getQueryData(cacheKey);
+  const cached = getFreshQueryData(qc, cacheKey, 60 * 60 * 1000);
   if (cached !== undefined) {
     return cached;
   }
@@ -1271,7 +1318,7 @@ export async function fetchFundsBestSources(fundCodes) {
   for (const c of fundCodes) {
     const code = c != null ? String(c).trim() : '';
     if (!code) continue;
-    const cached = qc.getQueryData(qk.fundBestSource(code));
+    const cached = getFreshQueryData(qc, qk.fundBestSource(code), 60 * 60 * 1000);
     if (cached !== undefined) {
       result[code] = cached;
     } else {
@@ -1456,6 +1503,12 @@ export const fetchFundData = async (c, overrideDataSource) => {
         reject(fbErr);
         return;
       }
+    }
+
+    if (Number(dataSource) === 1 && !hasFundEstimate(baseData)) {
+      try {
+        baseData = { ...baseData, ...(await fetchFundValuationBySource(code, 2)) };
+      } catch {}
     }
 
     const [tData] = await Promise.all([lsjzPromise]);

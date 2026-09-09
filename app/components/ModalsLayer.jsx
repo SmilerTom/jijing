@@ -203,8 +203,10 @@ function ModalsLayerContent({ callbacksRef }) {
                   </span>
                   。删除后将同时从这些分组中移除。确定要彻底删除吗？
                 </>
-              ) : (
+              ) : fundDeleteConfirm.hasHolding ? (
                 `基金 "${fundDeleteConfirm.name}" 存在持仓记录。删除后将从列表中移除该基金及其全部持仓与相关数据（含各分组内副本），是否继续？`
+              ) : (
+                `确定从列表中删除基金「${fundDeleteConfirm.name}」吗？`
               )
             }
             confirmText="确定删除"

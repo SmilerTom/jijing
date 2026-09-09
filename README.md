@@ -93,8 +93,8 @@ npm install -g @jigubao/cli
 1. 克隆仓库：
 
    ```bash
-   git clone https://github.com/hzm0321/real-time-fund.git
-   cd real-time-fund
+   git clone https://github.com/SmilerTom/jijing.git
+   cd jijing
    ```
 
 2. 安装依赖：
@@ -113,7 +113,7 @@ npm install -g @jigubao/cli
 - `NEXT_PUBLIC_Supabase_ANON_KEY`：Supabase 匿名公钥
 - `NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY`：Web3Forms Access Key
 - `NEXT_PUBLIC_GA_ID`：Google Analytics Measurement ID（如 `G-xxxx`）
-- `NEXT_PUBLIC_GITHUB_LATEST_RELEASE_URL`：GitHub 最新 Release 接口地址，用于在页面中展示"发现新版本"提示（如：`https://api.github.com/repos/hzm0321/real-time-fund/releases/latest`）
+- `NEXT_PUBLIC_GITHUB_LATEST_RELEASE_URL`：GitHub 最新 Release 接口地址，用于在页面中展示"发现新版本"提示（如：`https://api.github.com/repos/SmilerTom/jijing/releases/latest`）
 - `NEXT_PUBLIC_IS_GITHUB_LOGIN`：控制是否开启 GitHub OAuth 登录功能，可选值 `true` / `false`（默认 `false`）
 
 注：如不使用登录、反馈或 GA 统计功能，可不设置对应变量
@@ -201,11 +201,11 @@ npm install -g @jigubao/cli
 
 8. 导入关联板块数据（可选）
 
-   项目支持展示基金追踪的关联板块（如指数、行业板块）及其实时涨跌幅。该功能依赖两张数据表：
+   项目内置关联板块映射，可直接展示基金追踪的关联板块（如指数、行业板块）及其实时涨跌幅。也可将数据导入以下两张表，用 Supabase 数据覆盖内置映射：
    - `fund_related`：基金代码 → 关联板块名称映射
    - `fund_secid`：关联板块名称 → 东方财富 secid 映射
 
-   这两张表已在 `/doc/supabase.sql` 中创建，数据源位于 `/doc` 目录：
+   这两张表已在 `/doc/supabase.sql` 中创建，数据源位于 `/public/data` 目录：
    - `fund_tracking_targets.csv`：基金追踪目标数据
    - `related_sector_secid.csv`：关联板块 secid 映射数据
 

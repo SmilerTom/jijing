@@ -407,11 +407,13 @@ export function useScanImport({
       return !exists || hasHoldingData;
     });
 
+    setScanConfirmModalOpen(false);
     if (codes.length === 0) {
       showToast('所选基金已在目标分组中', 'info');
+      setScannedFunds([]);
+      setSelectedScannedCodes(new Set());
       return;
     }
-    setScanConfirmModalOpen(false);
     setIsScanImporting(true);
     setScanImportProgress({ current: 0, total: codes.length, success: 0, failed: 0 });
 
@@ -614,9 +616,10 @@ export function useScanImport({
       }
 
       if (successCount > 0) {
-        setSuccessModal({ open: true, message: `成功导入 ${successCount} 个基金` });
+        if (isOcrScan) setSuccessModal({ open: true, message: `成功导入 ${successCount} 个基金` });
+        else showToast(`成功添加 ${successCount} 个基金`, 'success');
       } else if (allSelectedSet.size > 0 && failedCount === 0) {
-        setSuccessModal({ open: true, message: '所选基金已在目标分组中' });
+        showToast('所选基金已在目标分组中', 'info');
       } else {
         showToast('未能导入任何基金', 'info');
       }

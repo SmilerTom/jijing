@@ -35,8 +35,7 @@ import {
   LinkIcon,
   PencilIcon,
   SettingsIcon,
-  StarIcon,
-  TrashIcon
+  StarIcon
 } from './Icons';
 import { ConsecutiveTrendBadge } from './Common';
 import {
@@ -289,7 +288,7 @@ function MobileEditBatchHeader({
             color: 'var(--danger)'
           }}
         >
-          <TrashIcon width="17" height="17" />
+          <CloseIcon width="17" height="17" />
         </button>
         <button
           type="button"
@@ -1283,6 +1282,17 @@ const MobileFundTable = memo(function MobileFundTable({
     mobileColumnVisibility?.period1y !== false;
   const periodReturnsCacheRef = useRef(new Map());
   const [periodReturnsByCode, setPeriodReturnsByCode] = useState({});
+  const periodReturnsRefreshKey = useMemo(
+    () =>
+      (isArray(data) ? data : [])
+        .map((row) => `${row.code}:${row.latestNavDate || ''}:${row.latestNav || ''}`)
+        .join('|'),
+    [data]
+  );
+
+  useEffect(() => {
+    periodReturnsCacheRef.current.clear();
+  }, [periodReturnsRefreshKey]);
 
   useEffect(() => {
     if (!periodReturnsEnabled) return;
@@ -1537,7 +1547,8 @@ const MobileFundTable = memo(function MobileFundTable({
           showGroupDeleteButton ? (
             <button
               type="button"
-              className="icon-button"
+              className="icon-button danger delete-x-button"
+              aria-label={`删除${original.fundName || original.name || '基金'}`}
               onClick={(e) => {
                 e.stopPropagation?.();
                 onRemoveFundRef.current?.(original);
@@ -1550,10 +1561,12 @@ const MobileFundTable = memo(function MobileFundTable({
                 border: 'none',
                 height: 26,
                 width: 26,
-                marginRight: 4
+                marginRight: 4,
+                color: 'var(--danger)',
+                boxShadow: 'none'
               }}
             >
-              <TrashIcon width="18" height="18" />
+              <CloseIcon width="16" height="16" />
             </button>
           ) : null
         ) : (
@@ -1924,55 +1937,23 @@ const MobileFundTable = memo(function MobileFundTable({
           const original = info.row.original || {};
           const code = original.code;
           const value = (code && (relatedSectorByCode?.[code] ?? relatedSectorCacheRef.current.get(code))) || '';
-          const display = value || '—';
           const labelKey = value ? String(value).trim() : '';
           const quote = labelKey ? sectorQuoteByLabel?.[labelKey] : null;
-          const nameFromQuote = quote?.name != null ? String(quote.name).trim() : '';
-          const firstLine = nameFromQuote || display;
           const pct = quote?.pct;
           const pctText = pct != null ? `${pct > 0 ? '+' : ''}${pct.toFixed(2)}%` : null;
           const pctCls = pct != null ? (pct > 0 ? 'up' : pct < 0 ? 'down' : '') : '';
           return (
-            <div
+            <span
+              className={pctCls}
               style={{
-                width: '100%',
-                minWidth: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'stretch',
-                gap: 2
+                display: 'block',
+                fontWeight: 700,
+                textAlign: 'right',
+                whiteSpace: 'nowrap'
               }}
             >
-              {pctText != null ? (
-                <div
-                  className={pctCls}
-                  style={{
-                    fontWeight: 700,
-                    textAlign: 'right',
-                    fontSize: 'clamp(9px, 2.5vw, 12px)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}
-                >
-                  {pctText}
-                </div>
-              ) : null}
-              <span
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  minWidth: 0,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  textAlign: 'right',
-                  fontSize: pctText != null ? '10px' : '12px'
-                }}
-              >
-                {firstLine}
-              </span>
-            </div>
+              {pctText || '—'}
+            </span>
           );
         },
         meta: { align: 'right', cellClassName: 'related-sector-cell', width: columnWidthMap.relatedSector ?? 120 }

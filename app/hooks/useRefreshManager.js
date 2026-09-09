@@ -19,6 +19,8 @@ import {
 } from '../api/fund';
 import { TZ } from '../lib/fundHelpers';
 import { getQueryClient } from '../lib/get-query-client';
+import { clearFundRefreshCache } from '../lib/fundRefreshCache.mjs';
+import * as qk from '../lib/query-keys';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -593,8 +595,24 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
     const currentFunds = useStorageStore.getState().funds;
     const codes = Array.from(new Set((isArray(currentFunds) ? currentFunds : []).map((f) => f.code)));
     if (!codes.length) return;
+    const queryClient = getQueryClient();
+    clearFundRefreshCache(queryClient, codes, qk);
     await refreshAll(codes);
   }, [refreshAll]);
+
+  useEffect(() => {
+    const refreshWhenActive = () => {
+      if (document.visibilityState !== 'hidden') manualRefresh();
+    };
+    document.addEventListener('visibilitychange', refreshWhenActive);
+    window.addEventListener('pageshow', refreshWhenActive);
+    window.addEventListener('online', refreshWhenActive);
+    return () => {
+      document.removeEventListener('visibilitychange', refreshWhenActive);
+      window.removeEventListener('pageshow', refreshWhenActive);
+      window.removeEventListener('online', refreshWhenActive);
+    };
+  }, [manualRefresh]);
 
   // 定时刷新 effect
   const refreshMs = useStorageStore((s) => s.refreshMs);
