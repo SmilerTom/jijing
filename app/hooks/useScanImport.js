@@ -381,7 +381,8 @@ export function useScanImport({
     targetGroupId = 'all',
     expandAfterAdd = true,
     autoDataSource = true,
-    autoImportTags = true
+    autoImportTags = true,
+    selection = null
   ) => {
     const parseAmount = (val) => {
       if (!val && val !== 0) return null;
@@ -389,7 +390,9 @@ export function useScanImport({
       return isNaN(num) ? null : num;
     };
 
-    const rawCodes = Array.from(selectedScannedCodes);
+    const importFunds = selection?.funds || scannedFunds;
+    const rawCodes = selection?.codes || Array.from(selectedScannedCodes);
+    const importIsOcrScan = selection?.isOcrScan ?? isOcrScan;
     const targetExists = (code) => {
       if (!code) return false;
       if (targetGroupId === 'all') return funds.some((f) => f.code === code);
@@ -400,7 +403,7 @@ export function useScanImport({
 
     const codes = rawCodes.filter((c) => {
       const exists = targetExists(c);
-      const scannedFund = scannedFunds.find((f) => f.code === c);
+      const scannedFund = importFunds.find((f) => f.code === c);
       const holdAmounts = parseAmount(scannedFund?.holdAmounts);
       const holdGains = parseAmount(scannedFund?.holdGains);
       const hasHoldingData = holdAmounts !== null && holdGains !== null;
@@ -448,7 +451,7 @@ export function useScanImport({
             newFunds.push(fundToAdd);
           }
 
-          const scannedFund = scannedFunds.find((f) => f.code === code);
+          const scannedFund = importFunds.find((f) => f.code === code);
           const holdAmounts = parseAmount(scannedFund?.holdAmounts);
           const holdGains = parseAmount(scannedFund?.holdGains);
           const dwjz = data?.dwjz || data?.gsz || 0;
@@ -616,7 +619,7 @@ export function useScanImport({
       }
 
       if (successCount > 0) {
-        if (isOcrScan) setSuccessModal({ open: true, message: `成功导入 ${successCount} 个基金` });
+        if (importIsOcrScan) setSuccessModal({ open: true, message: `成功导入 ${successCount} 个基金` });
         else showToast(`成功添加 ${successCount} 个基金`, 'success');
       } else if (allSelectedSet.size > 0 && failedCount === 0) {
         showToast('所选基金已在目标分组中', 'info');

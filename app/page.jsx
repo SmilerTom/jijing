@@ -3359,15 +3359,16 @@ export default function HomePage() {
       name: nameMap[code] || '',
       status: funds.some((f) => f.code === code) ? 'added' : 'pending'
     }));
-    setScannedFunds(fundsToConfirm);
-    setSelectedScannedCodes(new Set(selectedCodes));
-    setIsOcrScan(false);
-    setScanConfirmModalOpen(true);
     setSearchTerm('');
     setSelectedFunds([]);
     setShowDropdown(false);
     inputRef.current?.blur();
     setIsSearchFocused(false);
+    await confirmScanImport(currentTab === 'summary' ? 'all' : currentTab, true, Boolean(user), true, {
+      funds: fundsToConfirm,
+      codes: selectedCodes,
+      isOcrScan: false
+    });
   };
 
   const removeFund = (removeCode) => {

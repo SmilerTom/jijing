@@ -101,6 +101,11 @@ const DEFAULT_FUNDS = [
   { code: '017811', name: '东方人工智能主题混合C' }
 ];
 
+const DEFAULT_HOLDINGS = {
+  '024418': { share: 8815.927198, cost: 2.6715528542485996 },
+  '017811': { share: 5032.602114, cost: null, firstPurchaseDate: '2026-09-07' }
+};
+
 export { SORT_DISPLAY_MODES, DEFAULT_SORT_RULES };
 
 export const normalizePendingTrades = (value) => {
@@ -204,7 +209,10 @@ export const useStorageStore = create((set, get) => ({
 
   initHoldings: () => {
     if (typeof window !== 'undefined') {
-      set({ holdings: get().getItem('holdings', {}) });
+      const saved = get().getItem('holdings', null);
+      const holdings = saved === null ? DEFAULT_HOLDINGS : saved;
+      set({ holdings });
+      if (saved === null) get().setItem('holdings', JSON.stringify(holdings));
     }
   },
 
