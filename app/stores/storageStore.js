@@ -96,6 +96,11 @@ const SYNC_KEYS = new Set([
   'fundDividends'
 ]);
 
+const DEFAULT_FUNDS = [
+  { code: '024418', name: '华夏上证科创板半导体材料设备主题ETF发起式联接C' },
+  { code: '017811', name: '东方人工智能主题混合C' }
+];
+
 export { SORT_DISPLAY_MODES, DEFAULT_SORT_RULES };
 
 export const normalizePendingTrades = (value) => {
@@ -166,7 +171,9 @@ export const useStorageStore = create((set, get) => ({
   initFunds: () => {
     if (typeof window !== 'undefined') {
       const saved = get().getItem('funds', []);
-      set({ funds: isArray(saved) ? saved : [] });
+      const funds = isArray(saved) && saved.length ? saved : DEFAULT_FUNDS;
+      set({ funds });
+      if (!isArray(saved) || !saved.length) get().setItem('funds', JSON.stringify(funds));
     }
   },
 
