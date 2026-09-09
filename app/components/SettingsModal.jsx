@@ -365,7 +365,7 @@ export default function SettingsModal({
                   isMobile ? localShowGroupDropdownMobile : localShowGroupDropdownPc
                 )
               }
-              disabled={localSeconds < 30}
+              disabled={localSeconds < 5}
             >
               保存并关闭
             </button>
