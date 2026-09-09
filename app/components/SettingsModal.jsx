@@ -166,15 +166,15 @@ export default function SettingsModal({
               className="input"
               type="number"
               inputMode="numeric"
-              min="30"
+              min="5"
               step="5"
               value={localSeconds}
               onChange={(e) => setLocalSeconds(Number(e.target.value))}
               placeholder="自定义秒数"
             />
-            {localSeconds < 30 && (
+            {localSeconds < 5 && (
               <div className="error-text" style={{ marginTop: 8 }}>
-                最小 30 秒
+                最小 5 秒
               </div>
             )}
           </div>
