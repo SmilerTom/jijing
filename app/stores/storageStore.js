@@ -106,6 +106,8 @@ const DEFAULT_HOLDINGS = {
   '017811': { share: 5032.602114, cost: null, firstPurchaseDate: '2026-09-07' }
 };
 
+const PUBLIC_SEED_VERSION = '2026-09-09';
+
 export { SORT_DISPLAY_MODES, DEFAULT_SORT_RULES };
 
 export const normalizePendingTrades = (value) => {
@@ -176,9 +178,19 @@ export const useStorageStore = create((set, get) => ({
   initFunds: () => {
     if (typeof window !== 'undefined') {
       const saved = get().getItem('funds', []);
-      const funds = isArray(saved) && saved.length ? saved : DEFAULT_FUNDS;
-      set({ funds });
-      if (!isArray(saved) || !saved.length) get().setItem('funds', JSON.stringify(funds));
+      if (window.localStorage.getItem('jijingPublicSeedVersion') !== PUBLIC_SEED_VERSION) {
+        const currentFunds = isArray(saved) ? saved : [];
+        const existingCodes = new Set(currentFunds.map((fund) => fund?.code));
+        const funds = [...currentFunds, ...DEFAULT_FUNDS.filter((fund) => !existingCodes.has(fund.code))];
+        const savedHoldings = get().getItem('holdings', {});
+        const holdings = { ...DEFAULT_HOLDINGS, ...(isObject(savedHoldings) ? savedHoldings : {}) };
+        get().setItem('funds', JSON.stringify(funds));
+        get().setItem('holdings', JSON.stringify(holdings));
+        window.localStorage.setItem('jijingPublicSeedVersion', PUBLIC_SEED_VERSION);
+        return;
+      }
+
+      set({ funds: isArray(saved) && saved.length ? saved : DEFAULT_FUNDS });
     }
   },
 
