@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -491,13 +492,13 @@ export default function Index({
                   ) : null}
                   <ConsecutiveTrendBadge trend={fundExtraData?.consecutiveTrend} />
                   {layoutMode === 'drawer' ? (
-                    <a
+                    <Link
                       className="fund-dashboard-link"
                       href={`/board_calculator?fundCode=${encodeURIComponent(f.code)}&fundName=${encodeURIComponent(f.name)}`}
                       aria-label={`打开${f.name}交易看板`}
                     >
                       {f.name}
-                    </a>
+                    </Link>
                   ) : (
                     f.name
                   )}

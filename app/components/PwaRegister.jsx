@@ -14,8 +14,9 @@ export default function PwaRegister() {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator) || process.env.NODE_ENV !== 'production') {
       return;
     }
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
     navigator.serviceWorker
-      .register('/sw.js', { scope: '/', updateViaCache: 'none' })
+      .register(`${basePath}/sw.js`, { scope: `${basePath}/`, updateViaCache: 'none' })
       .then((reg) => {
         reg.addEventListener('updatefound', () => {
           const newWorker = reg.installing;

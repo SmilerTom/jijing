@@ -24,6 +24,7 @@ const getBrowserTimeZone = () => {
   return DEFAULT_TZ;
 };
 const TZ = getBrowserTimeZone();
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
 dayjs.tz.setDefault(TZ);
 const nowInTz = () => dayjs().tz(TZ);
 const toTz = (input) => (input ? dayjs.tz(input, TZ) : nowInTz());
@@ -46,11 +47,11 @@ const loadStaticRelatedSectorData = () => {
   }
 
   staticRelatedSectorDataPromise = Promise.all([
-    fetch(new URL('data/fund_tracking_targets.csv', document.baseURI)).then((response) => {
+    fetch(`${BASE_PATH}/data/fund_tracking_targets.csv`).then((response) => {
       if (!response.ok) throw new Error('基金板块映射加载失败');
       return response.text();
     }),
-    fetch(new URL('data/related_sector_secid.csv', document.baseURI)).then((response) => {
+    fetch(`${BASE_PATH}/data/related_sector_secid.csv`).then((response) => {
       if (!response.ok) throw new Error('板块代码映射加载失败');
       return response.text();
     })

@@ -10,6 +10,8 @@ import { QueryClientProviderWrapper } from './providers/query-client-provider';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import packageJson from '../package.json';
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
 export const metadata = {
   title: `基估宝 V${packageJson.version}`,
   description: '输入基金编号添加基金，实时显示估值与前10重仓'
@@ -24,9 +26,9 @@ export default function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-title" content="基估宝" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <link rel="apple-touch-icon" href="/Icon-60@3x.png?v=1" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/Icon-60@3x.png?v=1" />
-        <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="apple-touch-icon" href={`${basePath}/Icon-60@3x.png?v=1`} />
+        <link rel="apple-touch-icon" sizes="180x180" href={`${basePath}/Icon-60@3x.png?v=1`} />
+        <link rel="manifest" href={`${basePath}/manifest.webmanifest`} />
         {/* 初始为暗色；ThemeColorSync 会按 data-theme 同步为亮/暗 */}
         <meta name="theme-color" content="#0f172a" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
