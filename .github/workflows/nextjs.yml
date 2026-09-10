@@ -56,3 +56,27 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  package-macos:
+    name: Package macOS DMG
+    runs-on: macos-14
+    needs: deploy
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - name: Install Pake
+        run: npm install --global pake-cli@3.16.1
+      - name: Build universal DMG
+        run: pake https://smilertom.github.io/jijing/ --name "i基金" --width 1280 --height 820 --targets universal
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: iFund-macOS-universal
+          path: "*.dmg"
+          if-no-files-found: error

@@ -1,4 +1,4 @@
-# 基估宝-实时基金估值
+# i基金-实时基金估值
 
 一个基于 Next.js 开发的基金估值与重仓股实时追踪工具。采用玻璃拟态设计（Glassmorphism），支持移动端适配。
 
@@ -84,7 +84,7 @@ npm install -g @jigubao/cli
 - **脚本友好** (支持 `--json`)：除登录/登出外，所有指令均支持 `--json` 输出，便于与 `jq` 或其他脚本工具结合。
 - **安全退出** (`jgb logout`)：注销并清理本地及云端的登录会话。
 
-更多关于 CLI 的开发与高级用法，请参阅 [基估宝命令行工具说明文档 (jgb-cli/README.md)](https://fund.cc.cd/home/docs/cli/intro)。
+更多关于 CLI 的开发与高级用法，请参阅 [i基金命令行工具说明文档 (jgb-cli/README.md)](https://fund.cc.cd/home/docs/cli/intro)。
 
 ## 🚀 快速开始
 

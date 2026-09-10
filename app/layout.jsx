@@ -13,7 +13,7 @@ import packageJson from '../package.json';
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 export const metadata = {
-  title: `基估宝 V${packageJson.version}`,
+  title: `i基金 V${packageJson.version}`,
   description: '输入基金编号添加基金，实时显示估值与前10重仓'
 };
 
@@ -23,7 +23,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <head>
-        <meta name="apple-mobile-web-app-title" content="基估宝" />
+        <meta name="apple-mobile-web-app-title" content="i基金" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <link rel="apple-touch-icon" href={`${basePath}/Icon-60@3x.png?v=1`} />

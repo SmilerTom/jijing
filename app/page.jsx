@@ -4611,7 +4611,7 @@ export default function HomePage() {
                   <p>{isSyncing ? '正在同步到云端...' : undefined}</p>
                 </TooltipContent>
               </Tooltip>
-              <span>基估宝</span>
+              <span>i基金</span>
             </div>
             <div
               className={`glass add-fund-section navbar-add-fund ${isSearchFocused || selectedFunds.length > 0 ? 'search-focused' : ''}`}
