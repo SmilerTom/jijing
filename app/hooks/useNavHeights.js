@@ -42,9 +42,13 @@ export function useNavHeights({ groups, currentTab }) {
 
     // 初始延迟一下，确保渲染完成
     const timer = setTimeout(updateHeights, 100);
+    const resizeObserver = new ResizeObserver(updateHeights);
+    if (navbarRef.current) resizeObserver.observe(navbarRef.current);
+    if (filterBarRef.current) resizeObserver.observe(filterBarRef.current);
     window.addEventListener('resize', onResize);
     return () => {
       window.removeEventListener('resize', onResize);
+      resizeObserver.disconnect();
       clearTimeout(timer);
       if (rafId) cancelAnimationFrame(rafId);
     };

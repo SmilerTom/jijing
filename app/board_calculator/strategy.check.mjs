@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  buildStrategyPrompt,
   DEFAULT_STRATEGY,
   calculateMovingAverage,
   calculateStrategyState,
@@ -34,6 +35,15 @@ assert.equal(
 );
 assert.equal(calculateStrategyState({ holdingRate: 20, currentHoldingAmount: 10000 }).suggestedSellAmount, 3000);
 assert.equal(calculateStrategyState({ holdingRate: 0, strategy: { targetRate: '' } }).sellTriggered, false);
+assert.equal(
+  buildStrategyPrompt({
+    strategyState: { sellTriggered: true, suggestedSellAmount: 3000 },
+    holdingRate: 22,
+    currentHoldingAmount: 10000,
+    strategy: { targetRate: 20, sellRatio: 30 }
+  }).label,
+  '建议卖出'
+);
 assert.equal(calculateStrategyState({ holdingRate: 20, currentHoldingAmount: '' }).suggestedSellAmount, null);
 assert.equal(
   calculateStrategyState({ holdingRate: 20, currentHoldingAmount: 10000, strategy: { sellRatio: '' } })

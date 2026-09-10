@@ -166,7 +166,12 @@ function IndexCard({ item }) {
 // 默认展示：上证指数、深证成指、创业板指
 const DEFAULT_SELECTED_CODES = ['sh000001', 'sz399001', 'sz399006'];
 
-export default function MarketIndexAccordion({ navbarHeight = 0, onCustomSettingsChange, refreshing = false }) {
+export default function MarketIndexAccordion({
+  navbarHeight = 0,
+  marginTop = navbarHeight,
+  onCustomSettingsChange,
+  refreshing = false
+}) {
   const isMobile = useIsMobile();
   const [indices, setIndices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -312,7 +317,7 @@ export default function MarketIndexAccordion({ navbarHeight = 0, onCustomSetting
 
   const topMargin = Number(navbarHeight) || 0;
   const stickyStyle = {
-    marginTop: topMargin,
+    marginTop: Number(marginTop) || 0,
     position: 'sticky',
     top: topMargin,
     zIndex: 10,

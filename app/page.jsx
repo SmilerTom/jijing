@@ -33,6 +33,7 @@ import UserMenu from './components/UserMenu';
 import RefreshButton from './components/RefreshButton';
 const UpdateChecker = dynamic(() => import('./components/UpdateChecker'), { ssr: false });
 import MarketIndexAccordion from './components/MarketIndexAccordion';
+import StrategyTicker from './components/StrategyTicker';
 import githubImg from './assets/github.svg';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { getAllValuationSeries, clearFund } from './lib/valuationTimeseries';
@@ -4728,9 +4729,17 @@ export default function HomePage() {
               />
             </div>
           </div>
+          <StrategyTicker
+            funds={funds}
+            holdings={holdings}
+            getHoldingProfit={getHoldingProfit}
+            navbarHeight={navbarHeight}
+            containerPadding={isMobile ? 12 : 24}
+          />
           {shouldShowMarketIndex && (
             <MarketIndexAccordion
               navbarHeight={navbarHeight}
+              marginTop={0}
               onCustomSettingsChange={triggerCustomSettingsSync}
               refreshing={refreshing}
             />

@@ -8,7 +8,7 @@ import { TrashIcon } from '@/app/components/Icons';
 import { useHoldingProfit } from '@/app/hooks/useHoldingProfit';
 import * as qk from '@/app/lib/query-keys';
 import { storageStore, useStorageStore } from '@/app/stores/storageStore';
-import { DEFAULT_STRATEGY, calculateStrategyState, calculateTrackedHolding } from './strategy.mjs';
+import { DEFAULT_STRATEGY, buildStrategyPrompt, calculateStrategyState, calculateTrackedHolding } from './strategy.mjs';
 import styles from './page.module.css';
 
 const DEFAULT_STRATEGY_FORM = Object.fromEntries(
@@ -268,25 +268,17 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
     ]);
     setFlowAmount('');
   };
-  const remainingAmountAfterSell =
-    Number.isFinite(amountValue) && Number.isFinite(strategyState.suggestedSellAmount)
-      ? amountValue - strategyState.suggestedSellAmount
-      : null;
-  const status = strategyState.sellTriggered
-    ? {
-        label: '建议卖出',
-        tone: styles.up,
-        detail: `当前持有收益率 ${formatRate(rateValue)}，已达到目标 ${strategy.targetRate || '--'}%；建议卖出当前持仓的 ${strategy.sellRatio || '--'}%，约 ${formatMoney(strategyState.suggestedSellAmount)}，卖出后预计剩余 ${formatMoney(remainingAmountAfterSell)}。请在下方出入金选择“卖出”并录入金额。`
-      }
-    : strategyState.status === 'buy'
-      ? {
-          label: '建议补仓',
-          tone: styles.down,
-          detail: `净值跌破 ${strategy.maPeriod || '--'} 日均线，建议补仓一份 ${formatMoney(strategyState.cashPerTranche)}；请通过出入金手动录入。`
-        }
-      : strategyState.status === 'watch'
-        ? { label: '观察中', tone: '', detail: `等待净值跌破 ${strategy.maPeriod || '--'} 日均线。` }
-        : { label: '待更新', tone: '', detail: '没有真实净值或均线数据，暂不生成策略建议。' };
+  const strategyPrompt = buildStrategyPrompt({
+    strategyState,
+    holdingRate: rateValue,
+    currentHoldingAmount: amountValue,
+    strategy
+  });
+  const status = {
+    ...strategyPrompt,
+    tone: strategyPrompt.tone === 'up' ? styles.up : strategyPrompt.tone === 'down' ? styles.down : '',
+    detail: `${strategyPrompt.detail}${strategyState.sellTriggered ? ' 请在下方出入金选择“卖出”并录入金额。' : strategyState.status === 'buy' ? ' 请通过出入金手动录入。' : ''}`
+  };
 
   return (
     <div className={styles.boardPreview}>

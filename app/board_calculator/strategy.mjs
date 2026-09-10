@@ -98,3 +98,32 @@ export function calculateStrategyState({
         : 0
   };
 }
+
+const formatMoney = (value) => (Number.isFinite(value) ? `¥${value.toFixed(2)}` : '--');
+const formatRate = (value) => (Number.isFinite(value) ? `${value >= 0 ? '+' : ''}${value.toFixed(2)}%` : '--');
+
+export function buildStrategyPrompt({ strategyState, holdingRate, currentHoldingAmount, strategy = DEFAULT_STRATEGY }) {
+  const remainingAmount =
+    Number.isFinite(currentHoldingAmount) && Number.isFinite(strategyState?.suggestedSellAmount)
+      ? currentHoldingAmount - strategyState.suggestedSellAmount
+      : null;
+
+  if (strategyState?.sellTriggered) {
+    return {
+      label: '建议卖出',
+      tone: 'up',
+      detail: `当前持有收益率 ${formatRate(holdingRate)}，已达到目标 ${strategy.targetRate || '--'}%；建议卖出当前持仓的 ${strategy.sellRatio || '--'}%，约 ${formatMoney(strategyState.suggestedSellAmount)}，卖出后预计剩余 ${formatMoney(remainingAmount)}。`
+    };
+  }
+  if (strategyState?.status === 'buy') {
+    return {
+      label: '建议补仓',
+      tone: 'down',
+      detail: `净值跌破 ${strategy.maPeriod || '--'} 日均线，建议补仓一份 ${formatMoney(strategyState.cashPerTranche)}。`
+    };
+  }
+  if (strategyState?.status === 'watch') {
+    return { label: '观察中', tone: '', detail: `等待净值跌破 ${strategy.maPeriod || '--'} 日均线。` };
+  }
+  return { label: '待更新', tone: '', detail: '没有真实净值或均线数据，暂不生成策略建议。' };
+}

@@ -5339,3 +5339,80 @@ html::-webkit-scrollbar-thumb:active,
     backdrop-filter: blur(2px) !important;
   }
 }
+/* 首页策略提示：复用详情页策略结果，持续横向滚动。 */
+.strategy-ticker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin: 8px 0;
+  padding: 0 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted-foreground);
+}
+
+.strategy-ticker-label {
+  flex: none;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.strategy-ticker-viewport {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.strategy-ticker-track,
+.strategy-ticker-group,
+.strategy-ticker-item {
+  display: flex;
+  align-items: center;
+  width: max-content;
+}
+
+.strategy-ticker-track {
+  animation: strategy-ticker-scroll 36s linear infinite;
+}
+
+.strategy-ticker:hover .strategy-ticker-track {
+  animation-play-state: paused;
+}
+
+.strategy-ticker-item {
+  gap: 8px;
+  padding-right: 48px;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.strategy-ticker-item b {
+  color: var(--foreground);
+}
+
+.strategy-ticker-item strong {
+  color: var(--muted-foreground);
+}
+
+.strategy-ticker-up {
+  color: var(--danger) !important;
+}
+
+.strategy-ticker-down {
+  color: var(--success) !important;
+}
+
+@keyframes strategy-ticker-scroll {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .strategy-ticker-track {
+    animation: none;
+  }
+}
