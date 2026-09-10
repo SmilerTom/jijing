@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -73,10 +73,14 @@ jobs:
       - name: Install Pake
         run: npm install --global pake-cli@3.16.1
       - name: Build universal DMG
-        run: pake https://smilertom.github.io/jijing/ --name "i基金" --width 1280 --height 820 --targets universal
-      - name: Upload DMG
-        uses: actions/upload-artifact@v4
-        with:
-          name: iFund-macOS-universal
-          path: "*.dmg"
-          if-no-files-found: error
+        run: pake https://smilertom.github.io/jijing/ --name "i基金" --icon https://smilertom.github.io/jijing/ifund-icon.png --width 1280 --height 820 --targets universal
+      - name: Publish DMG release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view desktop-latest --repo SmilerTom/jijing >/dev/null 2>&1; then
+            gh release upload desktop-latest "i基金.dmg" --repo SmilerTom/jijing --clobber
+            gh release edit desktop-latest --repo SmilerTom/jijing --title "i基金 macOS" --notes "由 main 分支最新代码自动构建，支持 Intel 与 Apple Silicon。" --latest
+          else
+            gh release create desktop-latest "i基金.dmg" --repo SmilerTom/jijing --target "${GITHUB_SHA}" --title "i基金 macOS" --notes "由 main 分支最新代码自动构建，支持 Intel 与 Apple Silicon。" --latest
+          fi

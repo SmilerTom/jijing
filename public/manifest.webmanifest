@@ -11,19 +11,19 @@
   "id": "./",
   "icons": [
     {
-      "src": "Icon-60@3x.png",
+      "src": "ifund-icon.png",
       "sizes": "180x180",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "Icon-60@3x.png",
+      "src": "ifund-icon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "Icon-60@3x.png",
+      "src": "ifund-icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
