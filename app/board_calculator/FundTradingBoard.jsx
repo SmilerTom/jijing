@@ -3,12 +3,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { isArray, isNumber, isObject, isString } from 'lodash';
-import { fetchFundHistory } from '@/app/api/fund';
+import { fetchFundData, fetchFundHistory } from '@/app/api/fund';
 import { TrashIcon } from '@/app/components/Icons';
 import { useHoldingProfit } from '@/app/hooks/useHoldingProfit';
 import * as qk from '@/app/lib/query-keys';
 import { storageStore, useStorageStore } from '@/app/stores/storageStore';
-import { DEFAULT_STRATEGY, buildStrategyPrompt, calculateStrategyState, calculateTrackedHolding } from './strategy.mjs';
+import {
+  DEFAULT_STRATEGY,
+  buildStrategyPrompt,
+  calculateTrackedHolding,
+  getStrategyQuote,
+  normalizeStrategy
+} from './strategy.mjs';
+import useStrategyReminder, { notifyStrategyChange } from './useStrategyReminder';
 import styles from './page.module.css';
 
 const DEFAULT_STRATEGY_FORM = Object.fromEntries(
@@ -84,6 +91,8 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
   const [rate, setRate] = useState('');
   const [basisNav, setBasisNav] = useState('');
   const [strategy, setStrategy] = useState(DEFAULT_STRATEGY_FORM);
+  const [strategyError, setStrategyError] = useState('');
+  const [confirmationNav, setConfirmationNav] = useState('');
   const [flowType, setFlowType] = useState('buy');
   const [flowAmount, setFlowAmount] = useState('');
   const [flowDate, setFlowDate] = useState(localDateTime);
@@ -91,6 +100,19 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
   const [hydrated, setHydrated] = useState(false);
   const storageKey = `board-calculator:${fundId}`;
   const fund = useMemo(() => funds.find((item) => item.code === fundId), [funds, fundId]);
+  const { data: liveFund, isError: liveError } = useQuery({
+    queryKey: qk.fundData(fundId, fund?.dataSource || 1),
+    queryFn: () => fetchFundData(fundId, fund?.dataSource || 1),
+    enabled: !embedded && Boolean(fundId),
+    staleTime: 45000,
+    refetchInterval: 60000,
+    refetchOnWindowFocus: true
+  });
+  const marketFund = useMemo(() => {
+    if (embedded) return fund;
+    const merged = liveFund ? { ...fund, gsz: null, gztime: null, noValuation: false, ...liveFund } : fund;
+    return liveError ? { ...merged, gsz: null, gztime: null } : merged;
+  }, [embedded, fund, liveFund, liveError]);
   const holding = holdings?.[fundId];
   const holdingProfit = fund && holding ? getHoldingProfit(fund, holding, null) : null;
   const {
@@ -103,13 +125,6 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
     enabled: Boolean(fundId),
     staleTime: 10 * 60 * 1000
   });
-  const navHistory = useMemo(
-    () =>
-      history
-        .map((item) => Number(item?.unitNetValue ?? item?.value))
-        .filter((value) => Number.isFinite(value) && value > 0),
-    [history]
-  );
   const dailyChangeByDate = useMemo(() => {
     const changes = new Map();
     let previousNav = null;
@@ -135,9 +150,7 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
       });
     return changes;
   }, [history]);
-  const storedNav = Number(fund?.dwjz);
-  const historyNav = navHistory[navHistory.length - 1];
-  const currentNav = Number.isFinite(storedNav) && storedNav > 0 ? storedNav : historyNav;
+  const currentNav = getStrategyQuote(marketFund, history)?.nav;
   const manualAmountValue = hasNumber(amount) ? Number(amount) : NaN;
   const manualRateValue = hasNumber(rate) ? Number(rate) : NaN;
   const flowValue = Number(flowAmount);
@@ -165,17 +178,9 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
   const hasLiveHolding = Number.isFinite(holdingProfit?.amount);
   const profitTone = Number.isFinite(profitValue) ? (profitValue >= 0 ? styles.up : styles.down) : '';
   const rateTone = Number.isFinite(rateValue) ? (rateValue >= 0 ? styles.up : styles.down) : '';
-  const soldAmount = rows.reduce((total, row) => (row.type === 'sell' ? total + Number(row.amount) : total), 0);
   const rowSummaries = useMemo(() => summarizeRows(rows, dailyChangeByDate), [dailyChangeByDate, rows]);
-  const strategyState = calculateStrategyState({
-    holdingRate: Number.isFinite(rateValue) ? rateValue : null,
-    currentHoldingAmount: Number.isFinite(amountValue) ? amountValue : null,
-    currentNav: Number.isFinite(currentNav) ? currentNav : null,
-    navHistory,
-    lastSellNav: null,
-    soldAmount,
-    strategy
-  });
+  const reminder = useStrategyReminder({ fundId, fund: marketFund, history, strategy, enabled: hydrated });
+  const { strategyState } = reminder;
   const manualShare = trackedHolding?.share;
   const manualCost = trackedHolding?.cost;
 
@@ -221,10 +226,7 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
         if (isObject(saved.strategy) && !isArray(saved.strategy)) {
           setStrategy(
             Object.fromEntries(
-              Object.keys(DEFAULT_STRATEGY_FORM).map((key) => [
-                key,
-                inputValue(saved.strategy[key] ?? DEFAULT_STRATEGY_FORM[key])
-              ])
+              Object.keys(DEFAULT_STRATEGY_FORM).map((key) => [key, inputValue(normalizeStrategy(saved.strategy)[key])])
             )
           );
         }
@@ -245,7 +247,13 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
 
   useEffect(() => {
     if (!hydrated) return;
-    storageStore.setItem(storageKey, JSON.stringify({ amount, profit, rate, basisNav, rows, strategy }));
+    try {
+      storageStore.setItem(storageKey, JSON.stringify({ amount, profit, rate, basisNav, rows, strategy }));
+      notifyStrategyChange();
+      setStrategyError('');
+    } catch {
+      setStrategyError('设置保存失败，请检查浏览器存储；顶部提示仍使用之前保存的设置。');
+    }
   }, [hydrated, amount, profit, rate, basisNav, rows, strategy, storageKey]);
 
   const updateStrategy = (key, value) => setStrategy((current) => ({ ...current, [key]: value }));
@@ -255,10 +263,6 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
   };
   const applyDefaultStrategy = () => {
     setStrategy(DEFAULT_STRATEGY_FORM);
-    storageStore.setItem(
-      storageKey,
-      JSON.stringify({ amount, profit, rate, basisNav, rows, strategy: DEFAULT_STRATEGY_FORM })
-    );
   };
   const addFlow = () => {
     if (!(flowValue > 0) || !flowDate) return;
@@ -268,16 +272,18 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
     ]);
     setFlowAmount('');
   };
-  const strategyPrompt = buildStrategyPrompt({
-    strategyState,
-    holdingRate: rateValue,
-    currentHoldingAmount: amountValue,
-    strategy
-  });
+  const strategyPrompt = buildStrategyPrompt({ strategyState });
   const status = {
     ...strategyPrompt,
     tone: strategyPrompt.tone === 'up' ? styles.up : strategyPrompt.tone === 'down' ? styles.down : '',
-    detail: `${strategyPrompt.detail}${strategyState.sellTriggered ? ' 请在下方出入金选择“卖出”并录入金额。' : strategyState.status === 'buy' ? ' 请通过出入金手动录入。' : ''}`
+    detail: strategyPrompt.detail
+  };
+  const confirmationType = strategyState.status === 'stopped' ? 'resume' : strategyState.status;
+  const canConfirm = ['sell', 'buy', 'stop', 'resume'].includes(confirmationType);
+  const confirmTrade = (event) => {
+    event.preventDefault();
+    if (strategyError) return;
+    if (reminder.confirmTrade(confirmationType, confirmationNav)) setConfirmationNav('');
   };
 
   return (
@@ -305,18 +311,18 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
       <div className={styles.riskPanel} hidden={embedded}>
         <div className={styles.riskBanner}>
           <span className={styles.riskState}>
-            {Number.isFinite(currentNav) && navHistory.length >= Number(strategy.maPeriod) ? '已更新' : '待更新'}
+            {reminder.signalQuote?.estimated ? '估值已更新' : Number.isFinite(currentNav) ? '已更新' : '待更新'}
           </span>
           <span className={styles.riskMessage}>
-            {!Number.isFinite(currentNav)
-              ? '等待真实基金净值更新'
-              : historyLoading
-                ? '正在更新历史净值'
-                : historyError
-                  ? '历史净值更新失败'
-                  : navHistory.length < Number(strategy.maPeriod)
-                    ? `历史净值不足 ${strategy.maPeriod || '--'} 个交易日`
-                    : `最新净值 ${currentNav.toFixed(4)}，${strategy.maPeriod || '--'} 日均线 ${strategyState.movingAverage.toFixed(4)}`}
+            {reminder.signalQuote?.estimated
+              ? `盘中估值 ${reminder.signalQuote.nav.toFixed(4)}（${reminder.signalQuote.time}），仅用于预警`
+              : !Number.isFinite(currentNav)
+                ? '等待真实基金净值更新'
+                : historyLoading
+                  ? '正在更新历史净值'
+                  : historyError
+                    ? '历史净值更新失败，最高值记录可能不完整'
+                    : `最新净值 ${currentNav.toFixed(4)}${Number.isFinite(reminder.cycle?.peakNav) ? `，跟踪最高 ${reminder.cycle.peakNav.toFixed(4)}` : ''}`}
           </span>
         </div>
       </div>
@@ -378,7 +384,7 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
           )}
         </div>
         <div className={styles.stat}>
-          <i>最新净值</i>
+          <i>正式净值</i>
           <b className={styles.statValue}>{Number.isFinite(currentNav) ? currentNav.toFixed(4) : '待更新'}</b>
         </div>
         <div className={styles.stat}>
@@ -400,63 +406,101 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
         </div>
         <div className={styles.strategyFields}>
           <StrategyField
-            id={`${fundId}-target-rate`}
-            label="目标收益率"
-            value={strategy.targetRate}
-            onChange={(value) => updateStrategy('targetRate', value)}
-            min="0"
-            max="100"
+            id={`${fundId}-rise-rate`}
+            label="涨多少卖"
+            value={strategy.riseRate}
+            onChange={(value) => updateStrategy('riseRate', value)}
+            min="0.01"
+            max="1000"
             step="0.1"
             suffix="%"
-            hint="0—100"
+            hint="首次跟踪 / 上次实际买入为起点"
           />
           <StrategyField
-            id={`${fundId}-sell-ratio`}
-            label="每次卖出"
-            value={strategy.sellRatio}
-            onChange={(value) => updateStrategy('sellRatio', value)}
-            min="0"
-            max="100"
+            id={`${fundId}-buy-drop-rate`}
+            label="跌多少买回"
+            value={strategy.buyDropRate}
+            onChange={(value) => updateStrategy('buyDropRate', value)}
+            min="0.01"
+            max="99"
             step="0.1"
             suffix="%"
-            hint="按当前持仓份额"
+            hint="确认卖出后，较实际卖出价回落"
           />
           <StrategyField
-            id={`${fundId}-cash-tranches`}
-            label="卖出资金分"
-            value={strategy.cashTranches}
-            onChange={(value) => updateStrategy('cashTranches', value)}
-            min="1"
+            id={`${fundId}-stop-drawdown`}
+            label="最高值回落多少卖"
+            value={strategy.stopDrawdown}
+            onChange={(value) => updateStrategy('stopDrawdown', value)}
+            min="0.01"
+            max="99"
+            step="0.1"
+            suffix="%"
+            hint="跟踪期间最高净值回落，优先止损"
+          />
+          <StrategyField
+            id={`${fundId}-cooldown-days`}
+            label="冷静期"
+            value={strategy.cooldownDays}
+            onChange={(value) => updateStrategy('cooldownDays', value)}
+            min="0"
+            max="3650"
             step="1"
-            suffix="份"
-            hint="正整数"
-          />
-          <StrategyField
-            id={`${fundId}-ma-period`}
-            label="补仓条件"
-            value={strategy.maPeriod}
-            onChange={(value) => updateStrategy('maPeriod', value)}
-            min="1"
-            step="1"
-            prefix="跌破"
-            suffix="日均线"
-            hint="跌破后提示"
-          />
-          <StrategyField
-            id={`${fundId}-lock-rise-rate`}
-            label="踏空锁定线"
-            value={strategy.lockRiseRate}
-            onChange={(value) => updateStrategy('lockRiseRate', value)}
-            min="0"
-            step="0.1"
-            suffix="%"
-            hint="从最近卖出净值算"
+            suffix="天"
+            hint="实际成交确认后按日历天计算"
           />
         </div>
         <div className={styles.strategyStatus} role="status">
           <strong className={status.tone}>{status.label}</strong>
           <span>{status.detail}</span>
         </div>
+        {strategyError || reminder.error ? (
+          <p className={styles.strategyNote} role="alert">
+            {strategyError || reminder.error}
+          </p>
+        ) : null}
+        {canConfirm ? (
+          <form className={styles.strategyConfirmation} onSubmit={confirmTrade}>
+            <label htmlFor={`${fundId}-confirmed-nav`}>
+              实际成交净值
+              <input
+                id={`${fundId}-confirmed-nav`}
+                className={styles.strategyInput}
+                type="number"
+                min="0.000001"
+                max="1000000"
+                step="any"
+                required
+                value={confirmationNav}
+                onChange={(event) => setConfirmationNav(event.target.value)}
+                placeholder="按成交记录填写"
+              />
+            </label>
+            <button className={styles.strategyDefault} type="submit" disabled={Boolean(strategyError)}>
+              {confirmationType === 'resume'
+                ? '已重新买入，恢复跟踪'
+                : confirmationType === 'buy'
+                  ? '已买入'
+                  : '已卖出'}
+            </button>
+          </form>
+        ) : null}
+        <p className={styles.strategyNote}>
+          仅提示，不自动交易；成交确认只更新滚仓阶段，不修改持仓和出入金。普通买卖保留最高值，止损确认后暂停补仓。
+        </p>
+        {!embedded && liveError ? (
+          <p className={styles.strategyNote} role="status">
+            估值刷新失败，已暂停使用估值，按已有正式净值复核。
+          </p>
+        ) : null}
+        {reminder.signalQuote ? (
+          <small className={styles.strategyNote}>
+            {reminder.signalQuote.estimated
+              ? `估值时间：${reminder.signalQuote.time}；正式净值：${reminder.quote?.date || '待更新'}`
+              : `正式净值日期：${reminder.signalQuote.date}；暂无更新的有效当日估值`}
+            。估值只作预警，不更新最高值或成交基准。
+          </small>
+        ) : null}
       </section>
       <div className={styles.tableScroll} role="region" aria-label="出入金流水，可横向滚动" tabIndex={0}>
         <table className={styles.miniTable}>

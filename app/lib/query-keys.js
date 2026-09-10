@@ -19,6 +19,7 @@ export const pingzhongdata = (fundCode) => ['pingzhongdata', String(fundCode).tr
 /** @param {string} code @param {string} range @param {string} netValueType */
 export const fundHistory = (code, range, netValueType = 'unit') => ['fundHistory', code, range, netValueType];
 export const fundValuationTrend = (code, range) => ['fundValuationTrend', code, range];
+export const fundData = (code, source) => ['fundData', code, source];
 export const marketStatus = () => ['marketStatus'];
 
 /** @param {string} val */
