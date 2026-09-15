@@ -401,6 +401,7 @@
 }
 .flowForm input,
 .flowForm select {
+  height: 44px;
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
@@ -419,6 +420,9 @@
 .flowForm select.sell,
 .flowForm input.sell {
   color: var(--danger);
+}
+.flowSubmit {
+  height: 44px;
 }
 .flowBox small {
   display: block;

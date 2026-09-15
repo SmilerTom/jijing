@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict';
-import { hasFundEstimate, shouldShowTradingSessionData } from './fundValuation.mjs';
+import {
+  hasFundEstimate,
+  isMarketOpen,
+  shouldAutoRefresh,
+  shouldShowTradingSessionData,
+  trimValuationSeriesAtClose
+} from './fundValuation.mjs';
 
 assert.equal(hasFundEstimate({ gsz: null, gszzl: null }), false);
 assert.equal(hasFundEstimate({ gsz: '', gszzl: '' }), false);
@@ -39,6 +45,30 @@ assert.equal(
     isTradingDay: true,
     currentMinutes: 10 * 60
   }),
+  true
+);
+assert.deepEqual(
+  trimValuationSeriesAtClose([
+    { time: '14:59', value: 1 },
+    { time: '15:00', value: 2 },
+    { time: '15:01', value: 3 }
+  ]),
+  [
+    { time: '14:59', value: 1 },
+    { time: '15:00', value: 2 }
+  ]
+);
+assert.deepEqual(trimValuationSeriesAtClose(null), []);
+assert.equal(isMarketOpen({ isTradingDay: true, currentMinutes: 11 * 60 + 30 }), true);
+assert.equal(isMarketOpen({ isTradingDay: true, currentMinutes: 11 * 60 + 31 }), false);
+assert.equal(isMarketOpen({ isTradingDay: true, currentMinutes: 15 * 60 }), true);
+assert.equal(isMarketOpen({ isTradingDay: true, currentMinutes: 15 * 60 + 1 }), false);
+assert.equal(
+  shouldAutoRefresh({ isTradingDay: false, currentMinutes: 10 * 60, refreshOutsideTradingHours: false }),
+  false
+);
+assert.equal(
+  shouldAutoRefresh({ isTradingDay: false, currentMinutes: 10 * 60, refreshOutsideTradingHours: true }),
   true
 );
 

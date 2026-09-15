@@ -351,7 +351,7 @@ export default function FundIntradayChart({
       <div
         style={{
           position: 'relative',
-          height: actuallyShowImageChart ? (isMobile ? 200 : 300) : 100,
+          height: actuallyShowImageChart ? (isMobile ? 200 : 300) : isMobile ? 180 : 240,
           width: '100%',
           touchAction: 'pan-y',
           transition: 'height 0.2s ease-in-out'

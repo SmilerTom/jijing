@@ -244,6 +244,7 @@ export default function HomePage() {
     if (typeof window === 'undefined') return;
     syncFromCustomSettings(customSettings);
   }, [customSettings, syncFromCustomSettings]);
+  const refreshOutsideTradingHours = customSettings?.refreshOutsideTradingHours === true;
 
   // 自选状态
   const [currentTab, setCurrentTab] = useState('all');
@@ -2609,14 +2610,15 @@ export default function HomePage() {
     }
   }, [isTradingDay, setDcaPlans]);
 
-  const { refreshing, refreshCycleStartRef, manualRefresh, refreshAll } = useRefreshManager({
+  const { refreshing, refreshCycleStartRef, manualRefresh, autoRefresh, refreshAll } = useRefreshManager({
     scheduleDcaTrades,
     processPendingQueue,
-    deviceConflictModalOpenRef
+    deviceConflictModalOpenRef,
+    isTradingDay
   });
   useEffect(() => {
-    refreshAllRef.current = refreshAll;
-  }, [refreshAll]);
+    refreshAllRef.current = autoRefresh;
+  }, [autoRefresh]);
 
   const {
     handleAddGroup,
@@ -2731,7 +2733,7 @@ export default function HomePage() {
           const cleanedFunds = deduped.map(stripLegacyTagsFromFundObject);
           setFundTagRecords(normalizedTags);
           const codes = Array.from(new Set(cleanedFunds.map((f) => f.code)));
-          if (codes.length && shouldRefreshFromLocal) refreshAll(codes);
+          if (codes.length && shouldRefreshFromLocal) autoRefresh(codes);
         } else {
           try {
             const t = storageStore.getItem('tags', []);
@@ -3717,7 +3719,8 @@ export default function HomePage() {
     isMobileOverride,
     dynamicStyleOverride,
     containerWidthOverride,
-    showGroupDropdownOverride
+    showGroupDropdownOverride,
+    refreshOutsideTradingHoursOverride
   ) => {
     e?.preventDefault?.();
     const seconds = secondsOverride ?? tempSeconds;
@@ -3758,6 +3761,10 @@ export default function HomePage() {
     if (targetIsMobile) setShowGroupDropdownMobile(nextShowGroupDropdown);
     else setShowGroupDropdownPc(nextShowGroupDropdown);
 
+    const nextRefreshOutsideTradingHours = isBoolean(refreshOutsideTradingHoursOverride)
+      ? refreshOutsideTradingHoursOverride
+      : refreshOutsideTradingHours;
+
     // 在移动端不裁剪也不修改 pcContainerWidth，直接保留原值
     let w = Number(containerWidthOverride ?? containerWidth) || 1200;
     if (!targetIsMobile) {
@@ -3771,6 +3778,7 @@ export default function HomePage() {
         // 仅更新当前运行端对应的开关键，不覆盖 PC 端宽度
         setCustomSettings({
           ...parsed,
+          refreshOutsideTradingHours: nextRefreshOutsideTradingHours,
           showMarketIndexMobile: nextShowMarketIndex,
           showGroupFundSearchMobile: nextShowGroupFundSearch,
           dynamicStyleMobile: nextDynamicStyle,
@@ -3779,6 +3787,7 @@ export default function HomePage() {
       } else {
         setCustomSettings({
           ...parsed,
+          refreshOutsideTradingHours: nextRefreshOutsideTradingHours,
           pcContainerWidth: w,
           showMarketIndexPc: nextShowMarketIndex,
           showGroupFundSearchPc: nextShowGroupFundSearch,
@@ -4508,6 +4517,7 @@ export default function HomePage() {
     dynamicStyleMobile,
     showGroupDropdownPc,
     showGroupDropdownMobile,
+    refreshOutsideTradingHours,
     scanProgress: scanProgress ?? { stage: 'ocr', current: 0, total: 0 },
     scanImportProgress: scanImportProgress ?? { current: 0, total: 0, success: 0, failed: 0 },
     // Refs

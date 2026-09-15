@@ -848,7 +848,7 @@ export default function FundTrendChart({
             })}
       </div>
 
-      <div style={{ position: 'relative', height: 180, width: '100%', touchAction: 'pan-y' }}>
+      <div style={{ position: 'relative', height: 260, width: '100%', touchAction: 'pan-y' }}>
         {loading && (
           <div className="chart-overlay" style={{ backdropFilter: 'blur(2px)' }}>
             <span className="muted" style={{ fontSize: '12px' }}>

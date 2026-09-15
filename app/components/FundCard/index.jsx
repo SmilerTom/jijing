@@ -32,7 +32,7 @@ dayjs.extend(isSameOrAfter);
 
 import { DEFAULT_TZ } from '@/app/constants';
 import { isNavUpdated } from '@/app/lib/fundHelpers';
-import { shouldShowTradingSessionData } from '@/app/lib/fundValuation.mjs';
+import { shouldShowTradingSessionData, trimValuationSeriesAtClose } from '@/app/lib/fundValuation.mjs';
 const getBrowserTimeZone = () => {
   if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -882,7 +882,9 @@ export default function Index({
       />
 
       {(() => {
-        const currentSeries = f.fundValuationTimeseries?.[f.code] || valuationSeries?.[f.code];
+        const currentSeries = trimValuationSeriesAtClose(
+          f.fundValuationTimeseries?.[f.code] || valuationSeries?.[f.code] || []
+        );
         const showIntraday = !f.noValuation && isArray(currentSeries) && currentSeries.length >= 1;
         if (!showIntraday) return null;
 

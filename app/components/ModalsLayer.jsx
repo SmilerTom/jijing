@@ -932,6 +932,7 @@ function ModalsLayerContent({ callbacksRef }) {
             dynamicStyleMobile={cb.current.dynamicStyleMobile}
             showGroupDropdownPc={cb.current.showGroupDropdownPc}
             showGroupDropdownMobile={cb.current.showGroupDropdownMobile}
+            refreshOutsideTradingHours={cb.current.refreshOutsideTradingHours}
           />
         )}
       </AnimatePresence>

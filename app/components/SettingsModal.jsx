@@ -28,7 +28,8 @@ export default function SettingsModal({
   dynamicStylePc = true,
   dynamicStyleMobile = true,
   showGroupDropdownPc = false,
-  showGroupDropdownMobile = false
+  showGroupDropdownMobile = false,
+  refreshOutsideTradingHours = false
 }) {
   const isMobile = useIsMobile();
   const [sliderDragging, setSliderDragging] = useState(false);
@@ -43,6 +44,9 @@ export default function SettingsModal({
   const [localDynamicStyleMobile, setLocalDynamicStyleMobile] = useState(dynamicStyleMobile);
   const [localShowGroupDropdownPc, setLocalShowGroupDropdownPc] = useState(showGroupDropdownPc);
   const [localShowGroupDropdownMobile, setLocalShowGroupDropdownMobile] = useState(showGroupDropdownMobile);
+  const [localRefreshOutsideTradingHours, setLocalRefreshOutsideTradingHours] = useState(
+    refreshOutsideTradingHours
+  );
   const [localContainerWidth, setLocalContainerWidth] = useState(containerWidth);
   const pageWidthTrackRef = useRef(null);
   const [viewWidth, setViewWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
@@ -122,6 +126,10 @@ export default function SettingsModal({
   }, [showGroupDropdownMobile]);
 
   useEffect(() => {
+    setLocalRefreshOutsideTradingHours(refreshOutsideTradingHours);
+  }, [refreshOutsideTradingHours]);
+
+  useEffect(() => {
     setLocalContainerWidth(containerWidth);
   }, [containerWidth]);
 
@@ -177,6 +185,22 @@ export default function SettingsModal({
                 最小 5 秒
               </div>
             )}
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 16 }}>
+            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: '0.8rem' }}>非开盘时间自动刷新</div>
+                <div className="muted" style={{ marginTop: 4, fontSize: '0.72rem' }}>
+                  开盘时段始终自动刷新
+                </div>
+              </div>
+              <Switch
+                checked={localRefreshOutsideTradingHours}
+                onCheckedChange={(checked) => setLocalRefreshOutsideTradingHours(Boolean(checked))}
+                aria-label="非开盘时间自动刷新"
+              />
+            </div>
           </div>
 
           {!isMobile && setContainerWidth && (
@@ -362,7 +386,8 @@ export default function SettingsModal({
                   isMobile,
                   isMobile ? localDynamicStyleMobile : localDynamicStylePc,
                   localContainerWidth,
-                  isMobile ? localShowGroupDropdownMobile : localShowGroupDropdownPc
+                  isMobile ? localShowGroupDropdownMobile : localShowGroupDropdownPc,
+                  localRefreshOutsideTradingHours
                 )
               }
               disabled={localSeconds < 5}

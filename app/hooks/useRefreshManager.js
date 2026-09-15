@@ -17,7 +17,8 @@ import {
   fetchFundConfirmDays,
   fetchFundsBestSources
 } from '../api/fund';
-import { TZ } from '../lib/fundHelpers';
+import { nowInTz, TZ } from '../lib/fundHelpers';
+import { shouldAutoRefresh } from '../lib/fundValuation.mjs';
 import { getQueryClient } from '../lib/get-query-client';
 import { clearFundRefreshCache } from '../lib/fundRefreshCache.mjs';
 import * as qk from '../lib/query-keys';
@@ -45,9 +46,11 @@ const getAddBaseSnapshotFromFund = (fund) => {
  * @param {Function} deps.processPendingQueue - 执行积压的待处理交易
  * @param {React.RefObject} deps.deviceConflictModalOpenRef - 设备冲突弹窗是否打开
  */
-export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, deviceConflictModalOpenRef }) {
+export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, deviceConflictModalOpenRef, isTradingDay }) {
   const [refreshing, setRefreshing] = useState(false);
   const timerRef = useRef(null);
+  const autoRefreshSchedulerRef = useRef(null);
+  const isTradingDayRef = useRef(isTradingDay);
   const refreshCycleStartRef = useRef(Date.now());
   const refreshingRef = useRef(false);
   const refreshCodesRef = useRef([]);
@@ -60,6 +63,20 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
     processPendingQueueRef.current = processPendingQueue;
   }, [scheduleDcaTrades, processPendingQueue]);
 
+  useEffect(() => {
+    isTradingDayRef.current = isTradingDay;
+  }, [isTradingDay]);
+
+  const canAutoRefreshNow = useCallback(() => {
+    const now = nowInTz();
+    return shouldAutoRefresh({
+      isTradingDay: isTradingDayRef.current,
+      currentMinutes: now.hour() * 60 + now.minute(),
+      refreshOutsideTradingHours:
+        useStorageStore.getState().customSettings?.refreshOutsideTradingHours === true
+    });
+  }, []);
+
   // 同步 funds → refreshCodesRef
   const funds = useStorageStore((s) => s.funds);
   useEffect(() => {
@@ -68,15 +85,9 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
 
   const refreshAll = useCallback(
     async (codes) => {
-      const store = useStorageStore.getState();
-
       // 如果弹窗拦截同步中，则不允许执行数据刷新，但保持心跳循环
       if (deviceConflictModalOpenRef.current) {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(() => {
-          const nextCodes = refreshCodesRef.current || [];
-          if (nextCodes.length) refreshAll(nextCodes);
-        }, store.refreshMs);
+        autoRefreshSchedulerRef.current?.();
         return;
       }
 
@@ -556,15 +567,10 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
       } catch (e) {
         console.error('刷新过程出错', e);
       } finally {
-        const currentRefreshMs = useStorageStore.getState().refreshMs;
         refreshingRef.current = false;
         setRefreshing(false);
         refreshCycleStartRef.current = Date.now();
-        if (timerRef.current) clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(() => {
-          const codes = refreshCodesRef.current || [];
-          if (codes.length) refreshAll(codes);
-        }, currentRefreshMs);
+        autoRefreshSchedulerRef.current?.();
 
         try {
           if (scheduleDcaTradesRef.current) await scheduleDcaTradesRef.current();
@@ -600,9 +606,17 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
     await refreshAll(codes);
   }, [refreshAll]);
 
+  const autoRefresh = useCallback(
+    async (codes) => {
+      if (!canAutoRefreshNow()) return;
+      await refreshAll(codes);
+    },
+    [canAutoRefreshNow, refreshAll]
+  );
+
   useEffect(() => {
     const refreshWhenActive = () => {
-      if (document.visibilityState !== 'hidden') manualRefresh();
+      if (document.visibilityState !== 'hidden' && canAutoRefreshNow()) manualRefresh();
     };
     document.addEventListener('visibilitychange', refreshWhenActive);
     window.addEventListener('pageshow', refreshWhenActive);
@@ -612,7 +626,7 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
       window.removeEventListener('pageshow', refreshWhenActive);
       window.removeEventListener('online', refreshWhenActive);
     };
-  }, [manualRefresh]);
+  }, [canAutoRefreshNow, manualRefresh]);
 
   // 定时刷新 effect
   const refreshMs = useStorageStore((s) => s.refreshMs);
@@ -621,9 +635,10 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
 
     const tick = () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      refreshCycleStartRef.current = Date.now();
       timerRef.current = setTimeout(() => {
         const codes = refreshCodesRef.current || [];
-        if (codes.length) {
+        if (codes.length && canAutoRefreshNow()) {
           refreshAll(codes);
         } else {
           tick();
@@ -631,12 +646,14 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
       }, refreshMs);
     };
 
+    autoRefreshSchedulerRef.current = tick;
     tick();
 
     return () => {
+      if (autoRefreshSchedulerRef.current === tick) autoRefreshSchedulerRef.current = null;
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [refreshMs, refreshAll]);
+  }, [canAutoRefreshNow, refreshMs, refreshAll]);
 
-  return { refreshing, refreshCycleStartRef, manualRefresh, refreshAll };
+  return { refreshing, refreshCycleStartRef, manualRefresh, autoRefresh, refreshAll };
 }
