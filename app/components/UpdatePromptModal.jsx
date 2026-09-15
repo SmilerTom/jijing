@@ -3,17 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { UpdateIcon } from './Icons';
 
-const STATUS_MESSAGE = {
-  checking: '正在检查更新...',
-  current: '当前已是最新版本。',
-  update: '检测到新版本，点击后将自动加载最新内容。',
-  error: '暂时无法检查更新，请稍后重试。'
-};
-
-export default function UpdatePromptModal({ status, open, onClose, onCheck, onRefresh }) {
-  const hasUpdate = status === 'update';
-  const isChecking = status === 'checking';
-
+export default function UpdatePromptModal({ open, onClose, onRefresh }) {
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose?.()}>
       <DialogContent
@@ -33,7 +23,7 @@ export default function UpdatePromptModal({ status, open, onClose, onCheck, onRe
 
         <div style={{ marginBottom: 24 }}>
           <p className="muted" style={{ fontSize: '14px', lineHeight: '1.6' }}>
-            {STATUS_MESSAGE[status] || STATUS_MESSAGE.error}
+            检测到新版本，点击后将自动加载最新内容。
           </p>
         </div>
 
@@ -47,11 +37,10 @@ export default function UpdatePromptModal({ status, open, onClose, onCheck, onRe
           </button>
           <button
             className="button"
-            onClick={hasUpdate ? onRefresh : onCheck}
-            disabled={isChecking}
+            onClick={onRefresh}
             style={{ flex: 1, background: 'var(--success)', color: '#fff', border: 'none' }}
           >
-            {isChecking ? '检查中...' : hasUpdate ? '立即更新' : '重新检查'}
+            立即更新
           </button>
         </div>
       </DialogContent>

@@ -371,7 +371,6 @@ export default function HomePage() {
     _ms({ fundDeleteBulkConfirm: isFunction(v) ? v(_gs().fundDeleteBulkConfirm) : v });
   const setFundTagsEdit = (v) => _ms({ fundTagsEdit: isFunction(v) ? v(_gs().fundTagsEdit) : v });
   const setSuccessModal = (v) => _ms({ successModal: isFunction(v) ? v(_gs().successModal) : v });
-  const openAppUpdate = () => window.dispatchEvent(new Event('ifund:open-update'));
 
   const fundDetailDrawerCloseRef = useRef(null); // 由 MobileFundTable 注入，用于确认删除时关闭基金详情 Drawer
   const fundDetailDialogCloseRef = useRef(null); // 由 PcFundTable 注入，用于确认删除时关闭基金详情 Dialog
@@ -4737,7 +4736,6 @@ export default function HomePage() {
                   }
                 }}
                 onUpdateLog={() => setUpdateLogOpen(true)}
-                onCheckUpdate={openAppUpdate}
               />
             </div>
           </div>
@@ -5458,7 +5456,6 @@ export default function HomePage() {
             }
           }}
           onUpdateLog={() => setUpdateLogOpen(true)}
-          onCheckUpdate={openAppUpdate}
           onFeedback={() => {
             if (!user?.id) {
               sonnerToast.error('请先登录后再提交反馈');
