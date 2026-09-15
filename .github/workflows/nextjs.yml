@@ -2,7 +2,7 @@ name: Deploy Next.js to GitHub Pages
 
 on:
   push:
-    branches: ["main"]
+    branches: ['main']
   workflow_dispatch:
 
 permissions:
@@ -25,14 +25,19 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: '20'
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Write build version
+        run: >-
+          node -e "require('fs').writeFileSync('public/version.json',
+          JSON.stringify({ buildId: process.env.GITHUB_SHA }))"
       - name: Build with Next.js
         run: npm run build
         env:
           NEXT_PUBLIC_BASE_PATH: /jijing
+          NEXT_PUBLIC_BUILD_ID: ${{ github.sha }}
           NEXT_PUBLIC_GITHUB_LATEST_RELEASE_URL: https://api.github.com/repos/SmilerTom/jijing/releases/latest
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -59,13 +64,14 @@ jobs:
 
   package-macos:
     name: Package macOS DMG
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-14
     needs: deploy
     steps:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:

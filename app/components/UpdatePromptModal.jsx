@@ -3,7 +3,17 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { UpdateIcon } from './Icons';
 
-export default function UpdatePromptModal({ updateContent, open, onClose, onRefresh }) {
+const STATUS_MESSAGE = {
+  checking: '正在检查更新...',
+  current: '当前已是最新版本。',
+  update: '检测到新版本，点击后将自动加载最新内容。',
+  error: '暂时无法检查更新，请稍后重试。'
+};
+
+export default function UpdatePromptModal({ status, open, onClose, onCheck, onRefresh }) {
+  const hasUpdate = status === 'update';
+  const isChecking = status === 'checking';
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose?.()}>
       <DialogContent
@@ -22,29 +32,9 @@ export default function UpdatePromptModal({ updateContent, open, onClose, onRefr
         </DialogHeader>
 
         <div style={{ marginBottom: 24 }}>
-          <p className="muted" style={{ fontSize: '14px', lineHeight: '1.6', marginBottom: 12 }}>
-            检测到新版本，是否刷新浏览器以更新？
-            <br />
-            更新内容如下：
+          <p className="muted" style={{ fontSize: '14px', lineHeight: '1.6' }}>
+            {STATUS_MESSAGE[status] || STATUS_MESSAGE.error}
           </p>
-          {updateContent && (
-            <div
-              className="scrollbar-y-styled"
-              style={{
-                background: 'var(--card)',
-                padding: '12px',
-                borderRadius: '8px',
-                fontSize: '13px',
-                lineHeight: '1.5',
-                maxHeight: '200px',
-                overflowY: 'auto',
-                whiteSpace: 'pre-wrap',
-                border: '1px solid var(--border)'
-              }}
-            >
-              {updateContent}
-            </div>
-          )}
         </div>
 
         <div className="flex-row" style={{ gap: 12, display: 'flex' }}>
@@ -57,10 +47,11 @@ export default function UpdatePromptModal({ updateContent, open, onClose, onRefr
           </button>
           <button
             className="button"
-            onClick={onRefresh}
+            onClick={hasUpdate ? onRefresh : onCheck}
+            disabled={isChecking}
             style={{ flex: 1, background: 'var(--success)', color: '#fff', border: 'none' }}
           >
-            刷新浏览器
+            {isChecking ? '检查中...' : hasUpdate ? '立即更新' : '重新检查'}
           </button>
         </div>
       </DialogContent>

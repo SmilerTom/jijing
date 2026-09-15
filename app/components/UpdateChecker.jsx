@@ -1,50 +1,57 @@
 'use client';
-import { isString } from 'lodash';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import packageJson from '../../package.json';
-import { fetchLatestRelease } from '../api/fund';
+import { getAppReloadUrl, isAppUpdateAvailable } from '../lib/appUpdate.mjs';
 import { UpdateIcon } from './Icons';
 import UpdatePromptModal from './UpdatePromptModal';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 export default function UpdateChecker({ onModalOpenChange }) {
-  const [hasUpdate, setHasUpdate] = useState(false);
-  const [latestVersion, setLatestVersion] = useState('');
-  const [updateContent, setUpdateContent] = useState('');
+  const [status, setStatus] = useState('checking');
+  const [latestBuildId, setLatestBuildId] = useState('');
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const currentBuildId = process.env.NEXT_PUBLIC_BUILD_ID || 'development';
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
+  const checkUpdate = useCallback(async () => {
+    setStatus('checking');
+    try {
+      const response = await fetch(`${basePath}/version.json?t=${Date.now()}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const data = await response.json();
+      setLatestBuildId(data?.buildId || '');
+      setStatus(isAppUpdateAvailable(currentBuildId, data?.buildId) ? 'update' : 'current');
+    } catch (error) {
+      console.error('Check update failed:', error);
+      setStatus('error');
+    }
+  }, [basePath, currentBuildId]);
 
   useEffect(() => {
     onModalOpenChange?.(updateModalOpen);
   }, [updateModalOpen, onModalOpenChange]);
 
   useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_GITHUB_LATEST_RELEASE_URL) return;
-
-    const checkUpdate = async () => {
-      try {
-        const data = await fetchLatestRelease();
-        if (!data || !data.tagName || !isString(data.tagName)) return;
-        const remoteVersion = data.tagName.replace(/^v/, '');
-        if (remoteVersion !== packageJson.version) {
-          setHasUpdate(true);
-          setLatestVersion(remoteVersion);
-          setUpdateContent(data.body || '');
-        }
-      } catch (e) {
-        console.error('Check update failed:', e);
-      }
-    };
-
     checkUpdate();
-    const interval = setInterval(checkUpdate, 30 * 60 * 1000);
+    const interval = setInterval(checkUpdate, 5 * 60 * 1000);
     return () => clearInterval(interval);
+  }, [checkUpdate]);
+
+  useEffect(() => {
+    const openUpdatePanel = () => setUpdateModalOpen(true);
+    window.addEventListener('ifund:open-update', openUpdatePanel);
+    return () => window.removeEventListener('ifund:open-update', openUpdatePanel);
   }, []);
+
+  const refreshToLatest = () => {
+    window.location.replace(getAppReloadUrl(window.location.href, latestBuildId));
+  };
 
   return (
     <>
-      {hasUpdate && (
+      {status === 'update' && (
         <Tooltip>
           <TooltipTrigger asChild>
             <div
@@ -56,7 +63,7 @@ export default function UpdateChecker({ onModalOpenChange }) {
             </div>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{`发现新版本 ${latestVersion}，点击前往下载`}</p>
+            <p>发现新版本，点击自动更新</p>
           </TooltipContent>
         </Tooltip>
       )}
@@ -65,9 +72,10 @@ export default function UpdateChecker({ onModalOpenChange }) {
         {updateModalOpen && (
           <UpdatePromptModal
             open={updateModalOpen}
-            updateContent={updateContent}
+            status={status}
             onClose={() => setUpdateModalOpen(false)}
-            onRefresh={() => window.location.reload()}
+            onCheck={checkUpdate}
+            onRefresh={refreshToLatest}
           />
         )}
       </AnimatePresence>

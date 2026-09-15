@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
 import ConfirmModal from './ConfirmModal';
 import { HelpCircle } from 'lucide-react';
-import { CalendarIcon, LoginIcon, LogoutIcon, SettingsIcon, UserIcon, ListIcon } from './Icons';
+import { CalendarIcon, LoginIcon, LogoutIcon, SettingsIcon, UserIcon, ListIcon, UpdateIcon } from './Icons';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 export default function UserMenu({
@@ -23,7 +23,8 @@ export default function UserMenu({
   onLogout,
   onLogoutConfirmOpenChange,
   onTutorial,
-  onUpdateLog
+  onUpdateLog,
+  onCheckUpdate
 }) {
   const isMobile = useIsMobile();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -211,6 +212,16 @@ export default function UserMenu({
                     className="user-menu-item"
                     onClick={() => {
                       setUserMenuOpen(false);
+                      onCheckUpdate?.();
+                    }}
+                  >
+                    <UpdateIcon width="16" height="16" />
+                    <span>检查更新</span>
+                  </button>
+                  <button
+                    className="user-menu-item"
+                    onClick={() => {
+                      setUserMenuOpen(false);
                       onOpenSettings?.();
                     }}
                   >
@@ -274,6 +285,16 @@ export default function UserMenu({
                       </button>
                     </>
                   )}
+                  <button
+                    className="user-menu-item"
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      onCheckUpdate?.();
+                    }}
+                  >
+                    <UpdateIcon width="16" height="16" />
+                    <span>检查更新</span>
+                  </button>
                   <button
                     className="user-menu-item"
                     onClick={() => {

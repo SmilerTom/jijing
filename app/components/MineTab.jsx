@@ -13,6 +13,7 @@ export default function MineTab({
   onMyEarnings,
   onTutorial,
   onUpdateLog,
+  onCheckUpdate,
   onFeedback,
   onSponsorSupport,
   onOpenWeChat
@@ -101,6 +102,12 @@ export default function MineTab({
         <li>
           <button type="button" className="mine-menu-row glass" onClick={onUpdateLog}>
             <span className="mine-menu-label">更新日志</span>
+            <ChevronRight className="mine-menu-chevron" aria-hidden strokeWidth={2} />
+          </button>
+        </li>
+        <li>
+          <button type="button" className="mine-menu-row glass" onClick={onCheckUpdate}>
+            <span className="mine-menu-label">检查更新</span>
             <ChevronRight className="mine-menu-chevron" aria-hidden strokeWidth={2} />
           </button>
         </li>
