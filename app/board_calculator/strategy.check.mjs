@@ -255,6 +255,21 @@ check('驾驶舱和顶部提示共用四项策略文案', () => {
   assert.equal(buildStrategyPrompt({ strategyState: { status: 'stopped' } }).label, '止损后暂停');
   assert.equal(buildStrategyPrompt({ strategyState: { status: 'invalid' } }).label, '请检查设置');
 });
+check('观察提示显示涨跌幅阈值，不显示基金净值线', () => {
+  const holding = buildStrategyPrompt({ strategyState: evaluate({ currentNav: 1.05 }) }).detail;
+  assert.match(holding, /上涨 20\.00%.*回落 10\.00%/);
+  assert.doesNotMatch(holding, /1\.2000|0\.9450/);
+
+  const waitingBuy = buildStrategyPrompt({
+    strategyState: evaluate({
+      cycle: { ...cycle, phase: 'waitingBuy', anchorNav: 1.2, peakNav: 1.2 },
+      currentNav: 1.18,
+      strategy: { cooldownDays: 0 }
+    })
+  }).detail;
+  assert.match(waitingBuy, /回落 5\.00%.*回落 10\.00%/);
+  assert.doesNotMatch(waitingBuy, /1\.1400|1\.0800/);
+});
 console.log(`策略检查：${passed} 项通过；继续检查原有持仓计算。`);
 
 assert.deepEqual(calculateTrackedHolding({ amount: 1200, rate: 20, basisNav: 2, currentNav: 2.2 }), {

@@ -177,9 +177,9 @@ export function calculateStrategyState({
     drawdown,
     phase: cycle.phase,
     peakNav,
-    sellNav: cycle.anchorNav * (1 + Number(config.riseRate) / 100),
-    buyNav: cycle.anchorNav * (1 - Number(config.buyDropRate) / 100),
-    stopNav: peakNav * (1 - Number(config.stopDrawdown) / 100)
+    riseRate: Number(config.riseRate),
+    buyDropRate: Number(config.buyDropRate),
+    stopDrawdown: Number(config.stopDrawdown)
   };
 }
 
@@ -245,8 +245,8 @@ export function buildStrategyPrompt({ strategyState }) {
       tone: '',
       detail:
         state.phase === 'waitingBuy'
-          ? `${source}等待回落至 ${state.buyNav.toFixed(4)} 买回；从最高值回落至 ${state.stopNav.toFixed(4)} 时优先提示止损。`
-          : `${source}涨至 ${state.sellNav.toFixed(4)} 提示卖出；从最高值回落至 ${state.stopNav.toFixed(4)} 提示止损。`
+          ? `${source}回落 ${percentage(state.buyDropRate)} 时提示买回；从最高值回落 ${percentage(state.stopDrawdown)} 时优先提示止损。`
+          : `${source}上涨 ${percentage(state.riseRate)} 时提示卖出；从最高值回落 ${percentage(state.stopDrawdown)} 时提示止损。`
     };
   return { label: '待更新', tone: '', detail: '等待有效净值；成交确认后不使用成交日期之前的旧净值生成信号。' };
 }
