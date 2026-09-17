@@ -428,7 +428,7 @@ export default function HomePage() {
   const shouldShowGroupFundSearch = isMobile ? showGroupFundSearchMobile : showGroupFundSearchPc;
 
   // 交易日检测（抽离到 useTradingDay）
-  const { isTradingDay } = useTradingDay();
+  const { isTradingDay, isMarketOpenNow } = useTradingDay();
 
   const activeGroupId =
     currentTab !== 'all' &&
@@ -439,7 +439,7 @@ export default function HomePage() {
       : null;
 
   // 计算持仓收益（抽离至自定义 Hook 管理）
-  const { getHoldingProfit } = useHoldingProfit({ activeGroupId });
+  const { getHoldingProfit } = useHoldingProfit({ activeGroupId, isMarketOpenNow });
 
   const {
     groupsWithHoldings,
@@ -862,6 +862,9 @@ export default function HomePage() {
       });
     }
 
+    const now = nowInTz();
+    const currentMinutes = now.hour() * 60 + now.minute();
+
     if (currentTab !== 'all' && currentTab !== 'fav' && currentTab !== SUMMARY_TAB_ID && sortBy === 'default') {
       const group = groups.find((g) => g.id === currentTab);
       if (group && group.codes) {
@@ -883,7 +886,14 @@ export default function HomePage() {
       sortBy === 'estimateProfit'
         ? new Map(
             filtered.map((f) => {
-              const hasTodayData = isNavUpdated(f.jzrq, todayStr, f.confirmDays);
+              const hasTodayData =
+                isNavUpdated(f.jzrq, todayStr, f.confirmDays) &&
+                shouldShowTradingSessionData({
+                  dataDate: f.jzrq,
+                  todayStr,
+                  isTradingDay,
+                  currentMinutes
+                });
               const holding = holdingsForTabWithLinked[f.code];
               const profit = getHoldingProfitForTab(f, holding);
               const total = profit ? profit.profitTotal : null;
@@ -902,7 +912,9 @@ export default function HomePage() {
                   : null;
 
               const val =
-                fallbackEstimateProfitPercentValue != null && principal > 0
+                (!isMarketOpenNow || hasTodayData || hasEstimatePercent) &&
+                fallbackEstimateProfitPercentValue != null &&
+                principal > 0
                   ? principal * (fallbackEstimateProfitPercentValue / 100)
                   : null;
               return [f.code, val];
@@ -917,6 +929,16 @@ export default function HomePage() {
           // - noValuation 为 true 一律视为无“估算涨幅”
           // - 仅在 gszzl 为数字时使用 gszzl
           if (fund.noValuation) {
+            return { value: 0, hasValue: false };
+          }
+          if (
+            !shouldShowTradingSessionData({
+              dataDate: fund.gztime || fund.time,
+              todayStr,
+              isTradingDay,
+              currentMinutes
+            })
+          ) {
             return { value: 0, hasValue: false };
           }
           if (isNumber(fund.gszzl)) {
@@ -1158,7 +1180,9 @@ export default function HomePage() {
     currentFundDailyEarnings,
     fundExtraDataByCode,
     todayStr,
-    fundTagListsByCode
+    fundTagListsByCode,
+    isTradingDay,
+    isMarketOpenNow
   ]);
 
   const displayFunds = useDeferredValue(displayFundsRaw);
@@ -1212,7 +1236,14 @@ export default function HomePage() {
     const now = nowInTz();
     const currentMinutes = now.hour() * 60 + now.minute();
     return displayFunds.map((f) => {
-      const hasTodayData = isNavUpdated(f.jzrq, todayStr, f.confirmDays);
+      const hasTodayData =
+        isNavUpdated(f.jzrq, todayStr, f.confirmDays) &&
+        shouldShowTradingSessionData({
+          dataDate: f.jzrq,
+          todayStr,
+          isTradingDay,
+          currentMinutes
+        });
       const showLatestChange = shouldShowTradingSessionData({
         dataDate: f.jzrq,
         todayStr,
@@ -1362,7 +1393,12 @@ export default function HomePage() {
         hasEstimatePercent || hasHoldingPercent
           ? (hasEstimatePercent ? estimateChangeValue : 0) + (hasHoldingPercent ? holdingProfitPercentValue : 0)
           : null;
-      const estimateProfitPercentValue = hasTodayData ? holdingProfitPercentValue : fallbackEstimateProfitPercentValue;
+      const estimateProfitPercentValue =
+        isMarketOpenNow && !hasTodayData && !hasEstimatePercent
+          ? null
+          : hasTodayData
+            ? holdingProfitPercentValue
+            : fallbackEstimateProfitPercentValue;
       const estimateProfitValue = hasTodayData
         ? total
         : estimateProfitPercentValue != null && principal > 0
@@ -1425,7 +1461,7 @@ export default function HomePage() {
         fundName: f.name,
         fundTags,
         isHoldingLinked: !!isHoldingLinked,
-        isUpdated: isNavUpdated(f.jzrq, todayStr, f.confirmDays),
+        isUpdated: hasTodayData,
         hasDca: isHoldingLinked ? allEnabledDcaCodes.has(f.code) : dcaPlansForTab[f.code]?.enabled === true,
         hasPending: pendingCodesForTab.has(f.code),
         latestNav,
@@ -1473,6 +1509,7 @@ export default function HomePage() {
     displayFunds,
     holdingsForTabWithLinked,
     isTradingDay,
+    isMarketOpenNow,
     todayStr,
     getHoldingProfitForTab,
     dcaPlansForTab,

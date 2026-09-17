@@ -8,7 +8,7 @@ export const hasFundEstimate = (fund) =>
 
 export const shouldShowTradingSessionData = ({ dataDate, todayStr, isTradingDay, currentMinutes }) => {
   if (!dataDate) return false;
-  if (!isTradingDay || currentMinutes < 9 * 60 + 30) return true;
+  if (!isMarketOpen({ isTradingDay, currentMinutes })) return true;
   return String(dataDate).startsWith(todayStr);
 };
 

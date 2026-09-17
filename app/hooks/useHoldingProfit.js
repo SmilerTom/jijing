@@ -1,16 +1,21 @@
 import { useCallback, useRef } from 'react';
 import { isArray, isNumber, isString } from 'lodash';
 import { useStorageStore } from '../stores';
-import { formatDate, toTz, isNavUpdated } from '../lib/fundHelpers';
-import { countTradingDaysBetween } from '../lib/tradingCalendar';
+import { formatDate, nowInTz, toTz, isNavUpdated } from '../lib/fundHelpers';
+import { countTradingDaysBetween, isTradingDay } from '../lib/tradingCalendar';
+import { isMarketOpen } from '../lib/fundValuation.mjs';
 
 /**
  * 基金持仓与当日/累计收益计算逻辑自定义 Hook
  * @param {object} deps
  * @param {string | null} deps.activeGroupId - 当前活跃分组 ID
  */
-export function useHoldingProfit({ activeGroupId } = {}) {
+export function useHoldingProfit({ activeGroupId, isMarketOpenNow } = {}) {
   const todayStr = formatDate();
+  const now = nowInTz();
+  const marketOpen =
+    isMarketOpenNow ??
+    isMarketOpen({ isTradingDay: isTradingDay(now), currentMinutes: now.hour() * 60 + now.minute() });
   const cacheRef = useRef(new Map());
 
   const getHoldingProfit = useCallback(
@@ -23,13 +28,15 @@ export function useHoldingProfit({ activeGroupId } = {}) {
       const isDelayedConfirmFund = Number.isFinite(confirmDays) && confirmDays >= 2;
       const hasExactTodayData = isString(fund.jzrq) && fund.jzrq === todayStr;
       const hasTodayData = isNavUpdated(fund.jzrq, todayStr, fund.confirmDays);
-      const hasTodayValuation = isString(fund.gztime) && fund.gztime.startsWith(todayStr);
+      const hasTodayValuation =
+        !fund.noValuation && Number(fund.gsz) > 0 && isString(fund.gztime) && fund.gztime.startsWith(todayStr);
       const navTradingDayLag =
         isDelayedConfirmFund && isString(fund.jzrq) && fund.jzrq
           ? countTradingDaysBetween(fund.jzrq, todayStr, toTz)
           : null;
       const shouldUseConfirmedNav =
-        hasExactTodayData || (isDelayedConfirmFund ? hasTodayData && navTradingDayLag === 1 : hasTodayData);
+        (hasExactTodayData || (isDelayedConfirmFund ? hasTodayData && navTradingDayLag === 1 : hasTodayData)) &&
+        (!marketOpen || hasExactTodayData);
       // T+2 等延迟基金：净值日期只落后 1 个交易日时用确权净值；否则仅在今日估值存在时用估值。
       const useValuation = hasTodayValuation && !shouldUseConfirmedNav;
       const canCalcTodayProfit = shouldUseConfirmedNav || useValuation;
@@ -244,7 +251,7 @@ export function useHoldingProfit({ activeGroupId } = {}) {
         principalToday: isNumber(holding.cost) ? holding.cost * shareForTodayProfit : 0
       };
     },
-    [todayStr, activeGroupId]
+    [todayStr, activeGroupId, marketOpen]
   );
 
   return { getHoldingProfit };

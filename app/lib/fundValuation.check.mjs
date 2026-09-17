@@ -38,6 +38,26 @@ assert.equal(
   }),
   true
 );
+for (const [currentMinutes, expected] of [
+  [9 * 60 + 30, false],
+  [11 * 60 + 30, false],
+  [11 * 60 + 31, true],
+  [12 * 60 + 59, true],
+  [13 * 60, false],
+  [15 * 60, false],
+  [15 * 60 + 1, true]
+]) {
+  assert.equal(
+    shouldShowTradingSessionData({
+      dataDate: '2026-09-08',
+      todayStr: '2026-09-09',
+      isTradingDay: true,
+      currentMinutes
+    }),
+    expected,
+    `昨日净值不应在开盘时冒充今日数据：${currentMinutes}`
+  );
+}
 assert.equal(
   shouldShowTradingSessionData({
     dataDate: '2026-09-09 09:30',
