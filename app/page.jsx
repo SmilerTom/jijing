@@ -70,6 +70,7 @@ import {
   useSettingsStore
 } from './stores';
 import ModalsLayer from './components/ModalsLayer';
+import QqContact from './components/QqContact';
 
 import {
   DEFAULT_SORT_RULES,
@@ -402,8 +403,6 @@ export default function HomePage() {
   const setSortSettingOpen = (v) => _ms({ sortSettingOpen: isFunction(v) ? v(_gs().sortSettingOpen) : v });
   const setLoginModalOpen = (v) => _ms({ loginModalOpen: isFunction(v) ? v(_gs().loginModalOpen) : v });
   const setLoginInitialError = (v) => _ms({ loginInitialError: isFunction(v) ? v(_gs().loginInitialError) : v });
-  const setFeedbackOpen = (v) => _ms({ feedbackOpen: isFunction(v) ? v(_gs().feedbackOpen) : v });
-  const setFeedbackNonce = (v) => _ms({ feedbackNonce: isFunction(v) ? v(_gs().feedbackNonce) : v });
   const setDonateOpen = (v) => _ms({ donateOpen: isFunction(v) ? v(_gs().donateOpen) : v });
   const setIsLogoutConfirmOpen = (v) => _ms({ isLogoutConfirmOpen: isFunction(v) ? v(_gs().isLogoutConfirmOpen) : v });
   const setPortfolioEarningsOpen = (v) =>
@@ -5455,47 +5454,7 @@ export default function HomePage() {
                     }}
                   >
                     <p style={{ margin: 0 }}>
-                      遇到任何问题或需求建议可
-                      <button
-                        className="link-button"
-                        onClick={() => {
-                          if (!user?.id) {
-                            sonnerToast.error('请先登录后再提交反馈');
-                            return;
-                          }
-                          setFeedbackNonce((n) => n + 1);
-                          setFeedbackOpen(true);
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: 'var(--primary)',
-                          cursor: 'pointer',
-                          padding: '0 4px',
-                          textDecoration: 'underline',
-                          fontSize: 'inherit',
-                          fontWeight: 600
-                        }}
-                      >
-                        点此提交反馈
-                      </button>
-                      ，或
-                      <button
-                        className="link-button"
-                        onClick={() => _ms({ weChatOpen: true })}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: 'var(--primary)',
-                          cursor: 'pointer',
-                          padding: '0 4px',
-                          textDecoration: 'underline',
-                          fontSize: 'inherit',
-                          fontWeight: 600
-                        }}
-                      >
-                        加入微信用户支持群
-                      </button>
+                      <QqContact lead="遇到任何问题或需求建议可联系 QQ：" />
                     </p>
                     <button
                       onClick={() => setDonateOpen(true)}
@@ -5556,16 +5515,7 @@ export default function HomePage() {
             }
           }}
           onUpdateLog={() => setUpdateLogOpen(true)}
-          onFeedback={() => {
-            if (!user?.id) {
-              sonnerToast.error('请先登录后再提交反馈');
-              return;
-            }
-            setFeedbackNonce((n) => n + 1);
-            setFeedbackOpen(true);
-          }}
           onSponsorSupport={() => setDonateOpen(true)}
-          onOpenWeChat={() => _ms({ weChatOpen: true })}
         />
       )}
       {/* 弹框渲染层 - 独立组件，订阅 useModalStore，不触发 page.jsx 重渲染 */}
