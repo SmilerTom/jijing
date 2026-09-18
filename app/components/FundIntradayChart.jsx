@@ -11,6 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ocrFundChart } from '@/app/lib/query-keys';
 import { useStorageStore } from '../stores';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { alignValuationSeriesToSession, TRADING_SESSION_TICKS } from '../lib/intradaySession.mjs';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
@@ -110,14 +111,18 @@ export default function FundIntradayChart({
 
   const chartData = useMemo(() => {
     if (!series.length) return { labels: [], datasets: [] };
-    const labels = series.map((d) => d.time);
-    const values = series.map((d) => d.value);
-    const ref = referenceNav != null && Number.isFinite(Number(referenceNav)) ? Number(referenceNav) : values[0];
-    const percentages = values.map((v) => (ref ? ((v - ref) / ref) * 100 : 0));
-    const lastPct = percentages[percentages.length - 1];
+    const { labels, values } = alignValuationSeriesToSession(series);
+    const firstValue = values.find((value) => value != null);
+    const lastValue = [...values].reverse().find((value) => value != null);
+    if (firstValue == null) return { labels: [], datasets: [] };
+    const ref = referenceNav != null && Number.isFinite(Number(referenceNav)) ? Number(referenceNav) : firstValue;
+    const percentages = values.map((value) => (value == null || !ref ? null : ((value - ref) / ref) * 100));
+    const lastPct = lastValue != null && ref ? ((lastValue - ref) / ref) * 100 : null;
+    const lastIndex = percentages.reduce((found, value, index) => (value == null ? found : index), -1);
     const riseColor = chartColors.danger;
     const fallColor = chartColors.success;
     const lineColor = lastPct != null && lastPct >= 0 ? riseColor : fallColor;
+    const pointRadius = percentages.map((_, index) => (index === lastIndex ? 3 : 0));
 
     return {
       labels,
@@ -135,8 +140,9 @@ export default function FundIntradayChart({
             return gradient;
           },
           borderWidth: 2,
-          pointRadius: series.length <= 2 ? 3 : 0,
+          pointRadius,
           pointHoverRadius: 4,
+          spanGaps: true,
           fill: true,
           tension: 0.2
         }
@@ -162,11 +168,17 @@ export default function FundIntradayChart({
       scales: {
         x: {
           display: true,
+          offset: false,
           grid: { display: false },
           ticks: {
             color: colors.muted,
             font: { size: 10 },
-            maxTicksLimit: 6
+            autoSkip: false,
+            maxRotation: 0,
+            callback(value) {
+              const label = this.getLabelForValue(value);
+              return TRADING_SESSION_TICKS.includes(label) ? label : '';
+            }
           }
         },
         y: {

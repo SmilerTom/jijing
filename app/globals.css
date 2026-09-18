@@ -5397,12 +5397,36 @@ html::-webkit-scrollbar-thumb:active,
   color: var(--muted-foreground);
 }
 
+.strategy-ticker-metric {
+  color: var(--danger);
+  font-style: normal;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
 .strategy-ticker-up {
   color: var(--danger) !important;
 }
 
 .strategy-ticker-down {
   color: var(--success) !important;
+}
+
+.strategy-ticker-warn .strategy-ticker-metric,
+.strategy-ticker-up .strategy-ticker-metric {
+  color: var(--danger);
+}
+
+.strategy-ticker-item.strategy-ticker-up,
+.strategy-ticker-item.strategy-ticker-warn {
+  color: var(--foreground);
+}
+
+.strategy-ticker-item.strategy-ticker-up .strategy-ticker-metric,
+.strategy-ticker-item.strategy-ticker-warn .strategy-ticker-metric {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
 }
 
 @keyframes strategy-ticker-scroll {

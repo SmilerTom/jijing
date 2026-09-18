@@ -255,10 +255,16 @@ check('驾驶舱和顶部提示共用四项策略文案', () => {
   assert.equal(buildStrategyPrompt({ strategyState: { status: 'stopped' } }).label, '止损后暂停');
   assert.equal(buildStrategyPrompt({ strategyState: { status: 'invalid' } }).label, '请检查设置');
 });
-check('观察提示显示涨跌幅阈值，不显示基金净值线', () => {
-  const holding = buildStrategyPrompt({ strategyState: evaluate({ currentNav: 1.05 }) }).detail;
-  assert.match(holding, /上涨 20\.00%.*回落 10\.00%/);
-  assert.doesNotMatch(holding, /1\.2000|0\.9450/);
+check('观察提示显示当前涨跌幅与阈值', () => {
+  const holdingPrompt = buildStrategyPrompt({ strategyState: evaluate({ currentNav: 1.05 }) });
+  assert.match(holdingPrompt.detail, /已涨 5\.00% \/ 卖出线 20\.00%.*回落 0\.00% \/ 止损线 10\.00%/);
+  assert.equal(holdingPrompt.metric, '已涨 5.00%');
+  assert.equal(holdingPrompt.tone, '');
+  assert.doesNotMatch(holdingPrompt.detail, /1\.2000|0\.9450/);
+
+  const nearSell = buildStrategyPrompt({ strategyState: evaluate({ currentNav: 1.15 }) });
+  assert.equal(nearSell.tone, 'warn');
+  assert.equal(nearSell.metric, '已涨 15.00%');
 
   const waitingBuy = buildStrategyPrompt({
     strategyState: evaluate({
@@ -266,9 +272,10 @@ check('观察提示显示涨跌幅阈值，不显示基金净值线', () => {
       currentNav: 1.18,
       strategy: { cooldownDays: 0 }
     })
-  }).detail;
-  assert.match(waitingBuy, /回落 5\.00%.*回落 10\.00%/);
-  assert.doesNotMatch(waitingBuy, /1\.1400|1\.0800/);
+  });
+  assert.match(waitingBuy.detail, /已回落 1\.67% \/ 买回线 5\.00%.*回落 1\.67% \/ 止损线 10\.00%/);
+  assert.equal(waitingBuy.metric, '已回落 1.67%');
+  assert.doesNotMatch(waitingBuy.detail, /1\.1400|1\.0800/);
 });
 console.log(`策略检查：${passed} 项通过；继续检查原有持仓计算。`);
 

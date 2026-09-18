@@ -8,6 +8,7 @@ import { TrashIcon } from '@/app/components/Icons';
 import { useHoldingProfit } from '@/app/hooks/useHoldingProfit';
 import * as qk from '@/app/lib/query-keys';
 import { storageStore, useStorageStore } from '@/app/stores/storageStore';
+import { cn } from '@/lib/utils';
 import {
   DEFAULT_STRATEGY,
   buildStrategyPrompt,
@@ -275,7 +276,12 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
   const strategyPrompt = buildStrategyPrompt({ strategyState });
   const status = {
     ...strategyPrompt,
-    tone: strategyPrompt.tone === 'up' ? styles.up : strategyPrompt.tone === 'down' ? styles.down : '',
+    tone:
+      strategyPrompt.tone === 'up' || strategyPrompt.tone === 'warn'
+        ? styles.up
+        : strategyPrompt.tone === 'down'
+          ? styles.down
+          : '',
     detail: strategyPrompt.detail
   };
   const confirmationType = strategyState.status === 'stopped' ? 'resume' : strategyState.status;
@@ -450,8 +456,9 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
             hint="实际成交确认后按日历天计算"
           />
         </div>
-        <div className={styles.strategyStatus} role="status">
+        <div className={cn(styles.strategyStatus, status.tone && styles.strategyStatusHot)} role="status">
           <strong className={status.tone}>{status.label}</strong>
+          {strategyPrompt.metric ? <em className={styles.strategyMetric}>{strategyPrompt.metric}</em> : null}
           <span>{status.detail}</span>
         </div>
         {strategyError || reminder.error ? (

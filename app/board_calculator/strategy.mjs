@@ -1,4 +1,6 @@
-import { isObject, isString } from 'lodash';
+import lodash from 'lodash';
+
+const { isObject, isString } = lodash;
 
 export const DEFAULT_STRATEGY = Object.freeze({ riseRate: 20, buyDropRate: 5, stopDrawdown: 10, cooldownDays: 3 });
 const positive = (value) => value !== '' && value !== null && Number.isFinite(Number(value)) && Number(value) > 0;
@@ -202,9 +204,12 @@ export function confirmStrategyTrade({ cycle, status, nav, now = new Date() }) {
   };
 }
 
+const nearThreshold = (current, limit) =>
+  Number.isFinite(current) && Number.isFinite(limit) && limit > 0 && current / limit >= 0.7;
+
 export function buildStrategyPrompt({ strategyState }) {
   const state = strategyState || {};
-  const percentage = (value) => Math.abs(value).toFixed(2) + '%';
+  const percentage = (value) => Math.abs(Number(value) || 0).toFixed(2) + '%';
   const source = state.estimated
     ? `按 ${state.quoteTime || state.quoteDate} 估值预警，不代表成交价格。`
     : state.quoteDate
@@ -215,19 +220,22 @@ export function buildStrategyPrompt({ strategyState }) {
     return {
       label: `${prefix}回落止损 · 提示卖出`,
       tone: 'up',
-      detail: `${source}从已记录最高净值 ${state.peakNav.toFixed(4)} 回落 ${percentage(state.drawdown)}，止损优先于补仓。实际卖出后请确认。`
+      metric: `已回落 ${percentage(state.drawdown)}`,
+      detail: `${source}从已记录最高净值 ${state.peakNav.toFixed(4)} 回落 ${percentage(state.drawdown)}（止损线 ${percentage(state.stopDrawdown)}），止损优先于补仓。实际卖出后请确认。`
     };
   if (state.status === 'sell')
     return {
       label: `${prefix}上涨 · 提示卖出`,
       tone: 'up',
-      detail: `${source}较本轮参考净值上涨 ${percentage(state.change)}。卖出一部分后确认，再等待回落买回。`
+      metric: `已涨 ${percentage(state.change)}`,
+      detail: `${source}较本轮参考净值上涨 ${percentage(state.change)}（卖出线 ${percentage(state.riseRate)}）。卖出一部分后确认，再等待回落买回。`
     };
   if (state.status === 'buy')
     return {
       label: `${prefix}回落 · 提示买回`,
       tone: 'down',
-      detail: `${source}较实际卖出净值回落 ${percentage(state.change)}。实际买回后确认，开启下一轮。`
+      metric: `已回落 ${percentage(state.change)}`,
+      detail: `${source}较实际卖出净值回落 ${percentage(state.change)}（买回线 ${percentage(state.buyDropRate)}）。实际买回后确认，开启下一轮。`
     };
   if (state.status === 'cooldown')
     return { label: '冷静期', tone: '', detail: `成交确认后还需冷静 ${state.remainingDays} 天，期间不生成买卖提示。` };
@@ -237,14 +245,20 @@ export function buildStrategyPrompt({ strategyState }) {
     return { label: '请检查设置', tone: '', detail: '涨跌阈值须大于0，回落须小于100%；冷静期须为0–3650的整数。' };
   if (state.status === 'invalidCycle')
     return { label: '策略记录异常', tone: '', detail: '已暂停提醒，请检查本地记录，不自动清除基准或冷静期。' };
-  if (state.status === 'watch')
+  if (state.status === 'watch') {
+    const waitingBuy = state.phase === 'waitingBuy';
+    const currentMove = waitingBuy ? -Number(state.change) || 0 : Number(state.change) || 0;
+    const moveLimit = waitingBuy ? Number(state.buyDropRate) : Number(state.riseRate);
+    const drawdown = Number(state.drawdown) || 0;
+    const warn = nearThreshold(currentMove, moveLimit) || nearThreshold(drawdown, Number(state.stopDrawdown));
     return {
       label: state.estimated ? '估值观察' : '等待',
-      tone: '',
-      detail:
-        state.phase === 'waitingBuy'
-          ? `${source}回落 ${percentage(state.buyDropRate)} 时提示买回；从最高值回落 ${percentage(state.stopDrawdown)} 时优先提示止损。`
-          : `${source}上涨 ${percentage(state.riseRate)} 时提示卖出；从最高值回落 ${percentage(state.stopDrawdown)} 时提示止损。`
+      tone: warn ? 'warn' : '',
+      metric: waitingBuy ? `已回落 ${percentage(currentMove)}` : `已涨 ${percentage(currentMove)}`,
+      detail: waitingBuy
+        ? `${source}已回落 ${percentage(currentMove)} / 买回线 ${percentage(state.buyDropRate)}；从最高值回落 ${percentage(state.drawdown)} / 止损线 ${percentage(state.stopDrawdown)}。`
+        : `${source}已涨 ${percentage(currentMove)} / 卖出线 ${percentage(state.riseRate)}；从最高值回落 ${percentage(state.drawdown)} / 止损线 ${percentage(state.stopDrawdown)}。`
     };
+  }
   return { label: '待更新', tone: '', detail: '等待有效净值；成交确认后不使用成交日期之前的旧净值生成信号。' };
 }

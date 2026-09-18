@@ -21,13 +21,14 @@ function FundPrompt({ fund }) {
     ? { label: '提醒暂停', detail: reminder.error }
     : buildStrategyPrompt({ strategyState: reminder.strategyState });
   return (
-    <span className="strategy-ticker-item">
+    <span className={cn('strategy-ticker-item', prompt.tone && `strategy-ticker-${prompt.tone}`)}>
       <b>{fund.name}</b>
       <strong
         className={cn(prompt.tone === 'up' && 'strategy-ticker-up', prompt.tone === 'down' && 'strategy-ticker-down')}
       >
         {prompt.label}
       </strong>
+      {prompt.metric ? <em className="strategy-ticker-metric">{prompt.metric}</em> : null}
       <span>{prompt.detail}</span>
     </span>
   );
