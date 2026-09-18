@@ -1,8 +1,9 @@
 'use client';
 
 import Image from 'next/image';
-import { ChevronRight, QrCode } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { LoginIcon } from './Icons';
+import QqContact from './QqContact';
 
 export default function MineTab({
   visible = true,
@@ -13,13 +14,11 @@ export default function MineTab({
   onMyEarnings,
   onTutorial,
   onUpdateLog,
-  onFeedback,
-  onSponsorSupport,
-  onOpenWeChat
+  onSponsorSupport
 }) {
   return (
     <div className="mine-tab" style={{ display: visible ? undefined : 'none' }} aria-hidden={!visible || undefined}>
-      <section className="mine-profile-card glass" aria-label="个人信息" style={{ position: 'relative' }}>
+      <section className="mine-profile-card glass" aria-label="个人信息">
         <div className="mine-profile-row">
           <div className="mine-profile-avatar">
             {user ? (
@@ -66,23 +65,6 @@ export default function MineTab({
             )}
           </div>
         </div>
-        <a
-          className="ocr-quota-badge"
-          style={{
-            position: 'absolute',
-            bottom: 12,
-            right: 12,
-            cursor: 'pointer',
-            textDecoration: 'none',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 4
-          }}
-          onClick={onOpenWeChat}
-        >
-          <QrCode size={14} />
-          加入微信用户支持群
-        </a>
       </section>
 
       <ul className="mine-menu-list" role="list">
@@ -105,10 +87,11 @@ export default function MineTab({
           </button>
         </li>
         <li>
-          <button type="button" className="mine-menu-row glass" onClick={onFeedback}>
-            <span className="mine-menu-label">问题反馈</span>
-            <ChevronRight className="mine-menu-chevron" aria-hidden strokeWidth={2} />
-          </button>
+          <div className="mine-menu-row glass" style={{ cursor: 'default' }}>
+            <span className="mine-menu-label">
+              <QqContact lead="联系 QQ：" align="flex-start" />
+            </span>
+          </div>
         </li>
         <li>
           <button type="button" className="mine-menu-row glass" onClick={onSponsorSupport}>
