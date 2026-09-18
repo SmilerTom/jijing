@@ -1,6 +1,4 @@
-import lodash from 'lodash';
-
-const { isObject, isString } = lodash;
+import { isObject, isString } from 'lodash';
 
 export const DEFAULT_STRATEGY = Object.freeze({ riseRate: 20, buyDropRate: 5, stopDrawdown: 10, cooldownDays: 3 });
 const positive = (value) => value !== '' && value !== null && Number.isFinite(Number(value)) && Number(value) > 0;

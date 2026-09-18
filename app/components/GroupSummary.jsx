@@ -41,6 +41,12 @@ function CountUp({
 
     const start = displayValueRef.current;
     const end = value;
+    if (!Number.isFinite(start) || !Number.isFinite(end) || Math.abs(end - start) < 0.005) {
+      previousValue.current = value;
+      displayValueRef.current = value;
+      setDisplayValue(value);
+      return;
+    }
     const duration = 300;
     const startTime = performance.now();
 

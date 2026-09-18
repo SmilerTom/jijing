@@ -2583,7 +2583,7 @@ const PcFundTable = memo(function PcFundTable({
 
   const headerGroup = table.getHeaderGroups()[0];
   const tableRows = table.getRowModel().rows;
-  const enableVirtualization = data.length > 40;
+  const enableVirtualization = data.length > 15;
   const rowVirtualizer = useWindowVirtualizer({
     count: tableRows.length,
     estimateSize: () => 72,

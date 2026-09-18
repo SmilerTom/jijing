@@ -10,8 +10,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 
-import { createAvatar } from '@dicebear/core';
-import { identicon } from '@dicebear/collection';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -24,7 +22,6 @@ import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '@/
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Announcement from './components/Announcement';
 import EmptyStateCard from './components/EmptyStateCard';
-import FundCard from './components/FundCard';
 
 import GroupSummary from './components/GroupSummary';
 import GroupAccountSummaryCard from './components/GroupAccountSummaryCard';
@@ -46,11 +43,9 @@ import {
   fetchFundPeriodReturns,
   searchFunds
 } from './api/fund';
-import PcFundTable from './components/PcFundTable';
-import MobileFundTable from './components/MobileFundTable';
 import MobileBottomNav from './components/MobileBottomNav';
-import MineTab from './components/MineTab';
-import MarketTab from './components/MarketTab';
+const MineTab = dynamic(() => import('./components/MineTab'), { ssr: false });
+const MarketTab = dynamic(() => import('./components/MarketTab'), { ssr: false });
 import PcSideNav from './components/PcSideNav';
 import SearchFund from './components/SearchFund';
 import { useTheme } from './hooks/useTheme';
@@ -63,6 +58,7 @@ import { useScanImport } from './hooks/useScanImport';
 import { useRefreshManager } from './hooks/useRefreshManager';
 import { useSyncManager, normalizeFundDailyEarningsScoped } from './hooks/useSyncManager';
 import { useIsMobile } from './hooks/useIsMobile';
+import { useShallow } from 'zustand/react/shallow';
 import {
   useUserStore,
   clearAuthUser,
@@ -181,7 +177,66 @@ export default function HomePage() {
     sortRules,
     setSortRules,
     initSort
-  } = useStorageStore();
+  } = useStorageStore(
+    useShallow((s) => ({
+      funds: s.funds,
+      setFunds: s.setFunds,
+      initFunds: s.initFunds,
+      groups: s.groups,
+      setGroups: s.setGroups,
+      initGroups: s.initGroups,
+      favorites: s.favorites,
+      setFavorites: s.setFavorites,
+      initFavorites: s.initFavorites,
+      collapsedCodes: s.collapsedCodes,
+      setCollapsedCodes: s.setCollapsedCodes,
+      collapsedTrends: s.collapsedTrends,
+      setCollapsedTrends: s.setCollapsedTrends,
+      collapsedValuationTrends: s.collapsedValuationTrends,
+      setCollapsedValuationTrends: s.setCollapsedValuationTrends,
+      collapsedEarnings: s.collapsedEarnings,
+      setCollapsedEarnings: s.setCollapsedEarnings,
+      refreshMs: s.refreshMs,
+      setRefreshMs: s.setRefreshMs,
+      holdings: s.holdings,
+      setHoldings: s.setHoldings,
+      groupHoldings: s.groupHoldings,
+      setGroupHoldings: s.setGroupHoldings,
+      pendingTrades: s.pendingTrades,
+      setPendingTrades: s.setPendingTrades,
+      transactions: s.transactions,
+      setTransactions: s.setTransactions,
+      dcaPlans: s.dcaPlans,
+      setDcaPlans: s.setDcaPlans,
+      customSettings: s.customSettings,
+      setCustomSettings: s.setCustomSettings,
+      fundDailyEarnings: s.fundDailyEarnings,
+      setFundDailyEarnings: s.setFundDailyEarnings,
+      valuationSeries: s.valuationSeries,
+      setValuationSeries: s.setValuationSeries,
+      initCollapsed: s.initCollapsed,
+      initRefreshMs: s.initRefreshMs,
+      initHoldings: s.initHoldings,
+      initGroupHoldings: s.initGroupHoldings,
+      initPendingTrades: s.initPendingTrades,
+      initTransactions: s.initTransactions,
+      initDcaPlans: s.initDcaPlans,
+      initCustomSettings: s.initCustomSettings,
+      initFundDailyEarnings: s.initFundDailyEarnings,
+      initFundDividends: s.initFundDividends,
+      sortBy: s.sortBy,
+      setSortBy: s.setSortBy,
+      sortOrder: s.sortOrder,
+      setSortOrder: s.setSortOrder,
+      pcSortDisplayMode: s.pcSortDisplayMode,
+      setPcSortDisplayMode: s.setPcSortDisplayMode,
+      mobileSortDisplayMode: s.mobileSortDisplayMode,
+      setMobileSortDisplayMode: s.setMobileSortDisplayMode,
+      sortRules: s.sortRules,
+      setSortRules: s.setSortRules,
+      initSort: s.initSort
+    }))
+  );
   /** 基金标签（独立 localStorage 键 `tags`）：{ id, name, theme, fundCodes: string[] }[] */
   const [fundTagRecords, setFundTagRecords] = useState([]);
   /**
@@ -281,12 +336,20 @@ export default function HomePage() {
 
   // 用户认证状态（Supabase 会话仍由客户端持久化；用户信息由 zustand 全局管理）
   const user = useUserStore((s) => s.user);
-  const userAvatar = useMemo(() => {
-    if (!user?.id) return '';
-    return createAvatar(identicon, {
-      seed: user.id,
-      size: 80
-    }).toDataUri();
+  const [userAvatar, setUserAvatar] = useState('');
+  useEffect(() => {
+    if (!user?.id) {
+      setUserAvatar('');
+      return undefined;
+    }
+    let cancelled = false;
+    Promise.all([import('@dicebear/core'), import('@dicebear/collection')]).then(([core, collection]) => {
+      if (cancelled) return;
+      setUserAvatar(core.createAvatar(collection.identicon, { seed: user.id, size: 80 }).toDataUri());
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [user?.id]);
 
   // 搜索相关状态

@@ -18,6 +18,8 @@ export function useHoldingProfit({ activeGroupId, isMarketOpenNow } = {}) {
     isMarketOpen({ isTradingDay: isTradingDay(now), currentMinutes: now.hour() * 60 + now.minute() });
   const cacheRef = useRef(new Map());
 
+  const tradingDayLagRef = useRef(new Map());
+
   const getHoldingProfit = useCallback(
     (fund, holding, scopeGroupIdOverride) => {
       if (!holding || !isNumber(holding.share)) return null;
@@ -30,10 +32,16 @@ export function useHoldingProfit({ activeGroupId, isMarketOpenNow } = {}) {
       const hasTodayData = isNavUpdated(fund.jzrq, todayStr, fund.confirmDays);
       const hasTodayValuation =
         !fund.noValuation && Number(fund.gsz) > 0 && isString(fund.gztime) && fund.gztime.startsWith(todayStr);
-      const navTradingDayLag =
-        isDelayedConfirmFund && isString(fund.jzrq) && fund.jzrq
-          ? countTradingDaysBetween(fund.jzrq, todayStr, toTz)
-          : null;
+      let navTradingDayLag = null;
+      if (isDelayedConfirmFund && isString(fund.jzrq) && fund.jzrq) {
+        const lagKey = `${fund.jzrq}_${todayStr}`;
+        if (tradingDayLagRef.current.has(lagKey)) {
+          navTradingDayLag = tradingDayLagRef.current.get(lagKey);
+        } else {
+          navTradingDayLag = countTradingDaysBetween(fund.jzrq, todayStr, toTz);
+          tradingDayLagRef.current.set(lagKey, navTradingDayLag);
+        }
+      }
       const shouldUseConfirmedNav =
         (hasExactTodayData || (isDelayedConfirmFund ? hasTodayData && navTradingDayLag === 1 : hasTodayData)) &&
         (!marketOpen || hasExactTodayData);
@@ -71,17 +79,22 @@ export function useHoldingProfit({ activeGroupId, isMarketOpenNow } = {}) {
         dividendCash = cached.dividendCash;
         shareForTodayProfit = cached.shareForTodayProfit;
       } else {
+        const matchesScope = (tx) => {
+          const gid = tx.groupId || null;
+          if (txScope !== undefined) return txScope ? gid === txScope : !gid;
+          return activeGroupId ? gid === activeGroupId : !gid;
+        };
+        const scopedTxs = [];
+        for (const tx of txs) {
+          if (tx && matchesScope(tx)) scopedTxs.push(tx);
+        }
+
         // 1. 计算分红逻辑
         if (cachedDivs && isArray(cachedDivs)) {
           let earliestDate = holding.firstPurchaseDate;
           if (!earliestDate) {
-            for (const tx of txs) {
+            for (const tx of scopedTxs) {
               if (tx.type !== 'buy' || !tx.date) continue;
-              const gid = tx.groupId || null;
-              if (
-                txScope !== undefined ? (txScope ? gid !== txScope : gid) : activeGroupId ? gid !== activeGroupId : gid
-              )
-                continue;
               if (!earliestDate || tx.date < earliestDate) earliestDate = tx.date;
             }
           }
@@ -90,18 +103,7 @@ export function useHoldingProfit({ activeGroupId, isMarketOpenNow } = {}) {
             const getShareAtDate = (date) => {
               let s = 0;
               let hasTx = false;
-              for (const tx of txs) {
-                const gid = tx.groupId || null;
-                if (
-                  txScope !== undefined
-                    ? txScope
-                      ? gid !== txScope
-                      : gid
-                    : activeGroupId
-                      ? gid !== activeGroupId
-                      : gid
-                )
-                  continue;
+              for (const tx of scopedTxs) {
                 if (tx.isHistoryOnly) continue;
                 if (tx.date <= date) {
                   hasTx = true;
@@ -126,7 +128,6 @@ export function useHoldingProfit({ activeGroupId, isMarketOpenNow } = {}) {
                     extraShares += (actualShare * div.dividend) / div.nav;
                   }
                 } else {
-                  // 现金分红 (cash)
                   dividendCash += actualShare * div.dividend;
                 }
               }
@@ -145,15 +146,8 @@ export function useHoldingProfit({ activeGroupId, isMarketOpenNow } = {}) {
         if (canCalcTodayProfit) {
           let buyToday = 0;
           let sellToday = 0;
-          const list = txs;
-          for (const tx of list) {
+          for (const tx of scopedTxs) {
             if (!tx || !tx.date || tx.date < profitBasisDate) continue;
-            const gid = tx.groupId || null;
-            if (txScope) {
-              if (gid !== txScope) continue;
-            } else {
-              if (gid) continue;
-            }
             if (tx.isHistoryOnly) continue;
             const s = Number(tx.share);
             if (!Number.isFinite(s) || s <= 0) continue;

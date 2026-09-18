@@ -1,6 +1,4 @@
-import lodash from 'lodash';
-
-const { isArray } = lodash;
+import { isArray } from 'lodash';
 
 export const hasFundEstimate = (fund) =>
   (fund?.gsz != null && fund.gsz !== '' && Number.isFinite(Number(fund.gsz))) ||

@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn, formatMoney } from '@/lib/utils';
 import { useStorageStore } from '@/app/stores';
+import { useShallow } from 'zustand/react/shallow';
 import { fetchFundHoldings, fetchFundData } from '@/app/api/fund';
 import { useIsMobile } from '@/app/hooks/useIsMobile';
 import { Stat, ConsecutiveTrendBadge } from '../Common';
@@ -219,7 +220,7 @@ export default function Index({
   onAddFund,
   userId
 }) {
-  const { funds, refreshMs } = useStorageStore();
+  const { funds, refreshMs } = useStorageStore(useShallow((s) => ({ funds: s.funds, refreshMs: s.refreshMs })));
 
   const [fetchedValuation, setFetchedValuation] = useState(null);
 
@@ -314,12 +315,13 @@ export default function Index({
       }
     };
     fetchHoldings();
+    const intervalMs = Math.max(Number(refreshMs) || 30000, 30000);
     const tick = () => {
       timer = setTimeout(() => {
         if (!cancelled) {
           fetchHoldings().finally(tick);
         }
-      }, refreshMs || 30000);
+      }, intervalMs);
     };
     tick();
     return () => {

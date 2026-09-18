@@ -46,7 +46,12 @@ const getAddBaseSnapshotFromFund = (fund) => {
  * @param {Function} deps.processPendingQueue - 执行积压的待处理交易
  * @param {React.RefObject} deps.deviceConflictModalOpenRef - 设备冲突弹窗是否打开
  */
-export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, deviceConflictModalOpenRef, isTradingDay }) {
+export function useRefreshManager({
+  scheduleDcaTrades,
+  processPendingQueue,
+  deviceConflictModalOpenRef,
+  isTradingDay
+}) {
   const [refreshing, setRefreshing] = useState(false);
   const timerRef = useRef(null);
   const autoRefreshSchedulerRef = useRef(null);
@@ -72,8 +77,7 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
     return shouldAutoRefresh({
       isTradingDay: isTradingDayRef.current,
       currentMinutes: now.hour() * 60 + now.minute(),
-      refreshOutsideTradingHours:
-        useStorageStore.getState().customSettings?.refreshOutsideTradingHours === true
+      refreshOutsideTradingHours: useStorageStore.getState().customSettings?.refreshOutsideTradingHours === true
     });
   }, []);
 
@@ -616,7 +620,9 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
 
   useEffect(() => {
     const refreshWhenActive = () => {
-      if (document.visibilityState !== 'hidden' && canAutoRefreshNow()) manualRefresh();
+      if (document.visibilityState === 'hidden' || !canAutoRefreshNow()) return;
+      const codes = refreshCodesRef.current || [];
+      if (codes.length) autoRefresh(codes);
     };
     document.addEventListener('visibilitychange', refreshWhenActive);
     window.addEventListener('pageshow', refreshWhenActive);
@@ -626,7 +632,7 @@ export function useRefreshManager({ scheduleDcaTrades, processPendingQueue, devi
       window.removeEventListener('pageshow', refreshWhenActive);
       window.removeEventListener('online', refreshWhenActive);
     };
-  }, [canAutoRefreshNow, manualRefresh]);
+  }, [canAutoRefreshNow, autoRefresh]);
 
   // 定时刷新 effect
   const refreshMs = useStorageStore((s) => s.refreshMs);

@@ -23,6 +23,10 @@ const ScanProgressModal = dynamic(() => import('./ScanProgressModal'), { ssr: fa
 const AddHistoryModal = dynamic(() => import('./AddHistoryModal'), { ssr: false });
 const AllSectorsModal = dynamic(() => import('./AllSectorsModal'), { ssr: false });
 const DividendMethodModal = dynamic(() => import('./DividendMethodModal'), { ssr: false });
+const TutorialDrawer = dynamic(() => import('./TutorialDrawer'), { ssr: false });
+const UpdateLogModal = dynamic(() => import('./UpdateLogModal'), { ssr: false });
+const SortSettingModal = dynamic(() => import('./SortSettingModal'), { ssr: false });
+const MyEarningsCalendarPage = dynamic(() => import('./MyEarningsCalendarPage'), { ssr: false });
 
 // 高频组件：同步加载
 import ConfirmModal from './ConfirmModal';
@@ -35,13 +39,9 @@ import SettingsModal from './SettingsModal';
 import SuccessModal from './SuccessModal';
 import TradeModal from './TradeModal';
 import TransactionHistoryModal from './TransactionHistoryModal';
-import TutorialDrawer from './TutorialDrawer';
-import UpdateLogModal from './UpdateLogModal';
-import SortSettingModal from './SortSettingModal';
 import AddFundToGroupModal from './AddFundToGroupModal';
 import FundDataSourceSelector from './FundDataSourceSelector';
 import FundTagsEditDialog from './FundTagsEditDialog';
-import MyEarningsCalendarPage from './MyEarningsCalendarPage';
 import { DEFAULT_FUND_TAG_THEME, DCA_SCOPE_GLOBAL } from '@/app/constants';
 import { migrateDcaPlansToScoped } from '../lib/fundHelpers';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';

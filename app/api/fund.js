@@ -975,6 +975,10 @@ let fundValuationLastTimeout = null;
 const FUND_VALUATION_LAST_FIELDS = 'FCODE,SHORTNAME,GSZZL,GZTIME,GSZ,NAV,PDATE';
 const FUND_VALUATION_LAST_BATCH_SIZE = 50;
 const FUND_VALUATION_LAST_STALE_TIME = 10 * 1000; // 10s
+const HOLDINGS_QUOTES_STALE_TIME = 15 * 1000;
+const MARKET_INDICES_STALE_TIME = 15 * 1000;
+const SHANGHAI_INDEX_DATE_STALE_TIME = 60 * 1000;
+const QDII_VALUATION_STALE_TIME = 15 * 1000;
 const FUND_VALUATION_LAST_TIMEOUT_MS = 8000;
 
 const processFundValuationLastQueue = async () => {
@@ -1186,20 +1190,24 @@ export const fetchQdiiValuationFromSupabase = async (code) => {
   const normalized = String(code).trim();
   if (!normalized) return null;
 
+  const qc = getQueryClient();
   try {
-    const { data, error } = await withRetry(() =>
-      supabase.from('gs_qdii').select('gztime, gszzl, gzstatus').eq('fund_code', normalized).maybeSingle()
-    );
-
-    if (error || !data) return null;
-
-    // gszzl 在表中是 real，通常为百分比数值（如 1.23 表示 1.23%）
-    return {
-      gztime: data.gztime != null ? String(data.gztime).replace(/:(\d{2}):\d{2}$/, ':$1') : null,
-      gszzl: data.gszzl != null && Number.isFinite(Number(data.gszzl)) ? Number(data.gszzl) : null,
-      valuationSource: 'supabase_qdii',
-      gzstatus: data.gzstatus
-    };
+    return await qc.fetchQuery({
+      queryKey: qk.qdiiValuation(normalized),
+      staleTime: QDII_VALUATION_STALE_TIME,
+      queryFn: async () => {
+        const { data, error } = await withRetry(() =>
+          supabase.from('gs_qdii').select('gztime, gszzl, gzstatus').eq('fund_code', normalized).maybeSingle()
+        );
+        if (error || !data) return null;
+        return {
+          gztime: data.gztime != null ? String(data.gztime).replace(/:(\d{2}):\d{2}$/, ':$1') : null,
+          gszzl: data.gszzl != null && Number.isFinite(Number(data.gszzl)) ? Number(data.gszzl) : null,
+          valuationSource: 'supabase_qdii',
+          gzstatus: data.gzstatus
+        };
+      }
+    });
   } catch (e) {
     return null;
   }
@@ -1668,43 +1676,52 @@ export const fetchFundHoldings = async (code) => {
               resolveH({ holdings, holdingsReportDate, holdingsIsLastQuarter });
               return;
             }
-            const quoteUrl = `https://qt.gtimg.cn/q=${tencentCodes}`;
-            await new Promise((resQuote) => {
-              const scriptQuote = document.createElement('script');
-              scriptQuote.src = quoteUrl;
-              let quoteDone = false;
-              const cleanupQuote = () => {
-                quoteDone = true;
-                if (quoteTimer) clearTimeout(quoteTimer);
-                if (document.body.contains(scriptQuote)) document.body.removeChild(scriptQuote);
-              };
-              const quoteTimer = setTimeout(() => {
-                if (quoteDone) return;
-                cleanupQuote();
-                resQuote();
-              }, 10000);
-              scriptQuote.onload = () => {
-                if (quoteDone) return;
-                needQuotes.forEach(({ h, tencentCode }) => {
-                  const varName = getTencentVarName(tencentCode);
-                  const dataStr = varName ? window[varName] : null;
-                  if (dataStr) {
-                    const parts = dataStr.split('~');
-                    const isUS = /^us/i.test(String(tencentCode || ''));
-                    const idx = isUS ? 32 : 5;
-                    if (parts.length > idx) {
-                      h.change = parseFloat(parts[idx]);
-                    }
-                  }
-                });
-                cleanupQuote();
-                resQuote();
-              };
-              scriptQuote.onerror = () => {
-                cleanupQuote();
-                resQuote();
-              };
-              document.body.appendChild(scriptQuote);
+            const quoteMap = await getQueryClient().fetchQuery({
+              queryKey: qk.fundHoldingsQuotes(code, tencentCodes),
+              staleTime: HOLDINGS_QUOTES_STALE_TIME,
+              queryFn: () =>
+                new Promise((resQuote) => {
+                  const scriptQuote = document.createElement('script');
+                  scriptQuote.src = `https://qt.gtimg.cn/q=${tencentCodes}`;
+                  let quoteDone = false;
+                  const cleanupQuote = () => {
+                    quoteDone = true;
+                    if (quoteTimer) clearTimeout(quoteTimer);
+                    if (document.body.contains(scriptQuote)) document.body.removeChild(scriptQuote);
+                  };
+                  const quoteTimer = setTimeout(() => {
+                    if (quoteDone) return;
+                    cleanupQuote();
+                    resQuote({});
+                  }, 10000);
+                  scriptQuote.onload = () => {
+                    if (quoteDone) return;
+                    const map = {};
+                    needQuotes.forEach(({ tencentCode }) => {
+                      const varName = getTencentVarName(tencentCode);
+                      const dataStr = varName ? window[varName] : null;
+                      if (!dataStr) return;
+                      const parts = dataStr.split('~');
+                      const isUS = /^us/i.test(String(tencentCode || ''));
+                      const idx = isUS ? 32 : 5;
+                      if (parts.length > idx) {
+                        const change = parseFloat(parts[idx]);
+                        if (Number.isFinite(change)) map[tencentCode] = change;
+                      }
+                    });
+                    cleanupQuote();
+                    resQuote(map);
+                  };
+                  scriptQuote.onerror = () => {
+                    cleanupQuote();
+                    resQuote({});
+                  };
+                  document.body.appendChild(scriptQuote);
+                })
+            });
+            needQuotes.forEach(({ h, tencentCode }) => {
+              const change = quoteMap?.[tencentCode];
+              if (Number.isFinite(change)) h.change = change;
             });
           } catch (e) {}
         }
@@ -1813,40 +1830,46 @@ export const searchFunds = async (val) => {
 
 export const fetchShanghaiIndexDate = async () => {
   if (typeof window === 'undefined' || typeof document === 'undefined') return null;
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = `https://qt.gtimg.cn/q=sh000001&_t=${Date.now()}`;
-    let done = false;
-    const cleanup = () => {
-      done = true;
-      if (timer) clearTimeout(timer);
-      if (document.body.contains(script)) document.body.removeChild(script);
-    };
-    const timer = setTimeout(() => {
-      if (done) return;
-      cleanup();
-      reject(new Error('数据请求超时'));
-    }, 10000);
+  const qc = getQueryClient();
+  return qc.fetchQuery({
+    queryKey: qk.shanghaiIndexDate(),
+    staleTime: SHANGHAI_INDEX_DATE_STALE_TIME,
+    queryFn: () =>
+      new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = `https://qt.gtimg.cn/q=sh000001&_t=${Date.now()}`;
+        let done = false;
+        const cleanup = () => {
+          done = true;
+          if (timer) clearTimeout(timer);
+          if (document.body.contains(script)) document.body.removeChild(script);
+        };
+        const timer = setTimeout(() => {
+          if (done) return;
+          cleanup();
+          reject(new Error('数据请求超时'));
+        }, 10000);
 
-    script.onload = () => {
-      if (done) return;
-      const data = window.v_sh000001;
-      let dateStr = null;
-      if (data) {
-        const parts = data.split('~');
-        if (parts.length > 30) {
-          dateStr = parts[30].slice(0, 8);
-        }
-      }
-      cleanup();
-      resolve(dateStr);
-    };
-    script.onerror = () => {
-      if (done) return;
-      cleanup();
-      reject(new Error('指数数据加载失败'));
-    };
-    document.body.appendChild(script);
+        script.onload = () => {
+          if (done) return;
+          const data = window.v_sh000001;
+          let dateStr = null;
+          if (data) {
+            const parts = data.split('~');
+            if (parts.length > 30) {
+              dateStr = parts[30].slice(0, 8);
+            }
+          }
+          cleanup();
+          resolve(dateStr);
+        };
+        script.onerror = () => {
+          if (done) return;
+          cleanup();
+          reject(new Error('指数数据加载失败'));
+        };
+        document.body.appendChild(script);
+      })
   });
 };
 
@@ -1958,7 +1981,19 @@ const fetchTopixFromWorker = async () => {
 
 export const fetchMarketIndices = async () => {
   if (typeof window === 'undefined' || typeof document === 'undefined') return [];
+  const qc = getQueryClient();
+  try {
+    return await qc.fetchQuery({
+      queryKey: qk.marketIndices(),
+      staleTime: MARKET_INDICES_STALE_TIME,
+      queryFn: loadMarketIndices
+    });
+  } catch {
+    return [];
+  }
+};
 
+const loadMarketIndices = async () => {
   const fetchTencentIndices = new Promise((resolve, reject) => {
     const script = document.createElement('script');
     const codes = MARKET_INDEX_KEYS.map((item) => item.code).join(',');

@@ -10,6 +10,8 @@ const staleAt = Date.now() - 20_000;
 
 for (const code of codes) {
   client.setQueryData(queryKeys.fundValuationLast(code), { code, marker: 'stale' }, { updatedAt: staleAt });
+  client.setQueryData(queryKeys.fundHoldingsQuotes(code, 's_sh600000'), { change: 1 });
+  client.setQueryData(queryKeys.qdiiValuation(code), { gszzl: 1 });
 }
 for (const sectorId of sectorIds) {
   client.setQueryData(queryKeys.eastSectorQuote(sectorId), { sectorId, pct: 1 });
@@ -22,6 +24,8 @@ for (const code of codes) {
 clearFundRefreshCache(client, codes, queryKeys);
 for (const code of codes) {
   assert.equal(client.getQueryData(queryKeys.fundValuationLast(code)), undefined);
+  assert.equal(client.getQueryData(queryKeys.fundHoldingsQuotes(code, 's_sh600000')), undefined);
+  assert.equal(client.getQueryData(queryKeys.qdiiValuation(code)), undefined);
 }
 for (const sectorId of sectorIds) {
   assert.equal(client.getQueryData(queryKeys.eastSectorQuote(sectorId)), undefined);

@@ -1,7 +1,7 @@
 'use client';
 import { isArray } from 'lodash';
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import PcFundTable from './PcFundTable';
 import MobileFundTable from './MobileFundTable';
@@ -72,6 +72,20 @@ const FundListView = React.memo(function FundListView({
   fundTagListsByCode,
   groupTotalHoldingAmount
 }) {
+  const handleSortChange = useCallback(
+    (id) => {
+      startTransition(() => {
+        if (sortBy === id) {
+          setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+        } else {
+          setSortBy(id);
+          setSortOrder('desc');
+        }
+      });
+    },
+    [sortBy, setSortBy, setSortOrder, startTransition]
+  );
+
   return (
     <AnimatePresence mode="wait">
       <motion.div
@@ -99,16 +113,7 @@ const FundListView = React.memo(function FundListView({
               sortBy={sortBy}
               sortOrder={sortOrder}
               sortRules={sortRules}
-              onSortChange={(id) => {
-                startTransition(() => {
-                  if (sortBy === id) {
-                    setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-                  } else {
-                    setSortBy(id);
-                    setSortOrder('desc');
-                  }
-                });
-              }}
+              onSortChange={handleSortChange}
               onReorder={handleReorder}
               onRemoveFund={handleRemoveFundEntry}
               onRemoveFunds={removeFundsFromCurrentTabHandler}
@@ -138,16 +143,7 @@ const FundListView = React.memo(function FundListView({
               sortBy={sortBy}
               sortOrder={sortOrder}
               sortRules={sortRules}
-              onSortChange={(id) => {
-                startTransition(() => {
-                  if (sortBy === id) {
-                    setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-                  } else {
-                    setSortBy(id);
-                    setSortOrder('desc');
-                  }
-                });
-              }}
+              onSortChange={handleSortChange}
               stickyTop={navbarHeight + filterBarHeight}
               closeDrawerRef={fundDetailDrawerCloseRef}
               onReorder={handleReorder}

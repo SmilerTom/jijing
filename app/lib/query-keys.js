@@ -4,6 +4,19 @@ export const eastmoneyScript = (normalizedUrl) => ['eastmoneyScript', normalized
 /** @param {string} fundCode */
 export const fundHoldingsArchives = (fundCode) => ['fundHoldingsArchives', String(fundCode).trim()];
 
+/** @param {string} fundCode @param {string} [quoteKey] */
+export const fundHoldingsQuotes = (fundCode, quoteKey = '') => [
+  'fundHoldingsQuotes',
+  String(fundCode).trim(),
+  String(quoteKey)
+];
+
+export const marketIndices = () => ['marketIndices'];
+export const shanghaiIndexDate = () => ['shanghaiIndexDate'];
+
+/** @param {string} fundCode */
+export const qdiiValuation = (fundCode) => ['qdiiValuation', String(fundCode).trim()];
+
 /** @param {string} code @param {string} authSegment */
 export const relatedSectors = (code, authSegment) => ['relatedSectors', String(code).trim(), String(authSegment)];
 
