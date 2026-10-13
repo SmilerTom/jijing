@@ -94,8 +94,8 @@ export default function MineTab({
           </div>
         </li>
         <li>
-          <button type="button" className="mine-menu-row glass" onClick={onSponsorSupport}>
-            <span className="mine-menu-label">赞助支持</span>
+          <button type="button" className="mine-menu-row mine-menu-row-donate glass" onClick={onSponsorSupport}>
+            <span className="mine-menu-label">☕ 请喝茶</span>
             <ChevronRight className="mine-menu-chevron" aria-hidden strokeWidth={2} />
           </button>
         </li>

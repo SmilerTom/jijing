@@ -5446,42 +5446,18 @@ export default function HomePage() {
                   <div
                     style={{
                       marginTop: 12,
-                      opacity: 0.8,
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      gap: 8
+                      gap: 12
                     }}
                   >
-                    <p style={{ margin: 0 }}>
+                    <p style={{ margin: 0, opacity: 0.8 }}>
                       <QqContact lead="遇到任何问题或需求建议可联系 QQ：" />
                     </p>
-                    <button
-                      onClick={() => setDonateOpen(true)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--muted)',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.color = 'var(--primary)';
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.color = 'var(--muted)';
-                        e.currentTarget.style.background = 'transparent';
-                      }}
-                    >
+                    <button type="button" className="button donate-entry-btn" onClick={() => setDonateOpen(true)}>
                       <span>☕</span>
-                      <span>点此请作者喝杯咖啡</span>
+                      <span>请喝茶</span>
                     </button>
                   </div>
                 </>

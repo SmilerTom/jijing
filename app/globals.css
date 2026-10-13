@@ -3101,6 +3101,23 @@ html::-webkit-scrollbar-thumb:active,
   flex: 1;
 }
 
+.donate-entry-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 168px;
+  height: 44px;
+  font-size: 16px;
+}
+
+.mine-menu-row-donate {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  background: color-mix(in srgb, var(--primary) 16%, transparent);
+  color: var(--text);
+  font-weight: 700;
+}
+
 /* PC 表格设置侧弹框 */
 .pc-table-setting-overlay {
   position: fixed;
