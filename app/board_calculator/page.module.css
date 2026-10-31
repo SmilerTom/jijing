@@ -156,33 +156,414 @@
   border-color: var(--accent);
 }
 .riskPanel {
+  --risk-warn: #fbbf24;
+  --risk-color: var(--muted);
   margin-top: 10px;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
-.riskBanner {
-  display: flex;
-  gap: 10px;
+:global([data-theme='light']) .riskPanel {
+  --risk-warn: #b45309;
+}
+.riskLevel_low {
+  --risk-color: var(--success);
+}
+.riskLevel_mid {
+  --risk-color: var(--risk-warn);
+  border: 2px solid var(--risk-color);
+}
+.riskLevel_high {
+  --risk-color: var(--danger);
+  border: 2px solid var(--risk-color);
+}
+.riskHero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
   align-items: center;
-  min-width: 0;
-  padding: 9px 10px;
-  background: color-mix(in srgb, var(--accent) 12%, var(--card));
-  color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
-  border-radius: 8px;
-  overflow: hidden;
+  padding: 14px 16px;
+  color: var(--risk-color);
+  background: color-mix(in srgb, var(--risk-color) 14%, var(--card));
+  border-bottom: 2px solid var(--risk-color);
 }
-.riskState {
+.riskIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: var(--card);
+  border-radius: 50%;
+}
+.riskHeroText {
+  min-width: 0;
+}
+.riskTitleRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 15px;
+}
+.riskPulse {
+  width: 8px;
+  height: 8px;
   flex: 0 0 auto;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 700;
+  background: var(--risk-color);
+  border-radius: 50%;
+  animation: riskPulse 1.4s ease-in-out infinite;
 }
-.riskMessage {
-  min-width: 0;
-  overflow: hidden;
+@keyframes riskPulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+.riskHeadline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 13px;
+}
+.riskHeadline b {
+  color: var(--risk-color);
+  font-size: 30px;
+  line-height: 1.1;
+}
+.riskAction {
+  padding: 8px 14px;
+  color: var(--risk-color);
+  background: var(--card);
+  border: 1px solid var(--risk-color);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.riskAction:hover,
+.riskAction:focus-visible {
+  color: var(--card);
+  background: var(--risk-color);
+}
+.riskBody {
+  padding: 14px 16px;
+  font-size: 13px;
+}
+.riskMeterHead,
+.riskSectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
+  justify-content: space-between;
   color: var(--muted);
   font-size: 12px;
+}
+.riskSectionHead {
+  color: var(--text);
+  font-size: 13px;
+}
+.riskBar {
+  height: 10px;
+  margin-top: 8px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--muted) 18%, transparent);
+  border-radius: 5px;
+}
+.riskBar i {
+  display: block;
+  height: 100%;
+  background: var(--risk-color);
+  border-radius: 5px;
+}
+.riskMuted {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.riskLink {
+  margin-left: 4px;
+  padding: 0;
+  color: var(--primary);
+  background: none;
+  border: 0;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.riskSection {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.riskSpark {
+  display: block;
+  width: 100%;
+  height: 64px;
+  margin-top: 6px;
+}
+.riskSparkZone {
+  fill: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.riskSparkStop {
+  stroke: var(--danger);
+  stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke;
+}
+.riskSparkLine {
+  fill: none;
+  stroke: var(--risk-color);
+  stroke-width: 2.5;
+  vector-effect: non-scaling-stroke;
+}
+.trendRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  margin-top: 10px;
+}
+.trendBadge {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.stance_bull {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, var(--card));
+}
+.stance_bear {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 14%, var(--card));
+}
+.stance_neutral {
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 14%, var(--card));
+}
+.stanceText_bull {
+  color: var(--danger);
+}
+.stanceText_bear {
+  color: var(--success);
+}
+.stanceText_neutral {
+  color: var(--muted);
+}
+.stanceTag {
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 11px;
   white-space: nowrap;
-  text-overflow: ellipsis;
+}
+.probBlock {
+  margin-top: 12px;
+}
+.probBar {
+  display: flex;
+  height: 22px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.probBar span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  white-space: nowrap;
+}
+.evidenceList,
+.alertList {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.evidenceList li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+.alertList li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.alertTone_down {
+  color: var(--success);
+}
+.alertTone_warn {
+  color: var(--risk-warn);
+}
+.alertTone_neutral {
+  color: var(--muted);
+}
+.forecastSummary {
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+.forecastChart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 10px;
+}
+.forecastDivider {
+  stroke: var(--border);
+}
+.forecastAxis,
+.forecastStopText,
+.forecastMedianText {
+  fill: var(--muted);
+  font-size: 11px;
+}
+.forecastStopText {
+  fill: var(--danger);
+}
+.forecastMedianText {
+  fill: var(--risk-warn);
+}
+.forecastBandOuter {
+  fill: color-mix(in srgb, var(--risk-warn) 16%, transparent);
+}
+.forecastBandInner {
+  fill: color-mix(in srgb, var(--risk-warn) 32%, transparent);
+}
+.forecastPast {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 2;
+}
+.forecastMedian {
+  fill: none;
+  stroke: var(--risk-warn);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+.forecastNow {
+  fill: var(--text);
+}
+.forecastLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.forecastLegend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  vertical-align: -1px;
+  border-radius: 2px;
+}
+.legendPast {
+  background: var(--text);
+}
+.legendInner {
+  background: color-mix(in srgb, var(--risk-warn) 45%, transparent);
+}
+.legendOuter {
+  background: color-mix(in srgb, var(--risk-warn) 20%, transparent);
+}
+.scenarioGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.scenarioGrid div {
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--muted) 10%, var(--card));
+  border-radius: 8px;
+}
+.scenarioGrid span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.scenarioGrid b {
+  font-size: 18px;
+}
+.forecastMethod {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.forecastMethod summary {
+  cursor: pointer;
+}
+.forecastMethod ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+.newsTabs {
+  display: flex;
+  gap: 6px;
+}
+.newsTabs button {
+  padding: 4px 10px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.newsTabs button[aria-pressed='true'] {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+.newsTabs button:disabled {
+  cursor: not-allowed;
+}
+.newsList {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.newsList li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: start;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.newsList li:last-child {
+  border-bottom: 0;
+}
+.newsTitle {
+  color: var(--text);
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+.newsTitle:hover,
+.newsTitle:focus-visible {
+  color: var(--primary);
+  text-decoration: underline;
+}
+.riskAction:focus-visible,
+.newsTabs button:focus-visible,
+.riskLink:focus-visible,
+.forecastMethod summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 .riskSettings {
   margin-top: 9px;
@@ -677,6 +1058,9 @@
   .boardOption {
     transition: none;
   }
+  .riskPulse {
+    animation: none;
+  }
 }
 @container (max-width: 860px) {
   .stats {
@@ -702,5 +1086,17 @@
   .flowBoxHead {
     align-items: flex-start;
     flex-direction: column;
+  }
+  .riskHero {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .riskAction {
+    grid-column: 1 / -1;
+  }
+  .riskHeadline b {
+    font-size: 26px;
+  }
+  .scenarioGrid {
+    grid-template-columns: 1fr;
   }
 }

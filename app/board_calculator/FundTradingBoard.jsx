@@ -17,6 +17,7 @@ import {
   normalizeStrategy
 } from './strategy.mjs';
 import useStrategyReminder, { notifyStrategyChange } from './useStrategyReminder';
+import RiskPanel from './RiskPanel';
 import styles from './page.module.css';
 
 const DEFAULT_STRATEGY_FORM = Object.fromEntries(
@@ -286,6 +287,13 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
   };
   const confirmationType = strategyState.status === 'stopped' ? 'resume' : strategyState.status;
   const canConfirm = ['sell', 'buy', 'stop', 'resume'].includes(confirmationType);
+  const reviewStrategy = () => {
+    const section = document.getElementById(`${fundId}-strategy-title`)?.closest('section');
+    section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    (document.getElementById(`${fundId}-confirmed-nav`) || document.getElementById(`${fundId}-stop-drawdown`))?.focus({
+      preventScroll: true
+    });
+  };
   const confirmTrade = (event) => {
     event.preventDefault();
     if (strategyError) return;
@@ -314,24 +322,23 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
           ) : null}
         </div>
       </div>
-      <div className={styles.riskPanel} hidden={embedded}>
-        <div className={styles.riskBanner}>
-          <span className={styles.riskState}>
-            {reminder.signalQuote?.estimated ? '估值已更新' : Number.isFinite(currentNav) ? '已更新' : '待更新'}
-          </span>
-          <span className={styles.riskMessage}>
-            {reminder.signalQuote?.estimated
-              ? `盘中估值 ${reminder.signalQuote.nav.toFixed(4)}（${reminder.signalQuote.time}），仅用于预警`
-              : !Number.isFinite(currentNav)
-                ? '等待真实基金净值更新'
-                : historyLoading
-                  ? '正在更新历史净值'
-                  : historyError
-                    ? '历史净值更新失败，最高值记录可能不完整'
-                    : `最新净值 ${currentNav.toFixed(4)}${Number.isFinite(reminder.cycle?.peakNav) ? `，跟踪最高 ${reminder.cycle.peakNav.toFixed(4)}` : ''}`}
-          </span>
-        </div>
-      </div>
+      {embedded ? null : (
+        <>
+          {historyLoading || historyError ? (
+            <p className={styles.strategyNote} role="status">
+              {historyLoading ? '正在更新历史净值…' : '历史净值更新失败，最高值记录和预测可能不完整。'}
+            </p>
+          ) : null}
+          <RiskPanel
+            fundId={fundId}
+            fund={marketFund}
+            history={history}
+            reminder={reminder}
+            strategy={strategy}
+            onReview={reviewStrategy}
+          />
+        </>
+      )}
       <div className={styles.stats} hidden={embedded}>
         <div className={styles.stat}>
           <i>金额</i>
