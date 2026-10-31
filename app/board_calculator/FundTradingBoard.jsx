@@ -322,23 +322,19 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
           ) : null}
         </div>
       </div>
-      {embedded ? null : (
-        <>
-          {historyLoading || historyError ? (
-            <p className={styles.strategyNote} role="status">
-              {historyLoading ? '正在更新历史净值…' : '历史净值更新失败，最高值记录和预测可能不完整。'}
-            </p>
-          ) : null}
-          <RiskPanel
-            fundId={fundId}
-            fund={marketFund}
-            history={history}
-            reminder={reminder}
-            strategy={strategy}
-            onReview={reviewStrategy}
-          />
-        </>
-      )}
+      {historyLoading || historyError ? (
+        <p className={styles.strategyNote} role="status">
+          {historyLoading ? '正在更新历史净值…' : '历史净值更新失败，最高值记录和预测可能不完整。'}
+        </p>
+      ) : null}
+      <RiskPanel
+        fundId={fundId}
+        fund={marketFund}
+        history={history}
+        reminder={reminder}
+        strategy={strategy}
+        onReview={reviewStrategy}
+      />
       <div className={styles.stats} hidden={embedded}>
         <div className={styles.stat}>
           <i>金额</i>
