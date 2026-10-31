@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { getAppReloadUrl, isAppUpdateAvailable } from '../lib/appUpdate.mjs';
+import { downloadAppUpdate, getAppReloadUrl, isAppUpdateAvailable } from '../lib/appUpdate.mjs';
 import { UpdateIcon } from './Icons';
 import UpdatePromptModal from './UpdatePromptModal';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -11,6 +11,8 @@ export default function UpdateChecker({ onModalOpenChange }) {
   const [hasUpdate, setHasUpdate] = useState(false);
   const [latestBuildId, setLatestBuildId] = useState('');
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const [download, setDownload] = useState({ status: 'idle', loaded: 0, total: 0, error: '' });
+  const downloadRunRef = useRef(0);
   const currentBuildId = process.env.NEXT_PUBLIC_BUILD_ID || 'development';
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
@@ -38,8 +40,28 @@ export default function UpdateChecker({ onModalOpenChange }) {
     return () => clearInterval(interval);
   }, [checkUpdate]);
 
-  const refreshToLatest = () => {
-    window.location.replace(getAppReloadUrl(window.location.href, latestBuildId));
+  const closeUpdateModal = () => {
+    downloadRunRef.current += 1;
+    setDownload({ status: 'idle', loaded: 0, total: 0, error: '' });
+    setUpdateModalOpen(false);
+  };
+
+  const refreshToLatest = async () => {
+    const run = ++downloadRunRef.current;
+    const reloadUrl = getAppReloadUrl(window.location.href, latestBuildId);
+    setDownload({ status: 'downloading', loaded: 0, total: 0, error: '' });
+    try {
+      await downloadAppUpdate(reloadUrl, ({ loaded, total }) => {
+        if (run === downloadRunRef.current) setDownload({ status: 'downloading', loaded, total, error: '' });
+      });
+      if (run !== downloadRunRef.current) return;
+      setDownload((current) => ({ ...current, status: 'installing' }));
+      window.location.replace(reloadUrl);
+    } catch (error) {
+      if (run !== downloadRunRef.current) return;
+      console.error('Download update failed:', error);
+      setDownload((current) => ({ ...current, status: 'failed', error: error?.message || '下载失败' }));
+    }
   };
 
   return (
@@ -65,8 +87,9 @@ export default function UpdateChecker({ onModalOpenChange }) {
         {updateModalOpen && (
           <UpdatePromptModal
             open={updateModalOpen}
-            onClose={() => setUpdateModalOpen(false)}
+            onClose={closeUpdateModal}
             onRefresh={refreshToLatest}
+            download={download}
           />
         )}
       </AnimatePresence>
