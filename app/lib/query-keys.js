@@ -26,6 +26,13 @@ export const fundSecid = (relatedSector) => ['fundSecid', String(relatedSector).
 /** @param {string} secid */
 export const eastSectorQuote = (secid) => ['eastSectorQuote', String(secid).trim()];
 
+/** 交易驾驶舱风险面板：板块解析、日 K、资金流、资讯 */
+export const boardSector = (fundCode) => ['boardSector', String(fundCode).trim()];
+export const indexKlines = (secid) => ['indexKlines', String(secid).trim()];
+export const indexFundFlow = (secid) => ['indexFundFlow', String(secid).trim()];
+export const sectorNews = (keyword) => ['sectorNews', String(keyword).trim()];
+export const fundAnnouncements = (fundCode) => ['fundAnnouncements', String(fundCode).trim()];
+
 /** @param {string} fundCode */
 export const pingzhongdata = (fundCode) => ['pingzhongdata', String(fundCode).trim()];
 

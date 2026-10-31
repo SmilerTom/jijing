@@ -2555,3 +2555,113 @@ export const fetchOcrDailyRemaining = async (userId, maxLimit = 5) => {
     return { remaining: maxLimit, used: 0, max: maxLimit };
   }
 };
+
+const requestJsonp = (buildUrl, timeoutMs = 10000) =>
+  new Promise((resolve, reject) => {
+    if (typeof document === 'undefined' || !document.body) {
+      reject(new Error('当前环境不支持加载'));
+      return;
+    }
+    const callbackName = `jsonp_risk_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    const script = document.createElement('script');
+    const cleanup = () => {
+      clearTimeout(timer);
+      delete window[callbackName];
+      if (document.body.contains(script)) document.body.removeChild(script);
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('请求超时'));
+    }, timeoutMs);
+    window[callbackName] = (data) => {
+      cleanup();
+      resolve(data);
+    };
+    script.src = buildUrl(callbackName);
+    script.async = true;
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('数据加载失败'));
+    };
+    document.body.appendChild(script);
+  });
+
+/** 东方财富指数/板块日 K（前复权），升序 [{ date, close, pct }] */
+export const fetchIndexKlines = async (secid, limit = 800) => {
+  const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${encodeURIComponent(secid)}&fields1=f1,f2,f3&fields2=f51,f53,f59&klt=101&fqt=1&lmt=${limit}&end=20500101`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('板块行情加载失败');
+  const klines = (await res.json())?.data?.klines;
+  if (!isArray(klines)) return [];
+  return klines
+    .map((line) => {
+      const [date, close, pct] = String(line).split(',');
+      return { date, close: Number(close), pct: Number(pct) };
+    })
+    .filter((item) => item.close > 0);
+};
+
+/** 东方财富指数/板块每日主力净流入（元），升序 [{ date, net }] */
+export const fetchIndexFundFlow = async (secid, limit = 10) => {
+  const url = `https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get?secid=${encodeURIComponent(secid)}&fields1=f1,f2,f3&fields2=f51,f52&lmt=${limit}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('资金流向加载失败');
+  const klines = (await res.json())?.data?.klines;
+  if (!isArray(klines)) return [];
+  return klines
+    .map((line) => {
+      const [date, net] = String(line).split(',');
+      return { date, net: Number(net) };
+    })
+    .filter((item) => Number.isFinite(item.net));
+};
+
+const stripTags = (text) =>
+  String(text || '')
+    .replace(/<[^>]+>/g, '')
+    .trim();
+
+/** 东方财富资讯搜索（按时间倒序） */
+export const fetchSectorNews = async (keyword, size = 5) => {
+  const param = JSON.stringify({
+    uid: '',
+    keyword,
+    type: ['cmsArticleWebOld'],
+    client: 'web',
+    clientType: 'web',
+    clientVersion: 'curr',
+    param: {
+      cmsArticleWebOld: { searchScope: 'title', sort: 'time', pageIndex: 1, pageSize: size, preTag: '', postTag: '' }
+    }
+  });
+  const data = await requestJsonp(
+    (cb) => `https://search-api-web.eastmoney.com/search/jsonp?cb=${cb}&param=${encodeURIComponent(param)}`
+  );
+  const list = data?.result?.cmsArticleWebOld;
+  if (!isArray(list)) return [];
+  return list
+    .map((item) => ({
+      id: String(item.code || item.url),
+      title: stripTags(item.title),
+      url: String(item.url || '').replace(/^http:/, 'https:'),
+      date: String(item.date || ''),
+      source: stripTags(item.mediaName) || '东方财富'
+    }))
+    .filter((item) => item.title && item.url);
+};
+
+/** 天天基金基金公告 */
+export const fetchFundAnnouncements = async (code, size = 5) => {
+  const data = await requestJsonp(
+    (cb) =>
+      `https://api.fund.eastmoney.com/f10/JJGG?callback=${cb}&fundcode=${encodeURIComponent(code)}&pageIndex=1&pageSize=${size}&type=0`
+  );
+  if (!isArray(data?.Data)) return [];
+  return data.Data.map((item) => ({
+    id: String(item.ID),
+    title: stripTags(item.TITLE),
+    url: `https://fund.eastmoney.com/gonggao/${code},${item.ID}.html`,
+    date: String(item.PUBLISHDATEDesc || ''),
+    source: '基金公告'
+  })).filter((item) => item.title && item.id);
+};
