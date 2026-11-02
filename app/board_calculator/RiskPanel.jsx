@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import dayjs from 'dayjs';
 import {
   Building2,
   CalendarDays,
@@ -18,6 +19,7 @@ import {
 import {
   fetchEastmoneySectorQuotesBatch,
   fetchFundAnnouncements,
+  fetchFundHoldings,
   fetchFundSecidsBatch,
   fetchIndexFundFlow,
   fetchIndexKlines,
@@ -25,17 +27,19 @@ import {
   fetchSectorNews
 } from '@/app/api/fund';
 import * as qk from '@/app/lib/query-keys';
+import { isTradingDay } from '@/app/lib/tradingCalendar';
 import { cn } from '@/lib/utils';
 import {
   analyzeSectorTrend,
   buildRiskAlerts,
-  classifyNews,
   classifyRisk,
   drawdownSeries,
   forecastFund,
   sectorKeyword,
   toNavSeries
 } from './risk.mjs';
+import { attributeMove, classifyAnnouncement, evaluateDecision, summarizeSignals } from './insights.mjs';
+import DecisionCard from './DecisionCard';
 import styles from './page.module.css';
 
 const BENCHMARK_SECID = '1.000300';
@@ -43,7 +47,6 @@ const LEVEL_ICON = { high: OctagonAlert, mid: TriangleAlert, low: ShieldCheck, n
 const EVIDENCE_ICON = { ma: ChartLine, momentum: TrendingDown, days: CalendarDays, flow: Coins, relative: Scale };
 const ALERT_ICON = { trend: TrendingDown, speed: Zap, sector: Building2 };
 const STANCE_LABEL = { bull: '偏多', bear: '偏空', neutral: '中性' };
-const NEWS_LABEL = { bull: '利好', bear: '利空', neutral: '中性' };
 const signed = (value, digits = 2) =>
   Number.isFinite(value) ? `${value >= 0 ? '+' : '−'}${Math.abs(value).toFixed(digits)}%` : '--';
 const percent = (value) => `${Math.round(value * 100)}%`;
@@ -144,7 +147,77 @@ function ForecastChart({ navs, forecast, stopNav }) {
   );
 }
 
-function NewsList({ query, emptyText }) {
+const SIGNAL_LABEL = { stop: '触发止损线', sell: '达到卖出线', buy: '达到买回线' };
+
+function AttributionLine({ attribution }) {
+  return (
+    <div className={styles.attribution}>
+      <p>
+        估算：重仓股贡献 <b className={toneClass(attribution.contribution)}>{signed(attribution.contribution)}</b>
+        ，其他持仓和误差 <b className={toneClass(attribution.other)}>{signed(attribution.other)}</b>
+      </p>
+      <p className={styles.riskMuted}>
+        影响最大：
+        {attribution.top.map((stock, index) => (
+          <span key={stock.code || stock.name}>
+            {index ? '、' : ''}
+            {stock.name} <span className={toneClass(stock.contribution)}>{signed(stock.contribution)}</span>
+          </span>
+        ))}
+        。按前十大持仓占比 {attribution.coveredWeight.toFixed(0)}% 估算
+        {attribution.reportDate ? `，持仓截至 ${attribution.reportDate}` : ''}，实际持仓可能已变化。
+      </p>
+    </div>
+  );
+}
+
+function SignalReview({ log, latestNav }) {
+  const summary = summarizeSignals(log);
+  if (!summary.total && !summary.decisions.length) {
+    return <p className={styles.riskMuted}>还没有记录。触发提示或记录决定后，这里会对比之后 5 个交易日的走势。</p>;
+  }
+  return (
+    <>
+      <p className={styles.reviewSummary}>
+        共 {summary.total} 次提示，{summary.settled} 次已满 5 个交易日
+        {summary.settled ? `，其中 ${summary.hits} 次之后的走势与提示方向一致` : ''}。
+        {summary.settled && !summary.enoughSamples ? '样本还太少，不能据此判断提示是否可靠。' : ''}
+      </p>
+      <ul className={styles.reviewList}>
+        {summary.recent.map((signal) => (
+          <li key={`${signal.status}-${signal.date}`}>
+            <span>
+              {signal.date.slice(5)} {SIGNAL_LABEL[signal.status]}
+            </span>
+            {signal.outcome ? (
+              <span className={toneClass(signal.outcome.change)}>5 日后 {signed(signal.outcome.change)}</span>
+            ) : (
+              <span className={styles.riskMuted}>等待结果</span>
+            )}
+          </li>
+        ))}
+        {summary.decisions.map((decision) => {
+          const result = evaluateDecision(decision, latestNav);
+          return (
+            <li key={decision.at}>
+              <span>
+                {decision.date.slice(5)} 决定
+                {decision.ratio > 0 ? `卖出 ${Math.round(decision.ratio * 100)}%` : '继续持有'}
+              </span>
+              {result ? (
+                <span className={toneClass(result.change)}>之后净值 {signed(result.change)}</span>
+              ) : (
+                <span className={styles.riskMuted}>等待净值</span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
+function NewsList({ query, emptyText, showNoticeLevel = false, today = '' }) {
   if (query.isPending) return <p className={styles.riskMuted}>正在加载资讯…</p>;
   if (query.isError)
     return (
@@ -159,14 +232,16 @@ function NewsList({ query, emptyText }) {
   return (
     <ul className={styles.newsList}>
       {query.data.map((item) => {
-        const stance = classifyNews(item.title);
+        const notice = classifyAnnouncement(item.title, item.date, today);
         return (
           <li key={item.id}>
             <a href={item.url} target="_blank" rel="noopener noreferrer" className={styles.newsTitle}>
               {item.title}
             </a>
-            <span className={cn(styles.stanceTag, styles[`stance_${stance}`])}>{NEWS_LABEL[stance]}</span>
             <span className={styles.riskMuted}>
+              {showNoticeLevel && notice.level !== 'general' ? (
+                <span className={cn(styles.stanceTag, styles[`notice_${notice.level}`])}>{notice.tag}</span>
+              ) : null}{' '}
               {item.source} · {item.date.slice(5, 16)}
             </span>
           </li>
@@ -178,6 +253,7 @@ function NewsList({ query, emptyText }) {
 
 export default function RiskPanel({ fundId, fund, history, reminder, strategy, onReview }) {
   const [newsTab, setNewsTab] = useState('sector');
+  const [confirmingReset, setConfirmingReset] = useState(false);
   const state = reminder.strategyState || {};
   const risk = classifyRisk(state);
   const stopLine = Number(strategy?.stopDrawdown);
@@ -236,6 +312,12 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
     staleTime: 30 * 60 * 1000
   });
 
+  const holdingsQuery = useQuery({
+    queryKey: ['boardFundHoldings', fundId],
+    queryFn: () => fetchFundHoldings(fundId),
+    enabled: Boolean(fundId),
+    staleTime: 5 * 60 * 1000
+  });
   const sectorName = keyword || quoteQuery.data?.[secid]?.name || '所属板块';
   const sectorPct = quoteQuery.data?.[secid]?.pct ?? klineQuery.data?.at(-1)?.pct;
   const benchmarkPct = quoteQuery.data?.[BENCHMARK_SECID]?.pct;
@@ -248,6 +330,16 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
     drift5: trend?.stats.medianForward5,
     stopNav
   });
+  const fundPct = navs.length >= 2 ? (navs.at(-1).nav / navs.at(-2).nav - 1) * 100 : NaN;
+  const beijingToday = new Date(reminder.now.getTime() + 8 * 3600000).toISOString().slice(0, 10);
+  const comparable = quote?.estimated || quote?.date === beijingToday || !isTradingDay(dayjs(beijingToday));
+  const attribution = comparable
+    ? attributeMove({
+        fundPct,
+        stocks: holdingsQuery.data?.holdings || [],
+        reportDate: holdingsQuery.data?.holdingsReportDate
+      })
+    : null;
   const alerts = buildRiskAlerts({ navs, sectorName, sectorPct, benchmarkPct });
   const points = drawdownSeries(navs, peakNav, 10, reminder.cycle?.startDate);
   const LevelIcon = LEVEL_ICON[risk.level];
@@ -279,7 +371,7 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
         </div>
         {hot ? (
           <button type="button" className={styles.riskAction} onClick={onReview}>
-            {risk.level === 'high' ? '去确认卖出' : '复核策略'}
+            {risk.level === 'high' ? '记录实际成交' : '复核策略'}
           </button>
         ) : null}
       </div>
@@ -304,12 +396,64 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
           </div>
         ) : null}
         <p className={styles.riskMuted}>
+          {reminder.cycle?.startDate ? `从 ${reminder.cycle.startDate.slice(5)} 开始跟踪。` : ''}
           {quote?.estimated
             ? `按 ${quote.time} 盘中估值预警，不代表成交价。`
             : quote?.date
               ? `按 ${quote.date} 正式净值评估。`
               : '等待净值更新。'}
+          {reminder.cycle && quote ? (
+            confirmingReset ? (
+              <span className={styles.resetConfirm}>
+                将以当前净值重新开始跟踪，最高值和基准都会重置。
+                <button
+                  type="button"
+                  className={styles.riskLink}
+                  onClick={() => {
+                    reminder.resetCycle();
+                    setConfirmingReset(false);
+                  }}
+                >
+                  确定重置
+                </button>
+                <button type="button" className={styles.riskLink} onClick={() => setConfirmingReset(false)}>
+                  取消
+                </button>
+              </span>
+            ) : (
+              <button type="button" className={styles.riskLink} onClick={() => setConfirmingReset(true)}>
+                重新跟踪
+              </button>
+            )
+          ) : null}
         </p>
+        {Number.isFinite(fundPct) || Number.isFinite(sectorPct) ? (
+          <p className={styles.riskFacts}>
+            最新涨跌：本基金 <span className={toneClass(fundPct)}>{signed(fundPct)}</span>
+            {Number.isFinite(sectorPct) ? (
+              <>
+                {' '}
+                · {sectorName} <span className={toneClass(sectorPct)}>{signed(sectorPct)}</span>
+              </>
+            ) : null}
+            {Number.isFinite(benchmarkPct) ? (
+              <>
+                {' '}
+                · 沪深 300 <span className={toneClass(benchmarkPct)}>{signed(benchmarkPct)}</span>
+              </>
+            ) : null}
+          </p>
+        ) : null}
+        {attribution ? <AttributionLine attribution={attribution} /> : null}
+        <div className={styles.riskSection}>
+          <DecisionCard
+            fundId={fundId}
+            nav={quote?.nav}
+            estimated={Boolean(quote?.estimated)}
+            open={hot}
+            onDecide={reminder.saveDecision}
+          />
+        </div>
 
         <div className={styles.riskSection}>
           <div className={styles.riskSectionHead}>
@@ -349,18 +493,24 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
                   <span>下个交易日历史涨跌频率</span>
                   <span>样本 {trend.stats.sampleSize} 次</span>
                 </div>
-                <div
-                  className={styles.probBar}
-                  role="img"
-                  aria-label={`历史同类情形下，次日上涨 ${percent(trend.stats.upRate)}，下跌 ${percent(1 - trend.stats.upRate)}`}
-                >
-                  <span className={styles.stance_bull} style={{ width: percent(trend.stats.upRate) }}>
-                    涨 {percent(trend.stats.upRate)}
-                  </span>
-                  <span className={styles.stance_bear} style={{ width: percent(1 - trend.stats.upRate) }}>
-                    跌 {percent(1 - trend.stats.upRate)}
-                  </span>
-                </div>
+                {trend.stats.hasEdge ? (
+                  <div
+                    className={styles.probBar}
+                    role="img"
+                    aria-label={`历史同类情形下，次日上涨 ${percent(trend.stats.upRate)}，下跌 ${percent(1 - trend.stats.upRate)}`}
+                  >
+                    <span className={styles.stance_bull} style={{ width: percent(trend.stats.upRate) }}>
+                      涨 {percent(trend.stats.upRate)}
+                    </span>
+                    <span className={styles.stance_bear} style={{ width: percent(1 - trend.stats.upRate) }}>
+                      跌 {percent(1 - trend.stats.upRate)}
+                    </span>
+                  </div>
+                ) : (
+                  <p className={styles.noEdge}>
+                    历史上没有明显方向（涨 {percent(trend.stats.upRate)} / 跌 {percent(1 - trend.stats.upRate)}）
+                  </p>
+                )}
                 <p className={styles.riskMuted}>
                   {trend.stats.matchedSignal
                     ? `统计近 ${trend.stats.years} 年板块同样“${trend.stats.signalText}”后的下一交易日。`
@@ -388,28 +538,17 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
           )}
         </div>
 
-        <div className={styles.riskSection}>
-          <div className={styles.riskSectionHead}>
-            <b>未来 {forecast?.days || 5} 个交易日走势预测</b>
-            {forecast ? (
-              <span
-                className={cn(
-                  styles.stanceTag,
-                  styles[
-                    `stance_${forecast.label === '偏强' ? 'bull' : forecast.label === '偏弱' ? 'bear' : 'neutral'}`
-                  ]
-                )}
-              >
-                {forecast.label}
-              </span>
-            ) : null}
-          </div>
+        <details className={styles.riskFold}>
+          <summary>
+            <b>未来 {forecast?.days || 5} 个交易日波动范围</b>
+            <span className={styles.riskMuted}>未经回测，只用来了解波动</span>
+          </summary>
           {!forecast ? (
-            <p className={styles.riskMuted}>净值数据不足 20 个交易日，暂不预测。</p>
+            <p className={styles.riskMuted}>净值数据不足 20 个交易日，暂不估算。</p>
           ) : (
             <>
               <p className={styles.forecastSummary}>
-                中位预估 <b className={toneClass(forecast.median)}>{signed(forecast.median, 1)}</b>，大概率区间{' '}
+                按近期波动，80% 区间约{' '}
                 <b>
                   {signed(forecast.low, 1)} ~ {signed(forecast.high, 1)}
                 </b>
@@ -471,7 +610,7 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
               </details>
             </>
           )}
-        </div>
+        </details>
 
         <div className={styles.riskSection}>
           <b>风险走势提醒</b>
@@ -493,6 +632,14 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
           )}
         </div>
 
+        <details className={styles.riskFold}>
+          <summary>
+            <b>提示复盘</b>
+            <span className={styles.riskMuted}>只保存在这台设备上</span>
+          </summary>
+          <SignalReview log={reminder.signalLog} latestNav={quote?.nav} />
+        </details>
+
         <div className={styles.riskSection}>
           <div className={styles.riskSectionHead}>
             <b>最新资讯</b>
@@ -513,10 +660,10 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
           {newsTab === 'sector' && keyword ? (
             <NewsList query={sectorNewsQuery} emptyText="暂无板块资讯。" />
           ) : (
-            <NewsList query={fundNewsQuery} emptyText="暂无基金公告。" />
+            <NewsList query={fundNewsQuery} emptyText="暂无基金公告。" showNoticeLevel today={beijingToday} />
           )}
           <p className={styles.riskMuted}>
-            资讯来自东方财富，利好/利空按标题关键词粗分。趋势、概率和预测基于历史统计，仅供参考，不构成投资建议。
+            资讯来自东方财富。趋势、频率和波动范围基于历史统计，仅作提醒，买卖由你决定，不构成投资建议。
           </p>
         </div>
       </div>

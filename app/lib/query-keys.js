@@ -31,6 +31,7 @@ export const boardSector = (fundCode) => ['boardSector', String(fundCode).trim()
 export const indexKlines = (secid) => ['indexKlines', String(secid).trim()];
 export const indexFundFlow = (secid) => ['indexFundFlow', String(secid).trim()];
 export const sectorNews = (keyword) => ['sectorNews', String(keyword).trim()];
+export const fundTradeRules = (fundCode) => ['fundTradeRules', String(fundCode).trim()];
 export const fundAnnouncements = (fundCode) => ['fundAnnouncements', String(fundCode).trim()];
 
 /** @param {string} fundCode */

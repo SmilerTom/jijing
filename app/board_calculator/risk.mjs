@@ -37,7 +37,7 @@ export function classifyRisk(state = {}) {
   if (state.status === 'stop')
     return {
       level: 'high',
-      title: '高风险 · 已触发止损，提示卖出',
+      title: '高风险 · 已触发你设定的止损线',
       ratio,
       drawdown,
       stopLine,
@@ -196,6 +196,7 @@ export function analyzeSectorTrend({ klines = [], flows = [], sectorPct, benchma
     if (current.above === signal.above && current.ret5Bucket === signal.ret5Bucket) matched.push(sample);
   }
   const samples = matched.length >= 20 ? matched : all;
+  const upRate = samples.filter((item) => item.next).length / Math.max(1, samples.length);
   const forward5 = samples.map((item) => item.forward5).sort((a, b) => a - b);
 
   return {
@@ -206,7 +207,8 @@ export function analyzeSectorTrend({ klines = [], flows = [], sectorPct, benchma
     neutral: evidence.length - bull - bear,
     evidence,
     stats: {
-      upRate: samples.filter((item) => item.next).length / Math.max(1, samples.length),
+      upRate,
+      hasEdge: Math.abs(upRate - 0.5) > 1.96 * Math.sqrt(0.25 / Math.max(1, samples.length)),
       sampleSize: samples.length,
       matchedSignal: samples === matched,
       signalText: describeSignal(signal),
@@ -282,49 +284,6 @@ export function forecastFund({ navs = [], startNav, drift5 = 0, stopNav, days = 
     },
     label: median > 1 ? '偏强' : median < -1 ? '偏弱' : '震荡'
   };
-}
-
-const BULL_WORDS = [
-  '利好',
-  '大涨',
-  '涨超',
-  '涨停',
-  '走强',
-  '反弹',
-  '新高',
-  '增长',
-  '净流入',
-  '增持',
-  '回购',
-  '扶持',
-  '支持',
-  '突破'
-];
-const BEAR_WORDS = [
-  '利空',
-  '大跌',
-  '跌超',
-  '跌停',
-  '跳水',
-  '走弱',
-  '下跌',
-  '暴跌',
-  '新低',
-  '下滑',
-  '亏损',
-  '净流出',
-  '减持',
-  '处罚',
-  '立案',
-  '风险'
-];
-
-/** 资讯倾向：按标题关键词粗分，仅作阅读提示 */
-export function classifyNews(title = '') {
-  const text = String(title);
-  const bull = BULL_WORDS.filter((word) => text.includes(word)).length;
-  const bear = BEAR_WORDS.filter((word) => text.includes(word)).length;
-  return bull > bear ? 'bull' : bear > bull ? 'bear' : 'neutral';
 }
 
 /** 板块名转资讯搜索关键词：去掉指数公司前缀和“指数”后缀 */

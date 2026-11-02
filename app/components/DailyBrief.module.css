@@ -1,0 +1,188 @@
+.brief {
+  --brief-warn: #fbbf24;
+  margin: 8px 0;
+  padding: 14px 16px;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+:global([data-theme='light']) .brief {
+  --brief-warn: #b45309;
+}
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 15px;
+}
+.muted {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.head .muted,
+.status .muted,
+summary .muted,
+.barHead .muted,
+.overlaps .muted {
+  margin: 0;
+}
+.up {
+  color: var(--danger);
+}
+.down {
+  color: var(--success);
+}
+.total {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  margin-top: 8px;
+}
+.totalValue {
+  font-size: 28px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.summary {
+  margin: 6px 0 0;
+  font-size: 14px;
+}
+.summary:empty {
+  display: none;
+}
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+.status svg {
+  vertical-align: -2px;
+}
+.statusAction,
+.statusCalm {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.statusAction {
+  color: var(--brief-warn);
+  background: color-mix(in srgb, var(--brief-warn) 14%, var(--card));
+}
+.statusCalm {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, var(--card));
+}
+.tier {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 14px 0 0;
+  font-weight: 600;
+}
+.tierAction {
+  color: var(--danger);
+}
+.feed {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.item {
+  border-top: 1px solid var(--border);
+}
+.item:first-child {
+  border-top: 0;
+}
+.item a {
+  display: grid;
+  gap: 3px;
+  padding: 8px 0;
+  color: inherit;
+  text-decoration: none;
+}
+.item a:hover .itemTitle {
+  color: var(--primary);
+}
+.item a:focus-visible,
+.fold summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.itemTitle {
+  overflow-wrap: anywhere;
+}
+.itemMeta {
+  color: var(--muted);
+  font-size: 12px;
+}
+.tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-size: 11px;
+}
+.tag_action {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, var(--card));
+}
+.tag_judge {
+  color: var(--brief-warn);
+  background: color-mix(in srgb, var(--brief-warn) 14%, var(--card));
+}
+.tag_general {
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 14%, var(--card));
+}
+.fold {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.fold summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+  cursor: pointer;
+}
+.bars,
+.overlaps {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.barHead,
+.overlaps li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  justify-content: space-between;
+}
+.bar {
+  height: 6px;
+  margin-top: 4px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--muted) 18%, transparent);
+  border-radius: 3px;
+}
+.bar i {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+}
+.subhead {
+  margin: 12px 0 0;
+  font-weight: 600;
+}

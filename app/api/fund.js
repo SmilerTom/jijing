@@ -2665,3 +2665,24 @@ export const fetchFundAnnouncements = async (code, size = 5) => {
     source: '基金公告'
   })).filter((item) => item.title && item.id);
 };
+
+/** 基金交易规则：赎回费档位、申赎状态、确认和到账天数 */
+export const fetchFundTradeRules = async (code) => {
+  const url = `https://fundmobapi.eastmoney.com/FundMNewApi/FundMNRateInfo?FCODE=${encodeURIComponent(code)}&plat=Android&appType=ttjj&product=EFund&Version=1&deviceid=rtf${Date.now()}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('交易规则加载失败');
+  const data = (await res.json())?.Datas;
+  if (!data) throw new Error('交易规则加载失败');
+  const days = (value) => {
+    const number = Number(value);
+    return Number.isInteger(number) && number > 0 ? number : null;
+  };
+  return {
+    redeemRows: data.sh,
+    buyStatus: String(data.SGZT || ''),
+    redeemStatus: String(data.SHZT || ''),
+    confirmDays: days(data.RDMCFMDATA) ?? days(data.SSBCFMDATA),
+    buyConfirmDays: days(data.SSBCFMDATA),
+    arrivalDays: days(data.DRAWCFMDATA)
+  };
+};
