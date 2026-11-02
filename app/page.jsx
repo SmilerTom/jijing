@@ -31,7 +31,8 @@ import RefreshButton from './components/RefreshButton';
 const UpdateChecker = dynamic(() => import('./components/UpdateChecker'), { ssr: false });
 import MarketIndexAccordion from './components/MarketIndexAccordion';
 import DailyBrief from './components/DailyBrief';
-import StrategyTicker from './components/StrategyTicker';
+import StrategyTicker, { getTrackedFunds } from './components/StrategyTicker';
+import { mergeHeldPositions } from './board_calculator/decision.mjs';
 import githubImg from './assets/github.svg';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { getAllValuationSeries, clearFund } from './lib/valuationTimeseries';
@@ -513,6 +514,9 @@ export default function HomePage() {
     summaryHoldingSourceGroupByCode,
     summaryCardItems
   } = useSummaryCalculations({ currentTab, setCurrentTab, getHoldingProfit });
+
+  const heldPositions = useMemo(() => mergeHeldPositions(holdings, groupHoldings), [holdings, groupHoldings]);
+  const hasStrategyTicker = useMemo(() => getTrackedFunds(funds, heldPositions).length > 0, [funds, heldPositions]);
 
   const getHoldingProfitForTab = useCallback(
     (fund, holding) => {
@@ -4841,7 +4845,7 @@ export default function HomePage() {
           </div>
           <StrategyTicker
             funds={funds}
-            holdings={holdings}
+            holdings={heldPositions}
             getHoldingProfit={getHoldingProfit}
             navbarHeight={navbarHeight}
             containerPadding={isMobile ? 12 : 24}
@@ -4849,13 +4853,19 @@ export default function HomePage() {
           {shouldShowMarketIndex && (
             <MarketIndexAccordion
               navbarHeight={navbarHeight}
-              marginTop={0}
+              marginTop={hasStrategyTicker ? 0 : navbarHeight}
               onCustomSettingsChange={triggerCustomSettingsSync}
               refreshing={refreshing}
             />
           )}
           <div style={{ display: mainTab === 'home' ? 'contents' : 'none' }}>
-            <DailyBrief funds={funds} holdings={holdings} getHoldingProfit={getHoldingProfit} masked={maskAmounts} />
+            <DailyBrief
+              funds={funds}
+              holdings={holdings}
+              groupHoldings={groupHoldings}
+              getHoldingProfit={getHoldingProfit}
+              masked={maskAmounts}
+            />
             <div className="grid">
               <div className="col-12">
                 <div
@@ -4863,7 +4873,7 @@ export default function HomePage() {
                   className="filter-bar"
                   style={{
                     top: `calc(${navbarHeight}px + var(--market-index-height, 0px))`,
-                    marginTop: !shouldShowMarketIndex ? navbarHeight : 0,
+                    marginTop: !shouldShowMarketIndex && !hasStrategyTicker ? navbarHeight : 0,
                     marginBottom: 8,
                     display: 'flex',
                     justifyContent: 'space-between',

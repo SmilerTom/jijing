@@ -34,19 +34,18 @@ function FundPrompt({ fund }) {
   );
 }
 
+export const getTrackedFunds = (funds, holdings) =>
+  (funds || []).filter((fund) => {
+    if (Number(holdings?.[fund.code]?.share) > 0) return true;
+    try {
+      return Number(storageStore.getItem(`board-calculator:${fund.code}`, {})?.amount) > 0;
+    } catch {
+      return false;
+    }
+  });
+
 export default function StrategyTicker({ funds, holdings, navbarHeight = 0, containerPadding = 24 }) {
-  const trackedFunds = useMemo(
-    () =>
-      funds.filter((fund) => {
-        if (Number(holdings?.[fund.code]?.share) > 0) return true;
-        try {
-          return Number(storageStore.getItem(`board-calculator:${fund.code}`, {})?.amount) > 0;
-        } catch {
-          return false;
-        }
-      }),
-    [funds, holdings]
-  );
+  const trackedFunds = useMemo(() => getTrackedFunds(funds, holdings), [funds, holdings]);
   if (!trackedFunds.length) return null;
   const content = (hidden = false) => (
     <div className="strategy-ticker-group" aria-hidden={hidden || undefined}>

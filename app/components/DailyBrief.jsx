@@ -14,7 +14,13 @@ import {
   fetchIndexFundFlow,
   fetchRelatedSectorsBatch
 } from '@/app/api/fund';
-import { buildLots, findFeeSaving, getSettlement, parseRedemptionTiers } from '@/app/board_calculator/decision.mjs';
+import {
+  buildLots,
+  findFeeSaving,
+  getSettlement,
+  parseRedemptionTiers,
+  resolvePosition
+} from '@/app/board_calculator/decision.mjs';
 import { attributeMove, buildExposure, classifyAnnouncement, outflowStreak } from '@/app/board_calculator/insights.mjs';
 import { classifyRisk, sectorKeyword, toNavSeries } from '@/app/board_calculator/risk.mjs';
 import {
@@ -134,7 +140,7 @@ function ExposureView({ exposure, masked }) {
   );
 }
 
-export default function DailyBrief({ funds, holdings, getHoldingProfit, masked = false }) {
+export default function DailyBrief({ funds, holdings, groupHoldings, getHoldingProfit, masked = false }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60000);
@@ -142,8 +148,8 @@ export default function DailyBrief({ funds, holdings, getHoldingProfit, masked =
   }, []);
 
   const positions = useMemo(
-    () => (funds || []).filter((fund) => Number(holdings?.[fund.code]?.share) > 0),
-    [funds, holdings]
+    () => (funds || []).filter((fund) => resolvePosition(fund.code, holdings, groupHoldings)),
+    [funds, holdings, groupHoldings]
   );
   const codes = positions.map((fund) => fund.code);
   const codesKey = codes.join(',');
@@ -212,8 +218,10 @@ export default function DailyBrief({ funds, holdings, getHoldingProfit, masked =
   const sectorOf = (code) => sectorQuery.data?.labels?.[code] || '';
   const items = [];
   const rows = positions.map((fund, index) => {
-    const holding = holdings[fund.code];
-    const profit = getHoldingProfit?.(fund, holding, null) || null;
+    const position = resolvePosition(fund.code, holdings, groupHoldings);
+    const bookProfits = position.books.map((book) => getHoldingProfit?.(fund, book.holding, book.groupId) || null);
+    const amount = bookProfits.reduce((sum, profit) => sum + (Number.isFinite(profit?.amount) ? profit.amount : 0), 0);
+    const todayProfits = bookProfits.map((profit) => profit?.profitToday).filter(Number.isFinite);
     const history = historyQueries[index].data || [];
     const notices = noticeQueries[index].data || [];
     const stockData = stockQueries[index].data;
@@ -284,9 +292,10 @@ export default function DailyBrief({ funds, holdings, getHoldingProfit, masked =
     if (tiers && nav > 0) {
       const { lots, unknownShare } = buildLots({
         transactions: storageStore.getItem('transactions', {})?.[fund.code],
-        share: Number(holding.share),
+        share: position.share,
         confirmDays: rules.buyConfirmDays ?? 1,
-        isTrading
+        isTrading,
+        groupIds: position.groupIds
       });
       const feeSettlement = getSettlement({
         now,
@@ -298,7 +307,7 @@ export default function DailyBrief({ funds, holdings, getHoldingProfit, masked =
         lots,
         unknownShare,
         tiers,
-        share: Number(holding.share),
+        share: position.share,
         nav,
         settlement: feeSettlement,
         confirmDays: rules.confirmDays ?? 1,
@@ -319,8 +328,8 @@ export default function DailyBrief({ funds, holdings, getHoldingProfit, masked =
 
     return {
       fund,
-      amount: Number.isFinite(profit?.amount) ? profit.amount : 0,
-      profitToday: Number.isFinite(profit?.profitToday) ? profit.profitToday : null,
+      amount,
+      profitToday: todayProfits.length ? todayProfits.reduce((sum, value) => sum + value, 0) : null,
       estimated,
       sector: sectorKeyword(sectorOf(fund.code)),
       stocks: stockData?.holdings || []

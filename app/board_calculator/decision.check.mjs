@@ -5,7 +5,9 @@ import {
   estimateFee,
   findFeeSaving,
   getSettlement,
+  mergeHeldPositions,
   parseRedemptionTiers,
+  resolvePosition,
   simulateSale
 } from './decision.mjs';
 
@@ -63,6 +65,26 @@ check('买卖记录按先进先出还原批次，并排除分组和仅历史记�
     { share: 50, confirmDate: '2026-10-06' },
     { share: 100, confirmDate: '2026-10-14' }
   ]);
+});
+
+check('合并全局和分组持仓，并纳入对应分组的交易记录', () => {
+  const position = resolvePosition(
+    '000001',
+    { '000001': { share: 100, cost: 1 } },
+    { g1: { '000001': { share: 300, cost: 2 } }, g2: { '000001': { share: 0, cost: 9 } } }
+  );
+  assert.equal(position.share, 400);
+  near(position.cost, 1.75);
+  assert.deepEqual(position.groupIds, ['g1']);
+  assert.equal(resolvePosition('000001', {}, { g1: { '000001': { share: 10, cost: null } } }).cost, null);
+  assert.equal(resolvePosition('000002', {}, {}), null);
+  assert.deepEqual(Object.keys(mergeHeldPositions({ a: { share: 1 } }, { g: { b: { share: 2 } } })).sort(), ['a', 'b']);
+  const { lots } = buildLots({
+    share: 10,
+    groupIds: ['g1'],
+    transactions: [{ type: 'buy', share: 10, date: '2026-10-05', groupId: 'g1' }]
+  });
+  assert.equal(lots[0].share, 10);
 });
 
 check('持仓多于记录时不假设持有天数，赎回费只给下限', () => {
