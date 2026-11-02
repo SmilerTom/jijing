@@ -101,17 +101,26 @@ summary .muted,
 .item:first-child {
   border-top: 0;
 }
-.item a {
+.item a,
+.item button {
   display: grid;
   gap: 3px;
+  width: 100%;
   padding: 8px 0;
   color: inherit;
+  background: none;
+  border: 0;
+  font: inherit;
+  text-align: left;
   text-decoration: none;
+  cursor: pointer;
 }
-.item a:hover .itemTitle {
+.item a:hover .itemTitle,
+.item button:hover .itemTitle {
   color: var(--primary);
 }
 .item a:focus-visible,
+.item button:focus-visible,
 .fold summary:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;

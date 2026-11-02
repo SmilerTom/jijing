@@ -40,6 +40,7 @@ import {
 } from './risk.mjs';
 import { attributeMove, classifyAnnouncement, evaluateDecision, summarizeSignals } from './insights.mjs';
 import DecisionCard from './DecisionCard';
+import NewsReader from '@/app/components/NewsReader';
 import styles from './page.module.css';
 
 const BENCHMARK_SECID = '1.000300';
@@ -217,7 +218,7 @@ function SignalReview({ log, latestNav }) {
   );
 }
 
-function NewsList({ query, emptyText, showNoticeLevel = false, today = '' }) {
+function NewsList({ query, emptyText, onRead, showNoticeLevel = false, today = '' }) {
   if (query.isPending) return <p className={styles.riskMuted}>正在加载资讯…</p>;
   if (query.isError)
     return (
@@ -235,9 +236,9 @@ function NewsList({ query, emptyText, showNoticeLevel = false, today = '' }) {
         const notice = classifyAnnouncement(item.title, item.date, today);
         return (
           <li key={item.id}>
-            <a href={item.url} target="_blank" rel="noopener noreferrer" className={styles.newsTitle}>
+            <button type="button" className={styles.newsTitle} onClick={() => onRead(item)}>
               {item.title}
-            </a>
+            </button>
             <span className={styles.riskMuted}>
               {showNoticeLevel && notice.level !== 'general' ? (
                 <span className={cn(styles.stanceTag, styles[`notice_${notice.level}`])}>{notice.tag}</span>
@@ -254,6 +255,7 @@ function NewsList({ query, emptyText, showNoticeLevel = false, today = '' }) {
 export default function RiskPanel({ fundId, fund, history, reminder, strategy, onReview }) {
   const [newsTab, setNewsTab] = useState('sector');
   const [confirmingReset, setConfirmingReset] = useState(false);
+  const [readingNews, setReadingNews] = useState(null);
   const state = reminder.strategyState || {};
   const risk = classifyRisk(state);
   const stopLine = Number(strategy?.stopDrawdown);
@@ -658,15 +660,22 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
             </div>
           </div>
           {newsTab === 'sector' && keyword ? (
-            <NewsList query={sectorNewsQuery} emptyText="暂无板块资讯。" />
+            <NewsList query={sectorNewsQuery} emptyText="暂无板块资讯。" onRead={setReadingNews} />
           ) : (
-            <NewsList query={fundNewsQuery} emptyText="暂无基金公告。" showNoticeLevel today={beijingToday} />
+            <NewsList
+              query={fundNewsQuery}
+              emptyText="暂无基金公告。"
+              onRead={setReadingNews}
+              showNoticeLevel
+              today={beijingToday}
+            />
           )}
           <p className={styles.riskMuted}>
             资讯来自东方财富。趋势、频率和波动范围基于历史统计，仅作提醒，买卖由你决定，不构成投资建议。
           </p>
         </div>
       </div>
+      <NewsReader item={readingNews} onClose={() => setReadingNews(null)} />
     </section>
   );
 }

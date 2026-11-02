@@ -1,7 +1,9 @@
 'use client';
 
 import { Suspense } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 import FundTradingBoard from './FundTradingBoard';
 import styles from './page.module.css';
 
@@ -15,6 +17,9 @@ function BoardCalculatorContent() {
   const fundName = searchParams.get('fundName')?.trim() || DEFAULT_FUND_NAME;
   return (
     <main className={styles.page}>
+      <Link href="/" className={styles.backHome}>
+        <ArrowLeft size={15} aria-hidden="true" /> 返回首页
+      </Link>
       <h1>交易驾驶舱</h1>
       <p className={styles.subtitle}>查看持仓收益、行情和策略状态，记录本基金的出入金流水。</p>
       <div className={styles.boardOptions}>
