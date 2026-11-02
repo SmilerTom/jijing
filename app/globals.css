@@ -1396,6 +1396,12 @@ input[type='number'] {
   /* 横向滚动条样式与项目整体规范一致：深色背景、边框色、圆角、hover 高亮 */
   scrollbar-width: thin;
   scrollbar-color: var(--border) var(--bg);
+  /* 让客户端 WebView 的原生滚动条跟随主题，避免深色主题下出现白色轨道 */
+  color-scheme: dark;
+}
+
+[data-theme='light'] .table-scroll-area {
+  color-scheme: light;
 }
 
 .table-scroll-area::-webkit-scrollbar {

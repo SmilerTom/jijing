@@ -44,17 +44,57 @@ export function parseRedemptionTiers(rows) {
 
 const rateForDays = (tiers, days) => tiers?.find((tier) => days >= tier.minDays && days < tier.maxDays)?.rate;
 
+const validShare = (holding) => Number.isFinite(Number(holding?.share)) && Number(holding.share) > 0;
+
+/** 合并全局和各分组账本中某只基金的持仓；成本只按有成本的份额加权 */
+export function resolvePosition(code, holdings, groupHoldings) {
+  const books = [];
+  if (validShare(holdings?.[code])) books.push({ holding: holdings[code], groupId: null });
+  Object.entries(groupHoldings || {}).forEach(([groupId, bucket]) => {
+    if (validShare(bucket?.[code])) books.push({ holding: bucket[code], groupId });
+  });
+  if (!books.length) return null;
+  const share = books.reduce((sum, book) => sum + Number(book.holding.share), 0);
+  const costed = books.filter((book) => Number(book.holding.cost) > 0);
+  const costedShare = costed.reduce((sum, book) => sum + Number(book.holding.share), 0);
+  const cost =
+    costed.length === books.length
+      ? costed.reduce((sum, book) => sum + Number(book.holding.share) * Number(book.holding.cost), 0) / costedShare
+      : null;
+  return { share, cost, books, groupIds: books.map((book) => book.groupId).filter(Boolean) };
+}
+
+/** 全局和所有分组中持有的基金，供首页提示使用 */
+export function mergeHeldPositions(holdings, groupHoldings) {
+  const codes = new Set([
+    ...Object.keys(holdings || {}),
+    ...Object.values(groupHoldings || {}).flatMap((bucket) => Object.keys(bucket || {}))
+  ]);
+  const merged = {};
+  codes.forEach((code) => {
+    const position = resolvePosition(code, holdings, groupHoldings);
+    if (position) merged[code] = position;
+  });
+  return merged;
+}
+
 /**
- * 用全局交易记录按先进先出还原现存批次。
+ * 用全局和指定分组的交易记录按先进先出还原现存批次。
  * 持仓多于记录的部分没有买入日期，单列为 unknownShare，不假设持有天数。
  */
-export function buildLots({ transactions = [], share = 0, confirmDays = 1, isTrading = weekdayOnly } = {}) {
+export function buildLots({
+  transactions = [],
+  share = 0,
+  confirmDays = 1,
+  isTrading = weekdayOnly,
+  groupIds = []
+} = {}) {
   const lots = [];
   (isArray(transactions) ? transactions : [])
     .filter(
       (item) =>
         item &&
-        !item.groupId &&
+        (!item.groupId || groupIds.includes(item.groupId)) &&
         !item.isHistoryOnly &&
         Number(item.share) > 0 &&
         isString(item.date) &&

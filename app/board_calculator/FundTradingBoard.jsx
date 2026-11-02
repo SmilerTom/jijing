@@ -16,6 +16,7 @@ import {
   getStrategyQuote,
   normalizeStrategy
 } from './strategy.mjs';
+import { resolvePosition } from './decision.mjs';
 import useStrategyReminder, { notifyStrategyChange } from './useStrategyReminder';
 import RiskPanel from './RiskPanel';
 import styles from './page.module.css';
@@ -84,8 +85,17 @@ function StrategyField({ id, label, value, onChange, min, max, step, prefix, suf
 }
 
 export default function FundTradingBoard({ fundId, fundName, embedded = false }) {
-  const { funds, holdings, setHoldings, initFunds, initHoldings, initTransactions, initFundDividends } =
-    useStorageStore();
+  const {
+    funds,
+    holdings,
+    groupHoldings,
+    setHoldings,
+    initFunds,
+    initHoldings,
+    initGroupHoldings,
+    initTransactions,
+    initFundDividends
+  } = useStorageStore();
   const { getHoldingProfit } = useHoldingProfit({ activeGroupId: null });
   const [editing, setEditing] = useState(false);
   const [amount, setAmount] = useState('');
@@ -115,7 +125,8 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
     const merged = liveFund ? { ...fund, gsz: null, gztime: null, noValuation: false, ...liveFund } : fund;
     return liveError ? { ...merged, gsz: null, gztime: null } : merged;
   }, [embedded, fund, liveFund, liveError]);
-  const holding = holdings?.[fundId];
+  const position = useMemo(() => resolvePosition(fundId, holdings, groupHoldings), [fundId, holdings, groupHoldings]);
+  const holding = holdings?.[fundId] || position;
   const holdingProfit = fund && holding ? getHoldingProfit(fund, holding, null) : null;
   const {
     data: history = [],
@@ -191,6 +202,7 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
     const refreshStoredData = () => {
       initFunds();
       initHoldings();
+      initGroupHoldings();
       initTransactions();
       initFundDividends();
     };
@@ -201,7 +213,7 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
       window.removeEventListener('storage', refreshStoredData);
       window.removeEventListener('focus', refreshStoredData);
     };
-  }, [embedded, initFunds, initHoldings, initTransactions, initFundDividends]);
+  }, [embedded, initFunds, initHoldings, initGroupHoldings, initTransactions, initFundDividends]);
 
   useEffect(() => {
     try {

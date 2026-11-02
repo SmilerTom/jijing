@@ -8,7 +8,14 @@ import { fetchFundTradeRules } from '@/app/api/fund';
 import * as qk from '@/app/lib/query-keys';
 import { isTradingDay, loadHolidaysForYears } from '@/app/lib/tradingCalendar';
 import { useStorageStore } from '@/app/stores/storageStore';
-import { buildLots, findFeeSaving, getSettlement, parseRedemptionTiers, simulateSale } from './decision.mjs';
+import {
+  buildLots,
+  findFeeSaving,
+  getSettlement,
+  parseRedemptionTiers,
+  resolvePosition,
+  simulateSale
+} from './decision.mjs';
 import styles from './page.module.css';
 
 const OPTIONS = [
@@ -29,14 +36,15 @@ const profitText = (value) => (value === null ? '缺少成本' : `${value >= 0 ?
 const toneOf = (value) => (value > 0 ? styles.up : value < 0 ? styles.down : '');
 
 export default function DecisionCard({ fundId, nav, estimated, open, onDecide }) {
-  const { holdings, transactions } = useStorageStore();
+  const { holdings, groupHoldings, transactions } = useStorageStore();
   const [ratioPercent, setRatioPercent] = useState(50);
   const [now, setNow] = useState(() => new Date());
   const [decisionNote, setDecisionNote] = useState('');
   const sliderId = useId();
-  const holding = holdings?.[fundId];
-  const share = Number(holding?.share);
-  const cost = Number(holding?.cost);
+  const position = useMemo(() => resolvePosition(fundId, holdings, groupHoldings), [fundId, holdings, groupHoldings]);
+  const share = Number(position?.share);
+  const cost = Number(position?.cost);
+  const groupIdsKey = (position?.groupIds || []).join(',');
   const hasPosition = share > 0 && nav > 0;
 
   const rulesQuery = useQuery({
@@ -70,11 +78,12 @@ export default function DecisionCard({ fundId, nav, estimated, open, onDecide })
         transactions: fundTransactions,
         share: hasPosition ? share : 0,
         confirmDays: rules?.buyConfirmDays ?? 1,
-        isTrading
+        isTrading,
+        groupIds: groupIdsKey ? groupIdsKey.split(',') : []
       }),
     // 日历加载后需要按真实节假日重算
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [fundTransactions, hasPosition, share, rules, calendarReady]
+    [fundTransactions, hasPosition, share, rules, calendarReady, groupIdsKey]
   );
 
   if (!hasPosition) {
