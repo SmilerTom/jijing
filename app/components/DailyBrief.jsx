@@ -34,6 +34,7 @@ import * as qk from '@/app/lib/query-keys';
 import { isTradingDay, loadHolidaysForYears } from '@/app/lib/tradingCalendar';
 import { storageStore } from '@/app/stores/storageStore';
 import { cn } from '@/lib/utils';
+import NewsReader from './NewsReader';
 import styles from './DailyBrief.module.css';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -68,7 +69,7 @@ const readFundSignal = (fund, history, now) => {
   }
 };
 
-function FeedItem({ item, masked }) {
+function FeedItem({ item, masked, onRead }) {
   const body = (
     <>
       <span className={styles.itemTitle}>{item.title}</span>
@@ -81,9 +82,9 @@ function FeedItem({ item, masked }) {
   return (
     <li className={styles.item}>
       {item.external ? (
-        <a href={item.href} target="_blank" rel="noopener noreferrer">
+        <button type="button" onClick={() => onRead(item)}>
           {body}
-        </a>
+        </button>
       ) : (
         <Link href={item.href}>{body}</Link>
       )}
@@ -142,6 +143,7 @@ function ExposureView({ exposure, masked }) {
 
 export default function DailyBrief({ funds, holdings, groupHoldings, getHoldingProfit, masked = false }) {
   const [now, setNow] = useState(() => new Date());
+  const [readingNews, setReadingNews] = useState(null);
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(timer);
@@ -262,6 +264,8 @@ export default function DailyBrief({ funds, holdings, groupHoldings, getHoldingP
         meta: `${fund.name} · ${notice.date.slice(5, 10)}`,
         href: notice.url,
         external: true,
+        url: notice.url,
+        source: notice.source,
         date: notice.date
       });
     });
@@ -418,7 +422,7 @@ export default function DailyBrief({ funds, holdings, groupHoldings, getHoldingP
           </p>
           <ul className={styles.feed}>
             {actionItems.map((item) => (
-              <FeedItem key={item.id} item={item} masked={masked} />
+              <FeedItem key={item.id} item={item} masked={masked} onRead={setReadingNews} />
             ))}
           </ul>
         </>
@@ -432,7 +436,7 @@ export default function DailyBrief({ funds, holdings, groupHoldings, getHoldingP
           </summary>
           <ul className={styles.feed}>
             {judgeItems.map((item) => (
-              <FeedItem key={item.id} item={item} masked={masked} />
+              <FeedItem key={item.id} item={item} masked={masked} onRead={setReadingNews} />
             ))}
           </ul>
         </details>
@@ -445,7 +449,7 @@ export default function DailyBrief({ funds, holdings, groupHoldings, getHoldingP
           </summary>
           <ul className={styles.feed}>
             {generalItems.map((item) => (
-              <FeedItem key={item.id} item={item} masked={masked} />
+              <FeedItem key={item.id} item={item} masked={masked} onRead={setReadingNews} />
             ))}
           </ul>
         </details>
@@ -455,6 +459,7 @@ export default function DailyBrief({ funds, holdings, groupHoldings, getHoldingP
         {failed ? `${failed} 只基金的公告暂时没拿到。` : ''}
         公告分级按标题规则判断，归因是估算。仅作提醒，买卖由你决定，不构成投资建议。
       </p>
+      <NewsReader item={readingNews} onClose={() => setReadingNews(null)} />
     </section>
   );
 }
