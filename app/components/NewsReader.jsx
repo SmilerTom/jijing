@@ -27,6 +27,7 @@ export default function NewsReader({ item, onClose }) {
             sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
             referrerPolicy="no-referrer"
           />
+          <p className={styles.hint}>内容显示不出来时，请点上方“在浏览器打开”。</p>
         </DialogContent>
       ) : null}
     </Dialog>

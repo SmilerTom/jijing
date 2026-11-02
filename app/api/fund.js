@@ -2,6 +2,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import { isArray, isNil, isNumber, isObject, isString } from 'lodash';
+import { normalizeNewsUrl } from '../board_calculator/insights.mjs';
 import { storageStore } from '../stores';
 import { withRetry } from '../lib/asyncHelper';
 import { getQueryClient } from '../lib/get-query-client';
@@ -2643,7 +2644,7 @@ export const fetchSectorNews = async (keyword, size = 5) => {
     .map((item) => ({
       id: String(item.code || item.url),
       title: stripTags(item.title),
-      url: String(item.url || '').replace(/^http:/, 'https:'),
+      url: normalizeNewsUrl(item.url),
       date: String(item.date || ''),
       source: stripTags(item.mediaName) || '东方财富'
     }))

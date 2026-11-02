@@ -35,6 +35,12 @@
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
+.hint {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
 .frame {
   flex: 1 1 auto;
   width: 100%;
