@@ -182,4 +182,14 @@ export function outflowStreak(flows = []) {
   return { days, total };
 }
 
+/**
+ * 东方财富部分频道会把 https 文章跳转到 http，线上 https 页面内嵌时会被拦截成空白；
+ * 统一改用不跳转的 finance 域名，其他链接只升级协议。
+ */
+export function normalizeNewsUrl(url = '') {
+  const article = String(url).match(/^https?:\/\/[a-z0-9-]+\.eastmoney\.com\/a\/(\d+\.html)(?:[?#].*)?$/i);
+  if (article) return `https://finance.eastmoney.com/a/${article[1]}`;
+  return String(url).replace(/^http:/, 'https:');
+}
+
 export const signalLogKey = (fundId) => `board-signal-log:${fundId}`;

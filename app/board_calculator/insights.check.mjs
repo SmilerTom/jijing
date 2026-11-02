@@ -4,6 +4,7 @@ import {
   buildExposure,
   classifyAnnouncement,
   evaluateDecision,
+  normalizeNewsUrl,
   outflowStreak,
   recordDecision,
   recordSignal,
@@ -105,6 +106,22 @@ check('资金连续流出天数', () => {
   assert.equal(result.days, 2);
   assert.equal(result.total, -3);
   assert.equal(outflowStreak([{ net: -1 }, { net: 1 }]).days, 0);
+});
+
+check('资讯链接改用不跳转的 https 地址', () => {
+  assert.equal(
+    normalizeNewsUrl('http://stock.eastmoney.com/a/202611023918605459.html'),
+    'https://finance.eastmoney.com/a/202611023918605459.html'
+  );
+  assert.equal(
+    normalizeNewsUrl('https://fund.eastmoney.com/a/1.html?from=x'),
+    'https://finance.eastmoney.com/a/1.html'
+  );
+  assert.equal(normalizeNewsUrl('http://example.com/a.html'), 'https://example.com/a.html');
+  assert.equal(
+    normalizeNewsUrl('https://fund.eastmoney.com/gonggao/017811,AN1.html'),
+    'https://fund.eastmoney.com/gonggao/017811,AN1.html'
+  );
 });
 
 console.log(`洞察检查：${passed} 项通过`);
