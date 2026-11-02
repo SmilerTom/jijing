@@ -12,6 +12,8 @@ import {
   normalizeStrategy,
   observeStrategyPeak
 } from './strategy.mjs';
+import { normalizeSignalLog, recordDecision, recordSignal, settleSignals, signalLogKey } from './insights.mjs';
+import { toNavSeries } from './risk.mjs';
 
 export const notifyStrategyChange = () => window.dispatchEvent(new Event('board-strategy-change'));
 const subscribe = (callback) => {
@@ -39,7 +41,9 @@ export default function useStrategyReminder({ fundId, fund, history = [], strate
     () => readSnapshot(`board-calculator:${fundId}`),
     serverSnapshot
   );
+  const signalLogJson = useSyncExternalStore(subscribe, () => readSnapshot(signalLogKey(fundId)), serverSnapshot);
   const cycle = useMemo(() => JSON.parse(cycleJson), [cycleJson]);
+  const signalLog = useMemo(() => normalizeSignalLog(JSON.parse(signalLogJson)), [signalLogJson]);
   const saved = useMemo(() => JSON.parse(settingsJson), [settingsJson]);
   const config = normalizeStrategy(strategy ?? saved?.strategy);
   const [now, setNow] = useState(() => new Date());
@@ -121,12 +125,66 @@ export default function useStrategyReminder({ fundId, fund, history = [], strate
     }
   };
 
+  const status = strategyState.status;
+  const signalNav = signalQuote?.nav;
+  const signalDate = signalQuote?.date;
+  const signalEstimated = Boolean(signalQuote?.estimated);
+  useEffect(() => {
+    if (!enabled || signalLogJson === '"storage-unavailable"') return;
+    try {
+      const recorded = recordSignal(signalLog, {
+        status,
+        date: signalDate,
+        nav: signalNav,
+        estimated: signalEstimated
+      });
+      const next = settleSignals(recorded, toNavSeries(history));
+      if (!isEqual(next, signalLog)) {
+        storageStore.setItem(signalLogKey(fundId), JSON.stringify(next));
+        notifyStrategyChange();
+      }
+    } catch {}
+  }, [enabled, fundId, history, signalDate, signalEstimated, signalLog, signalLogJson, signalNav, status]);
+
+  const saveDecision = (ratio) => {
+    if (!signalQuote) return false;
+    try {
+      const next = recordDecision(signalLog, {
+        ratio,
+        status,
+        date: signalQuote.date,
+        nav: signalQuote.nav,
+        at: new Date().toISOString()
+      });
+      storageStore.setItem(signalLogKey(fundId), JSON.stringify(next));
+      notifyStrategyChange();
+      return true;
+    } catch {
+      setError('决定保存失败，请检查浏览器存储。');
+      return false;
+    }
+  };
+
+  const resetCycle = () => {
+    if (!quote) return false;
+    try {
+      return saveCycle(createStrategyCycle(quote.nav, quote.date));
+    } catch (failure) {
+      setError(failure.message || '重新跟踪失败，请重试。');
+      return false;
+    }
+  };
+
   return {
     cycle: observedCycle,
     quote,
     signalQuote,
     strategyState,
     confirmTrade,
+    resetCycle,
+    now,
+    signalLog,
+    saveDecision,
     error:
       cycle === 'storage-unavailable' || saved === 'storage-unavailable' ? '无法读取本地策略记录，已暂停提醒。' : error
   };

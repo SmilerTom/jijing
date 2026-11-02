@@ -539,7 +539,7 @@
 }
 .newsList li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 4px 12px;
   align-items: start;
   padding: 8px 0;
@@ -1018,6 +1018,158 @@
   .strategyFields {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+.attribution {
+  margin-top: 8px;
+}
+.attribution p {
+  margin: 4px 0 0;
+}
+.notice_action {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, var(--card));
+}
+.notice_judge {
+  color: var(--risk-warn);
+  background: color-mix(in srgb, var(--risk-warn) 14%, var(--card));
+}
+.decisionRecord {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+.decisionRecord .riskMuted {
+  margin: 0;
+}
+.reviewSummary {
+  margin: 8px 0 0;
+}
+.reviewList {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.reviewList li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  justify-content: space-between;
+}
+.riskFacts {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+.resetConfirm {
+  display: inline;
+  margin-left: 4px;
+  color: var(--text);
+}
+.noEdge {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--muted) 12%, var(--card));
+  border-radius: 8px;
+  font-size: 13px;
+}
+.riskFold,
+.decisionFold {
+  min-width: 0;
+}
+.riskFold {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.riskFold > summary,
+.decisionFold > summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  cursor: pointer;
+}
+.riskFold > summary .riskMuted,
+.decisionFold > summary .riskMuted {
+  margin: 0;
+}
+.riskFold > summary:focus-visible,
+.decisionFold > summary:focus-visible,
+.decisionScroll:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.decisionAlert {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, var(--card));
+  border-radius: 8px;
+}
+.decisionScroll {
+  margin-top: 10px;
+  overflow-x: auto;
+}
+.decisionTable {
+  width: 100%;
+  min-width: 360px;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.decisionTable th,
+.decisionTable td {
+  padding: 8px 6px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.decisionTable thead th {
+  font-weight: 600;
+}
+.decisionTable tbody th {
+  color: var(--muted);
+  font-weight: 400;
+}
+.decisionTable th:first-child {
+  text-align: left;
+}
+.decisionTable tbody tr:last-child th,
+.decisionTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+.decisionSlider {
+  margin-top: 12px;
+}
+.decisionSlider input {
+  width: 100%;
+  margin-top: 8px;
+  accent-color: var(--primary);
+}
+.decisionTip,
+.decisionCutoff {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 10px 0 0;
+}
+.decisionTip svg,
+.decisionCutoff svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.decisionTip {
+  padding: 8px 10px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--primary) 12%, var(--card));
+  border-radius: 8px;
+}
+.decisionCutoff svg {
+  color: var(--risk-warn);
 }
 @media (max-width: 640px) {
   .page {

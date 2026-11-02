@@ -30,6 +30,7 @@ import UserMenu from './components/UserMenu';
 import RefreshButton from './components/RefreshButton';
 const UpdateChecker = dynamic(() => import('./components/UpdateChecker'), { ssr: false });
 import MarketIndexAccordion from './components/MarketIndexAccordion';
+import DailyBrief from './components/DailyBrief';
 import StrategyTicker from './components/StrategyTicker';
 import githubImg from './assets/github.svg';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
@@ -4854,6 +4855,7 @@ export default function HomePage() {
             />
           )}
           <div style={{ display: mainTab === 'home' ? 'contents' : 'none' }}>
+            <DailyBrief funds={funds} holdings={holdings} getHoldingProfit={getHoldingProfit} masked={maskAmounts} />
             <div className="grid">
               <div className="col-12">
                 <div

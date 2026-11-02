@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import {
   analyzeSectorTrend,
   buildRiskAlerts,
-  classifyNews,
   classifyRisk,
   drawdownSeries,
   forecastFund,
@@ -74,6 +73,7 @@ check('持续下跌的板块判为短期下行，并给出同类信号样本', (
   assert.equal(trend.direction, 'down');
   assert.ok(trend.stats.sampleSize >= 20);
   assert.ok(trend.stats.upRate >= 0 && trend.stats.upRate <= 1);
+  assert.equal(typeof trend.stats.hasEdge, 'boolean');
   assert.equal(analyzeSectorTrend({ klines: klines.slice(0, 10) }), null);
 });
 
@@ -90,12 +90,6 @@ check('走势预测结果稳定，区间有序且情景概率合计为 1', () =>
   const below = forecastFund({ navs, stopNav: 5 });
   assert.equal(below.belowStop, true);
   assert.equal(below.touchStop, null);
-});
-
-check('资讯标题按关键词粗分倾向', () => {
-  assert.equal(classifyNews('AI 算力板块午后跳水，多只龙头跌超 5%'), 'bear');
-  assert.equal(classifyNews('板块大涨，资金净流入'), 'bull');
-  assert.equal(classifyNews('基金合同修订公告'), 'neutral');
 });
 
 check('板块名转资讯关键词', () => {

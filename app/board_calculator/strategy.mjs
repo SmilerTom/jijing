@@ -218,21 +218,21 @@ export function buildStrategyPrompt({ strategyState }) {
   const prefix = state.estimated ? '估值预警 · ' : '';
   if (state.status === 'stop')
     return {
-      label: `${prefix}回落止损 · 提示卖出`,
+      label: `${prefix}已触发你设定的止损线`,
       tone: 'up',
       metric: `已回落 ${percentage(state.drawdown)}`,
       detail: `${source}从已记录最高净值 ${state.peakNav.toFixed(4)} 回落 ${percentage(state.drawdown)}（止损线 ${percentage(state.stopDrawdown)}），止损优先于补仓。实际卖出后请确认。`
     };
   if (state.status === 'sell')
     return {
-      label: `${prefix}上涨 · 提示卖出`,
+      label: `${prefix}已达你设定的卖出线`,
       tone: 'up',
       metric: `已涨 ${percentage(state.change)}`,
       detail: `${source}较本轮参考净值上涨 ${percentage(state.change)}（卖出线 ${percentage(state.riseRate)}）。卖出一部分后确认，再等待回落买回。`
     };
   if (state.status === 'buy')
     return {
-      label: `${prefix}回落 · 提示买回`,
+      label: `${prefix}已达你设定的买回线`,
       tone: 'down',
       metric: `已回落 ${percentage(state.change)}`,
       detail: `${source}较实际卖出净值回落 ${percentage(state.change)}（买回线 ${percentage(state.buyDropRate)}）。实际买回后确认，开启下一轮。`
