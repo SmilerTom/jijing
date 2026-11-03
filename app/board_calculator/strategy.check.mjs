@@ -318,9 +318,12 @@ const bandState = (options = {}) =>
     ...options
   });
 
-check('估值带：未开启时保持原默认，非法周期回到 250 日', () => {
+check('估值带：默认开启，自动存下的 rolling 不算选择，非法周期回到 250 日', () => {
   assert.deepEqual(normalizeStrategy({ targetRate: 25 }), { ...DEFAULT_STRATEGY, riseRate: 25 });
-  assert.equal(normalizeBand({}).mode, 'rolling');
+  assert.equal(normalizeBand({}).mode, 'band');
+  assert.equal(normalizeBand(null).mode, 'band');
+  assert.equal(normalizeBand({ mode: 'rolling' }).mode, 'band');
+  assert.equal(normalizeBand({ mode: 'rolling', modePicked: '1' }).mode, 'rolling');
   assert.equal(normalizeBand({ bandPeriod: 7 }).bandPeriod, 250);
   assert.equal(normalizeBand({ bandPeriod: '20', mode: 'band' }).bandPeriod, 20);
 });

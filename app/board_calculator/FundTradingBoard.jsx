@@ -283,7 +283,7 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
     if (Number.isFinite(currentNav)) setBasisNav(String(currentNav));
   };
   const applyDefaultStrategy = () => {
-    setStrategy((current) => ({ ...DEFAULT_STRATEGY_FORM, mode: current.mode }));
+    setStrategy((current) => ({ ...DEFAULT_STRATEGY_FORM, mode: current.mode, modePicked: current.modePicked }));
   };
   const pickBandPeriod = (period) =>
     setStrategy((current) => ({
@@ -337,6 +337,164 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
     if (reminder.confirmTrade(confirmationType, confirmationNav)) setConfirmationNav('');
   };
 
+  const tradeNote = (
+    <p className={styles.strategyNote}>
+      仅提示，不自动交易；成交确认只更新滚仓阶段，不修改持仓和出入金。
+      {bandMode ? '' : '普通买卖保留最高值，止损确认后暂停补仓。'}
+    </p>
+  );
+  const strategySection = (
+    <section className={styles.strategyBox} aria-labelledby={`${fundId}-strategy-title`}>
+      <div className={styles.strategyHead}>
+        <div className={styles.bandTitle}>
+          <b id={`${fundId}-strategy-title`}>{bandMode ? '估值带滚仓' : '策略设置'}</b>
+          {bandMode ? <small>底仓不动，只让机动仓在均线上下轨之间买卖</small> : null}
+        </div>
+        <div className={styles.modeSwitch} role="group" aria-label="滚仓模式">
+          {[
+            ['rolling', '涨跌滚仓'],
+            ['band', '估值带滚仓']
+          ].map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              className={cn(styles.segButton, strategy.mode === mode && styles.segActive)}
+              aria-pressed={strategy.mode === mode}
+              onClick={() => setStrategy((current) => ({ ...current, mode, modePicked: '1' }))}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {bandMode ? null : (
+          <button
+            type="button"
+            className={styles.strategyDefault}
+            onClick={applyDefaultStrategy}
+            aria-label="恢复默认策略"
+          >
+            默认
+          </button>
+        )}
+      </div>
+      <div className={styles.strategyFields} hidden={bandMode}>
+        <StrategyField
+          id={`${fundId}-rise-rate`}
+          label="涨多少卖"
+          value={strategy.riseRate}
+          onChange={(value) => updateStrategy('riseRate', value)}
+          min="0.01"
+          max="1000"
+          step="0.1"
+          suffix="%"
+          hint="首次跟踪 / 上次实际买入为起点"
+        />
+        <StrategyField
+          id={`${fundId}-buy-drop-rate`}
+          label="跌多少买回"
+          value={strategy.buyDropRate}
+          onChange={(value) => updateStrategy('buyDropRate', value)}
+          min="0.01"
+          max="99"
+          step="0.1"
+          suffix="%"
+          hint="确认卖出后，较实际卖出价回落"
+        />
+        <StrategyField
+          id={`${fundId}-stop-drawdown`}
+          label="最高值回落多少卖"
+          value={strategy.stopDrawdown}
+          onChange={(value) => updateStrategy('stopDrawdown', value)}
+          min="0.01"
+          max="99"
+          step="0.1"
+          suffix="%"
+          hint="跟踪期间最高净值回落，优先止损"
+        />
+        <StrategyField
+          id={`${fundId}-cooldown-days`}
+          label="冷静期"
+          value={strategy.cooldownDays}
+          onChange={(value) => updateStrategy('cooldownDays', value)}
+          min="0"
+          max="3650"
+          step="1"
+          suffix="天"
+          hint="实际成交确认后按日历天计算"
+        />
+      </div>
+      <div
+        className={cn(styles.strategyStatus, status.tone && styles.strategyStatusHot, bandMode && styles.bandStatus)}
+        role="status"
+      >
+        <strong className={status.tone}>{status.label}</strong>
+        {strategyPrompt.metric ? (
+          <em className={cn(styles.strategyMetric, bandMode && styles.bandMetric)}>{strategyPrompt.metric}</em>
+        ) : null}
+        <span>{status.detail}</span>
+      </div>
+      {strategyError || reminder.error ? (
+        <p className={styles.strategyNote} role="alert">
+          {strategyError || reminder.error}
+        </p>
+      ) : null}
+      {bandMode && ['sell', 'buy'].includes(confirmationType) ? (
+        <p className={styles.strategyNote}>{bandTradeHint}</p>
+      ) : null}
+      {canConfirm ? (
+        <form className={styles.strategyConfirmation} onSubmit={confirmTrade}>
+          <label htmlFor={`${fundId}-confirmed-nav`}>
+            实际成交净值
+            <input
+              id={`${fundId}-confirmed-nav`}
+              className={styles.strategyInput}
+              type="number"
+              min="0.000001"
+              max="1000000"
+              step="any"
+              required
+              value={confirmationNav}
+              onChange={(event) => setConfirmationNav(event.target.value)}
+              placeholder="按成交记录填写"
+            />
+          </label>
+          <button className={styles.strategyDefault} type="submit" disabled={Boolean(strategyError)}>
+            {confirmationType === 'resume' ? '已重新买入，恢复跟踪' : confirmationType === 'buy' ? '已买入' : '已卖出'}
+          </button>
+        </form>
+      ) : null}
+      {bandMode ? null : tradeNote}
+      {bandMode ? (
+        <ValuationBandPanel
+          fundId={fundId}
+          strategy={strategy}
+          state={strategyState}
+          history={reminder.bandHistory}
+          loading={reminder.bandLoading}
+          failed={reminder.bandFailed}
+          split={bandSplit}
+          onPeriod={pickBandPeriod}
+          onField={updateStrategy}
+          onReset={applyDefaultStrategy}
+        />
+      ) : null}
+      {bandMode ? tradeNote : null}
+      {!embedded && liveError ? (
+        <p className={styles.strategyNote} role="status">
+          估值刷新失败，已暂停使用估值，按已有正式净值复核。
+        </p>
+      ) : null}
+      {reminder.signalQuote ? (
+        <small className={styles.strategyNote}>
+          {reminder.signalQuote.estimated
+            ? `估值时间：${reminder.signalQuote.time}；正式净值：${reminder.quote?.date || '待更新'}`
+            : `正式净值日期：${reminder.signalQuote.date}；暂无更新的有效当日估值`}
+          。估值只作预警，{bandMode ? '不算入均线' : '不更新最高值或成交基准'}。
+        </small>
+      ) : null}
+    </section>
+  );
+
   return (
     <div className={styles.boardPreview}>
       <div className={styles.previewHead} hidden={embedded}>
@@ -364,6 +522,7 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
           {historyLoading ? '正在更新历史净值…' : '历史净值更新失败，最高值记录和预测可能不完整。'}
         </p>
       ) : null}
+      {bandMode ? strategySection : null}
       <RiskPanel
         fundId={fundId}
         fund={marketFund}
@@ -438,152 +597,7 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
           <b className={styles.statValue}>{fund?.relatedSectorQuoteName || fund?.relatedSector || '--'}</b>
         </div>
       </div>
-      <section className={styles.strategyBox} aria-labelledby={`${fundId}-strategy-title`}>
-        <div className={styles.strategyHead}>
-          <b id={`${fundId}-strategy-title`}>策略设置</b>
-          <div className={styles.modeSwitch} role="group" aria-label="滚仓模式">
-            {[
-              ['rolling', '涨跌滚仓'],
-              ['band', '估值带滚仓']
-            ].map(([mode, label]) => (
-              <button
-                key={mode}
-                type="button"
-                className={cn(styles.segButton, strategy.mode === mode && styles.segActive)}
-                aria-pressed={strategy.mode === mode}
-                onClick={() => updateStrategy('mode', mode)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            className={styles.strategyDefault}
-            onClick={applyDefaultStrategy}
-            aria-label="恢复默认策略"
-          >
-            默认
-          </button>
-        </div>
-        <div className={styles.strategyFields} hidden={bandMode}>
-          <StrategyField
-            id={`${fundId}-rise-rate`}
-            label="涨多少卖"
-            value={strategy.riseRate}
-            onChange={(value) => updateStrategy('riseRate', value)}
-            min="0.01"
-            max="1000"
-            step="0.1"
-            suffix="%"
-            hint="首次跟踪 / 上次实际买入为起点"
-          />
-          <StrategyField
-            id={`${fundId}-buy-drop-rate`}
-            label="跌多少买回"
-            value={strategy.buyDropRate}
-            onChange={(value) => updateStrategy('buyDropRate', value)}
-            min="0.01"
-            max="99"
-            step="0.1"
-            suffix="%"
-            hint="确认卖出后，较实际卖出价回落"
-          />
-          <StrategyField
-            id={`${fundId}-stop-drawdown`}
-            label="最高值回落多少卖"
-            value={strategy.stopDrawdown}
-            onChange={(value) => updateStrategy('stopDrawdown', value)}
-            min="0.01"
-            max="99"
-            step="0.1"
-            suffix="%"
-            hint="跟踪期间最高净值回落，优先止损"
-          />
-          <StrategyField
-            id={`${fundId}-cooldown-days`}
-            label="冷静期"
-            value={strategy.cooldownDays}
-            onChange={(value) => updateStrategy('cooldownDays', value)}
-            min="0"
-            max="3650"
-            step="1"
-            suffix="天"
-            hint="实际成交确认后按日历天计算"
-          />
-        </div>
-        <div className={cn(styles.strategyStatus, status.tone && styles.strategyStatusHot)} role="status">
-          <strong className={status.tone}>{status.label}</strong>
-          {strategyPrompt.metric ? (
-            <em className={cn(styles.strategyMetric, bandMode && styles.bandMetric)}>{strategyPrompt.metric}</em>
-          ) : null}
-          <span>{status.detail}</span>
-        </div>
-        {strategyError || reminder.error ? (
-          <p className={styles.strategyNote} role="alert">
-            {strategyError || reminder.error}
-          </p>
-        ) : null}
-        {bandMode && ['sell', 'buy'].includes(confirmationType) ? (
-          <p className={styles.strategyNote}>{bandTradeHint}</p>
-        ) : null}
-        {canConfirm ? (
-          <form className={styles.strategyConfirmation} onSubmit={confirmTrade}>
-            <label htmlFor={`${fundId}-confirmed-nav`}>
-              实际成交净值
-              <input
-                id={`${fundId}-confirmed-nav`}
-                className={styles.strategyInput}
-                type="number"
-                min="0.000001"
-                max="1000000"
-                step="any"
-                required
-                value={confirmationNav}
-                onChange={(event) => setConfirmationNav(event.target.value)}
-                placeholder="按成交记录填写"
-              />
-            </label>
-            <button className={styles.strategyDefault} type="submit" disabled={Boolean(strategyError)}>
-              {confirmationType === 'resume'
-                ? '已重新买入，恢复跟踪'
-                : confirmationType === 'buy'
-                  ? '已买入'
-                  : '已卖出'}
-            </button>
-          </form>
-        ) : null}
-        <p className={styles.strategyNote}>
-          仅提示，不自动交易；成交确认只更新滚仓阶段，不修改持仓和出入金。
-          {bandMode ? '' : '普通买卖保留最高值，止损确认后暂停补仓。'}
-        </p>
-        {bandMode ? (
-          <ValuationBandPanel
-            fundId={fundId}
-            strategy={strategy}
-            state={strategyState}
-            history={reminder.bandHistory}
-            loading={reminder.bandLoading}
-            failed={reminder.bandFailed}
-            split={bandSplit}
-            onPeriod={pickBandPeriod}
-            onField={updateStrategy}
-          />
-        ) : null}
-        {!embedded && liveError ? (
-          <p className={styles.strategyNote} role="status">
-            估值刷新失败，已暂停使用估值，按已有正式净值复核。
-          </p>
-        ) : null}
-        {reminder.signalQuote ? (
-          <small className={styles.strategyNote}>
-            {reminder.signalQuote.estimated
-              ? `估值时间：${reminder.signalQuote.time}；正式净值：${reminder.quote?.date || '待更新'}`
-              : `正式净值日期：${reminder.signalQuote.date}；暂无更新的有效当日估值`}
-            。估值只作预警，{bandMode ? '不算入均线' : '不更新最高值或成交基准'}。
-          </small>
-        ) : null}
-      </section>
+      {bandMode ? null : strategySection}
       <div className={styles.tableScroll} role="region" aria-label="出入金流水，可横向滚动" tabIndex={0}>
         <table className={styles.miniTable}>
           <thead>

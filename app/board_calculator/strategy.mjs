@@ -25,8 +25,10 @@ export const BAND_PERIODS = Object.freeze({
   120: { sell: 15, buy: 10, lessReturn: 0.97, winRate: 20.6, drawdown: 32.1, trades: 5 },
   250: { sell: 25, buy: 10, lessReturn: 0.11, winRate: 22.6, drawdown: 33.8, trades: 4 }
 });
+export const BAND_HISTORY_RANGE = 'all';
 export const DEFAULT_BAND = Object.freeze({
-  mode: 'rolling',
+  mode: 'band',
+  modePicked: '',
   bandPeriod: 250,
   bandSell: 25,
   bandBuy: 10,
@@ -37,7 +39,9 @@ export const DEFAULT_BAND = Object.freeze({
 export function normalizeBand(saved = {}) {
   const period = Number(saved?.bandPeriod);
   return {
-    mode: saved?.mode === 'band' ? 'band' : 'rolling',
+    // 早期版本打开页面就会自动存下 rolling，只有用户亲手选过才算数
+    mode: saved?.mode === 'rolling' && saved?.modePicked ? 'rolling' : 'band',
+    modePicked: saved?.modePicked ? '1' : '',
     bandPeriod: BAND_PERIODS[period] ? period : DEFAULT_BAND.bandPeriod,
     bandSell: saved?.bandSell ?? DEFAULT_BAND.bandSell,
     bandBuy: saved?.bandBuy ?? DEFAULT_BAND.bandBuy,

@@ -27,6 +27,7 @@ import {
   buildStrategyPrompt,
   calculateStrategyState,
   getStrategyQuote,
+  BAND_HISTORY_RANGE,
   normalizeBand,
   normalizeStrategy,
   observeStrategyPeak
@@ -176,8 +177,8 @@ export default function DailyBrief({ funds, holdings, groupHoldings, getHoldingP
   });
   const bandQueries = useQueries({
     queries: positions.map((fund) => ({
-      queryKey: qk.fundHistory(fund.code, '3y'),
-      queryFn: () => fetchFundHistory(fund.code, '3y'),
+      queryKey: qk.fundHistory(fund.code, BAND_HISTORY_RANGE),
+      queryFn: () => fetchFundHistory(fund.code, BAND_HISTORY_RANGE),
       enabled: normalizeBand(storageStore.getItem(`board-calculator:${fund.code}`, null)?.strategy).mode === 'band',
       staleTime: 10 * 60 * 1000
     }))
