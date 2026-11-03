@@ -10,19 +10,24 @@ import * as qk from '@/app/lib/query-keys';
 import { storageStore, useStorageStore } from '@/app/stores/storageStore';
 import { cn } from '@/lib/utils';
 import {
+  BAND_PERIODS,
+  DEFAULT_BAND,
   DEFAULT_STRATEGY,
   buildStrategyPrompt,
   calculateTrackedHolding,
   getStrategyQuote,
-  normalizeStrategy
+  normalizeBand,
+  normalizeStrategy,
+  splitBandPosition
 } from './strategy.mjs';
 import { resolvePosition } from './decision.mjs';
 import useStrategyReminder, { notifyStrategyChange } from './useStrategyReminder';
 import RiskPanel from './RiskPanel';
+import ValuationBandPanel from './ValuationBandPanel';
 import styles from './page.module.css';
 
 const DEFAULT_STRATEGY_FORM = Object.fromEntries(
-  Object.entries(DEFAULT_STRATEGY).map(([key, value]) => [key, String(value)])
+  Object.entries({ ...DEFAULT_STRATEGY, ...DEFAULT_BAND }).map(([key, value]) => [key, String(value)])
 );
 
 const pad = (value) => String(value).padStart(2, '0');
@@ -240,7 +245,9 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
         if (isObject(saved.strategy) && !isArray(saved.strategy)) {
           setStrategy(
             Object.fromEntries(
-              Object.keys(DEFAULT_STRATEGY_FORM).map((key) => [key, inputValue(normalizeStrategy(saved.strategy)[key])])
+              Object.entries({ ...normalizeStrategy(saved.strategy), ...normalizeBand(saved.strategy) }).map(
+                ([key, value]) => [key, inputValue(value)]
+              )
             )
           );
         }
@@ -276,8 +283,15 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
     if (Number.isFinite(currentNav)) setBasisNav(String(currentNav));
   };
   const applyDefaultStrategy = () => {
-    setStrategy(DEFAULT_STRATEGY_FORM);
+    setStrategy((current) => ({ ...DEFAULT_STRATEGY_FORM, mode: current.mode }));
   };
+  const pickBandPeriod = (period) =>
+    setStrategy((current) => ({
+      ...current,
+      bandPeriod: String(period),
+      bandSell: String(BAND_PERIODS[period].sell),
+      bandBuy: String(BAND_PERIODS[period].buy)
+    }));
   const addFlow = () => {
     if (!(flowValue > 0) || !flowDate) return;
     setRows((current) => [
@@ -299,6 +313,17 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
   };
   const confirmationType = strategyState.status === 'stopped' ? 'resume' : strategyState.status;
   const canConfirm = ['sell', 'buy', 'stop', 'resume'].includes(confirmationType);
+  const bandMode = strategy.mode === 'band';
+  const bandSplit = splitBandPosition({
+    amount: amountValue,
+    corePercent: strategy.corePercent,
+    phase: strategyState.phase
+  });
+  const bandTradeHint = !bandSplit
+    ? '录入持仓后可估算机动仓金额。'
+    : confirmationType === 'sell'
+      ? `建议卖出机动仓约 ${formatMoney(bandSplit.sleeve)}；赎回费和到账时间可在上方决策卡把卖出比例调到 ${100 - Number(strategy.corePercent)}% 测算。`
+      : `建议买回机动仓约 ${formatMoney(bandSplit.sleeve)}。`;
   const reviewStrategy = () => {
     const section = document.getElementById(`${fundId}-strategy-title`)?.closest('section');
     section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -416,6 +441,22 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
       <section className={styles.strategyBox} aria-labelledby={`${fundId}-strategy-title`}>
         <div className={styles.strategyHead}>
           <b id={`${fundId}-strategy-title`}>策略设置</b>
+          <div className={styles.modeSwitch} role="group" aria-label="滚仓模式">
+            {[
+              ['rolling', '涨跌滚仓'],
+              ['band', '估值带滚仓']
+            ].map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                className={cn(styles.segButton, strategy.mode === mode && styles.segActive)}
+                aria-pressed={strategy.mode === mode}
+                onClick={() => updateStrategy('mode', mode)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <button
             type="button"
             className={styles.strategyDefault}
@@ -425,7 +466,7 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
             默认
           </button>
         </div>
-        <div className={styles.strategyFields}>
+        <div className={styles.strategyFields} hidden={bandMode}>
           <StrategyField
             id={`${fundId}-rise-rate`}
             label="涨多少卖"
@@ -473,13 +514,18 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
         </div>
         <div className={cn(styles.strategyStatus, status.tone && styles.strategyStatusHot)} role="status">
           <strong className={status.tone}>{status.label}</strong>
-          {strategyPrompt.metric ? <em className={styles.strategyMetric}>{strategyPrompt.metric}</em> : null}
+          {strategyPrompt.metric ? (
+            <em className={cn(styles.strategyMetric, bandMode && styles.bandMetric)}>{strategyPrompt.metric}</em>
+          ) : null}
           <span>{status.detail}</span>
         </div>
         {strategyError || reminder.error ? (
           <p className={styles.strategyNote} role="alert">
             {strategyError || reminder.error}
           </p>
+        ) : null}
+        {bandMode && ['sell', 'buy'].includes(confirmationType) ? (
+          <p className={styles.strategyNote}>{bandTradeHint}</p>
         ) : null}
         {canConfirm ? (
           <form className={styles.strategyConfirmation} onSubmit={confirmTrade}>
@@ -508,8 +554,22 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
           </form>
         ) : null}
         <p className={styles.strategyNote}>
-          仅提示，不自动交易；成交确认只更新滚仓阶段，不修改持仓和出入金。普通买卖保留最高值，止损确认后暂停补仓。
+          仅提示，不自动交易；成交确认只更新滚仓阶段，不修改持仓和出入金。
+          {bandMode ? '' : '普通买卖保留最高值，止损确认后暂停补仓。'}
         </p>
+        {bandMode ? (
+          <ValuationBandPanel
+            fundId={fundId}
+            strategy={strategy}
+            state={strategyState}
+            history={reminder.bandHistory}
+            loading={reminder.bandLoading}
+            failed={reminder.bandFailed}
+            split={bandSplit}
+            onPeriod={pickBandPeriod}
+            onField={updateStrategy}
+          />
+        ) : null}
         {!embedded && liveError ? (
           <p className={styles.strategyNote} role="status">
             估值刷新失败，已暂停使用估值，按已有正式净值复核。
@@ -520,7 +580,7 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
             {reminder.signalQuote.estimated
               ? `估值时间：${reminder.signalQuote.time}；正式净值：${reminder.quote?.date || '待更新'}`
               : `正式净值日期：${reminder.signalQuote.date}；暂无更新的有效当日估值`}
-            。估值只作预警，不更新最高值或成交基准。
+            。估值只作预警，{bandMode ? '不算入均线' : '不更新最高值或成交基准'}。
           </small>
         ) : null}
       </section>

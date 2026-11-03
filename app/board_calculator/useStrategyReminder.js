@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { isEqual } from 'lodash';
+import { fetchFundHistory } from '@/app/api/fund';
+import * as qk from '@/app/lib/query-keys';
 import { storageStore } from '@/app/stores/storageStore';
 import {
   calculateStrategyState,
@@ -9,6 +12,7 @@ import {
   createStrategyCycle,
   getStrategyQuote,
   isStrategyCycle,
+  normalizeBand,
   normalizeStrategy,
   observeStrategyPeak
 } from './strategy.mjs';
@@ -45,7 +49,15 @@ export default function useStrategyReminder({ fundId, fund, history = [], strate
   const cycle = useMemo(() => JSON.parse(cycleJson), [cycleJson]);
   const signalLog = useMemo(() => normalizeSignalLog(JSON.parse(signalLogJson)), [signalLogJson]);
   const saved = useMemo(() => JSON.parse(settingsJson), [settingsJson]);
-  const config = normalizeStrategy(strategy ?? saved?.strategy);
+  const source = strategy ?? saved?.strategy;
+  const config = { ...normalizeStrategy(source), ...normalizeBand(source) };
+  const bandQuery = useQuery({
+    queryKey: qk.fundHistory(fundId, '3y'),
+    queryFn: () => fetchFundHistory(fundId, '3y'),
+    enabled: Boolean(fundId) && config.mode === 'band',
+    staleTime: 10 * 60 * 1000
+  });
+  const bandHistory = bandQuery.data ?? null;
   const [now, setNow] = useState(() => new Date());
   const quote = getStrategyQuote(fund, history);
   const signalQuote = getStrategyQuote(fund, history, { preferEstimate: true, now });
@@ -99,6 +111,7 @@ export default function useStrategyReminder({ fundId, fund, history = [], strate
     quoteTime: signalQuote?.time,
     cycle: observedCycle,
     strategy: config,
+    history: bandHistory,
     now
   });
   const confirmTrade = (status, nav) => {
@@ -112,6 +125,7 @@ export default function useStrategyReminder({ fundId, fund, history = [], strate
         estimated: Boolean(freshQuote?.estimated),
         cycle: current,
         strategy: config,
+        history: bandHistory,
         now: confirmationTime
       });
       if (status !== 'resume' && freshState.status !== status) throw new Error('条件已变化，请根据最新提示确认。');
@@ -185,6 +199,9 @@ export default function useStrategyReminder({ fundId, fund, history = [], strate
     now,
     signalLog,
     saveDecision,
+    bandHistory,
+    bandLoading: config.mode === 'band' && bandQuery.isPending,
+    bandFailed: config.mode === 'band' && bandQuery.isError,
     error:
       cycle === 'storage-unavailable' || saved === 'storage-unavailable' ? '无法读取本地策略记录，已暂停提醒。' : error
   };
