@@ -12,6 +12,7 @@ import {
   createStrategyCycle,
   getStrategyQuote,
   isStrategyCycle,
+  BAND_HISTORY_RANGE,
   normalizeBand,
   normalizeStrategy,
   observeStrategyPeak
@@ -52,8 +53,8 @@ export default function useStrategyReminder({ fundId, fund, history = [], strate
   const source = strategy ?? saved?.strategy;
   const config = { ...normalizeStrategy(source), ...normalizeBand(source) };
   const bandQuery = useQuery({
-    queryKey: qk.fundHistory(fundId, '3y'),
-    queryFn: () => fetchFundHistory(fundId, '3y'),
+    queryKey: qk.fundHistory(fundId, BAND_HISTORY_RANGE),
+    queryFn: () => fetchFundHistory(fundId, BAND_HISTORY_RANGE),
     enabled: Boolean(fundId) && config.mode === 'band',
     staleTime: 10 * 60 * 1000
   });

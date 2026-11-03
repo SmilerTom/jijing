@@ -32,7 +32,8 @@ function useChartColors() {
         upper: token('--chart-5'),
         lower: token('--chart-2'),
         grid: token('--border'),
-        card: token('--card')
+        card: token('--card'),
+        text: token('--text')
       });
     };
     read();
@@ -43,12 +44,39 @@ function useChartColors() {
   return colors;
 }
 
+// 信号点里写“卖/买”，线尾写线名，不靠颜色区分
+const bandLabels = (colors) => ({
+  id: 'bandLabels',
+  afterDatasetsDraw(chart) {
+    const { ctx, chartArea } = chart;
+    ctx.save();
+    ctx.font = '10px sans-serif';
+    ctx.textBaseline = 'middle';
+    chart.data.datasets.forEach((dataset, index) => {
+      const points = chart.getDatasetMeta(index).data;
+      if (dataset.markLetter) {
+        ctx.fillStyle = colors.card;
+        ctx.textAlign = 'center';
+        dataset.data.forEach((value, at) => {
+          if (value !== null) ctx.fillText(dataset.markLetter, points[at].x, points[at].y);
+        });
+      } else if (dataset.endLabel) {
+        ctx.fillStyle = colors.text;
+        ctx.textAlign = 'left';
+        ctx.fillText(dataset.endLabel, chartArea.right + 6, points.at(-1).y);
+      }
+    });
+    ctx.restore();
+  }
+});
+
 function BandChart({ series, signals, period }) {
   const colors = useChartColors();
   const data = useMemo(() => {
     if (!colors) return null;
-    const line = (label, key, color, dash, width = 1.5) => ({
+    const line = (label, key, color, dash, width = 1.5, endLabel) => ({
       label,
+      endLabel,
       data: series.map((row) => row[key]),
       borderColor: color,
       backgroundColor: color,
@@ -57,16 +85,16 @@ function BandChart({ series, signals, period }) {
       pointRadius: 0,
       pointHoverRadius: 3
     });
-    const marks = (label, type, color, rotation) => {
+    const marks = (label, type, color, letter) => {
       const byDate = new Map(signals.filter((item) => item.type === type).map((item) => [item.date, item.nav]));
       return {
         label,
         data: series.map((row) => byDate.get(row.date) ?? null),
         showLine: false,
-        pointStyle: 'triangle',
-        pointRotation: rotation,
+        pointStyle: 'circle',
         pointRadius: 8,
         pointHoverRadius: 9,
+        markLetter: letter,
         pointBackgroundColor: color,
         pointBorderColor: colors.card,
         pointBorderWidth: 2
@@ -75,12 +103,12 @@ function BandChart({ series, signals, period }) {
     return {
       labels: series.map((row) => row.date),
       datasets: [
-        marks('卖出信号', 'sell', colors.upper, 180),
-        marks('买回信号', 'buy', colors.lower, 0),
+        marks('卖出信号', 'sell', colors.upper, '卖'),
+        marks('买回信号', 'buy', colors.lower, '买'),
         line('净值', 'nav', colors.nav, [], 2),
         line(`${period} 日均线`, 'ma', colors.muted, [2, 3]),
-        line('卖出线', 'upper', colors.upper, [6, 3]),
-        line('买回线', 'lower', colors.lower, [6, 3])
+        line('卖出线', 'upper', colors.upper, [6, 3], 1.5, '卖出线'),
+        line('买回线', 'lower', colors.lower, [6, 3], 1.5, '买回线')
       ]
     };
   }, [colors, period, series, signals]);
@@ -90,6 +118,7 @@ function BandChart({ series, signals, period }) {
         responsive: true,
         maintainAspectRatio: false,
         animation: false,
+        layout: { padding: { right: 44 } },
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: { display: false },
@@ -116,12 +145,14 @@ function BandChart({ series, signals, period }) {
       },
     [colors]
   );
+  const plugins = useMemo(() => (colors ? [bandLabels(colors)] : []), [colors]);
   if (!data) return null;
   return (
     <div className={styles.bandChart}>
       <Line
         data={data}
         options={options}
+        plugins={plugins}
         role="img"
         aria-label={`净值、${period} 日均线和上下轨走势；共 ${signals.length} 次信号，明细见历史信号表。`}
       />
@@ -138,7 +169,8 @@ export default function ValuationBandPanel({
   failed,
   split,
   onPeriod,
-  onField
+  onField,
+  onReset
 }) {
   const config = normalizeBand(strategy);
   const period = config.bandPeriod;
@@ -158,7 +190,11 @@ export default function ValuationBandPanel({
     Number(config.bandBuy) === tested.buy &&
     Number(config.corePercent) === 70 &&
     Number(config.minHoldDays) === 30;
-  const hasBand = Number.isFinite(state.ma);
+  const latest = series.at(-1);
+  const ma = state.ma ?? latest?.ma;
+  const hasBand = Number.isFinite(ma);
+  const deviation = state.deviation ?? (hasBand ? (latest.nav / ma - 1) * 100 : null);
+  const usable = Object.keys(BAND_PERIODS).filter((key) => Number(key) <= (history?.length ?? 0));
   const corePercent = Number(config.corePercent);
   const validCore = corePercent > 0 && corePercent < 100;
   const fields = [
@@ -180,10 +216,10 @@ export default function ValuationBandPanel({
     <div className={styles.bandPanel}>
       <div className={styles.bandStats}>
         {[
-          ['净值', nav3(state.nav), state.quoteDate || '待更新'],
-          [maLabel, nav3(state.ma), hasBand ? `偏离 ${signed(state.deviation)}` : '数据不足'],
-          ['卖出线', nav3(state.upper), `均线 +${bandSell}%`],
-          ['买回线', nav3(state.lower), `均线 −${bandBuy}%`]
+          ['净值', nav3(state.nav ?? latest?.nav), state.quoteDate || latest?.date || '待更新'],
+          [maLabel, nav3(ma), hasBand ? `偏离 ${signed(deviation)}` : '数据不足'],
+          ['卖出线', nav3(state.upper ?? latest?.upper), `均线 +${bandSell}%`],
+          ['买回线', nav3(state.lower ?? latest?.lower), `均线 −${bandBuy}%`]
         ].map(([label, value, sub]) => (
           <div key={label} className={styles.bandStat}>
             <i>{label}</i>
@@ -194,18 +230,25 @@ export default function ValuationBandPanel({
       </div>
 
       <div className={styles.bandCard}>
-        <ul className={styles.bandLegend}>
-          {LEGEND.map((item) => (
-            <li key={item.label}>
-              <svg width="20" height="4" aria-hidden="true">
-                <line x1="0" y1="2" x2="20" y2="2" stroke={item.color} strokeWidth="2" strokeDasharray={item.dash} />
-              </svg>
-              {item.label}
+        <div className={styles.bandCardHead}>
+          <h3 className={styles.bandHeading}>净值与估值带</h3>
+          <ul className={styles.bandLegend}>
+            {LEGEND.map((item) => (
+              <li key={item.label}>
+                <svg width="20" height="4" aria-hidden="true">
+                  <line x1="0" y1="2" x2="20" y2="2" stroke={item.color} strokeWidth="2" strokeDasharray={item.dash} />
+                </svg>
+                {item.label}
+              </li>
+            ))}
+            <li>
+              <i className={cn(styles.bandMark, styles.bandMarkSell)}>卖</i>卖出信号
             </li>
-          ))}
-          <li>▼ 卖出信号</li>
-          <li>▲ 买回信号</li>
-        </ul>
+            <li>
+              <i className={cn(styles.bandMark, styles.bandMarkBuy)}>买</i>买回信号
+            </li>
+          </ul>
+        </div>
         {series.length ? (
           <BandChart series={series} signals={signals} period={period} />
         ) : (
@@ -214,7 +257,7 @@ export default function ValuationBandPanel({
               ? '正在加载历史净值…'
               : failed
                 ? '历史净值更新失败，已暂停生成新信号，刷新成功后自动恢复。'
-                : `这只基金的净值历史不足 ${period} 个交易日，暂不生成信号。`}
+                : `这只基金的净值历史不足 ${period} 个交易日，暂不生成信号。${usable.length ? `可在下方改用 ${usable.join('、')} 日均线。` : ''}`}
           </p>
         )}
         {failed && series.length ? (
@@ -226,6 +269,12 @@ export default function ValuationBandPanel({
 
       <div className={styles.bandColumns}>
         <div className={styles.bandCard}>
+          <div className={styles.bandCardHead}>
+            <h3 className={styles.bandHeading}>策略设置</h3>
+            <button type="button" className={styles.segButton} onClick={onReset} aria-label="恢复默认策略">
+              默认
+            </button>
+          </div>
           <div role="group" aria-labelledby={`${fundId}-band-period`}>
             <p id={`${fundId}-band-period`} className={styles.bandLabel}>
               均线周期
@@ -293,8 +342,13 @@ export default function ValuationBandPanel({
         </div>
 
         <div className={styles.bandCard}>
-          <p className={styles.bandLabel}>当前参数下的历史信号（图中区间回放）</p>
-          <div className={styles.tableScroll} role="region" aria-label="历史信号，可横向滚动" tabIndex={0}>
+          <h3 className={styles.bandHeading}>当前参数下的历史信号</h3>
+          <div
+            className={cn(styles.tableScroll, styles.bandSignals)}
+            role="region"
+            aria-label="历史信号，可横向滚动"
+            tabIndex={0}
+          >
             <table className={styles.miniTable}>
               <thead>
                 <tr>
