@@ -27,6 +27,7 @@ import {
   buildStrategyPrompt,
   calculateStrategyState,
   getStrategyQuote,
+  normalizeBand,
   normalizeStrategy,
   observeStrategyPeak
 } from '@/app/board_calculator/strategy.mjs';
@@ -47,7 +48,7 @@ const toneClass = (value) => (value > 0 ? styles.up : value < 0 ? styles.down : 
 const boardHref = (fund) =>
   `/board_calculator?fundCode=${encodeURIComponent(fund.code)}&fundName=${encodeURIComponent(fund.name)}`;
 
-const readFundSignal = (fund, history, now) => {
+const readFundSignal = (fund, history, bandHistory, now) => {
   try {
     const cycle = storageStore.getItem(`board-strategy-cycle:${fund.code}`, null);
     if (!cycle) return null;
@@ -60,7 +61,8 @@ const readFundSignal = (fund, history, now) => {
       estimated: Boolean(quote?.estimated),
       quoteTime: quote?.time,
       cycle: observeStrategyPeak(cycle, official, history),
-      strategy: normalizeStrategy(settings?.strategy),
+      strategy: { ...normalizeStrategy(settings?.strategy), ...normalizeBand(settings?.strategy) },
+      history: bandHistory,
       now
     });
     return { state, prompt: buildStrategyPrompt({ strategyState: state }), risk: classifyRisk(state) };
@@ -172,6 +174,14 @@ export default function DailyBrief({ funds, holdings, groupHoldings, getHoldingP
       staleTime: 10 * 60 * 1000
     }))
   });
+  const bandQueries = useQueries({
+    queries: positions.map((fund) => ({
+      queryKey: qk.fundHistory(fund.code, '3y'),
+      queryFn: () => fetchFundHistory(fund.code, '3y'),
+      enabled: normalizeBand(storageStore.getItem(`board-calculator:${fund.code}`, null)?.strategy).mode === 'band',
+      staleTime: 10 * 60 * 1000
+    }))
+  });
   const noticeQueries = useQueries({
     queries: positions.map((fund) => ({
       queryKey: qk.fundAnnouncements(fund.code),
@@ -228,7 +238,7 @@ export default function DailyBrief({ funds, holdings, groupHoldings, getHoldingP
     const notices = noticeQueries[index].data || [];
     const stockData = stockQueries[index].data;
     const rules = ruleQueries[index].data;
-    const signal = readFundSignal(fund, history, now);
+    const signal = readFundSignal(fund, history, bandQueries[index].data ?? null, now);
     const navs = toNavSeries(history);
     const estimated = Number(fund.gsz) > 0 && String(fund.gztime || '').startsWith(today) && fund.jzrq !== today;
 

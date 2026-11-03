@@ -845,6 +845,7 @@
 }
 .strategyHead {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -1278,4 +1279,167 @@
   .scenarioGrid {
     grid-template-columns: 1fr;
   }
+}
+
+.modeSwitch {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.segButton {
+  min-height: 44px;
+  padding: 0 12px;
+  color: var(--text);
+  background: var(--input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.segButton:hover {
+  border-color: var(--primary);
+}
+.segActive {
+  color: var(--primary);
+  background: var(--tabs-trigger-active-bg);
+  border-color: var(--primary);
+}
+.bandPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+.bandStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+}
+.bandStat,
+.bandCard {
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.bandStat i,
+.bandStat small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+.bandStat b {
+  display: block;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.bandLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0 0 8px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 12px;
+  list-style: none;
+}
+.bandLegend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bandChart {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  height: 320px;
+  overflow: hidden;
+}
+.bandFields .strategyInput,
+.strategyHead .strategyDefault {
+  min-height: 44px;
+}
+.bandEmpty {
+  margin: 0;
+  padding: 56px 16px;
+  color: var(--muted);
+  text-align: center;
+}
+.bandColumns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.bandColumns > .bandCard {
+  flex: 1 1 340px;
+}
+.bandLabel {
+  margin: 14px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.bandCard > :first-child > .bandLabel,
+.bandCard > .bandLabel:first-child {
+  margin-top: 0;
+}
+.periodGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 6px;
+}
+.bandHint {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.bandFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.bandBar {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+}
+.bandBar i:first-child {
+  background: var(--chart-1);
+  border-radius: 4px 0 0 4px;
+}
+.bandBar i:last-child {
+  flex: 1 1 0;
+  border-radius: 0 4px 4px 0;
+}
+.bandBarSleeve {
+  background: var(--chart-2);
+}
+.bandBarCash {
+  background: var(--muted);
+}
+.bandSplit {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-top: 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.bandEvidence {
+  margin: 0;
+  font-size: 13px;
+}
+.strategyFields[hidden] {
+  display: none;
+}
+.bandMetric {
+  color: var(--text);
 }

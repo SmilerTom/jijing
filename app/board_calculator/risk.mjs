@@ -29,6 +29,12 @@ export function toNavSeries(history = []) {
 export function classifyRisk(state = {}) {
   const drawdown = Number(state.drawdown);
   const stopLine = Number(state.stopDrawdown);
+  if (state.mode === 'band' && state.status === 'sell')
+    return { level: 'mid', title: '估值带 · 已到卖出线', note: '可卖出机动仓，底仓不动；这个模式不设止损线。' };
+  if (state.mode === 'band' && state.status === 'buy')
+    return { level: 'low', title: '估值带 · 已到买回线', note: '可买回机动仓；这个模式不设止损线。' };
+  if (state.mode === 'band' && state.status !== 'stopped')
+    return { level: 'neutral', title: '估值带模式', note: '这个模式不设止损线，只按均线上下轨提示。' };
   if (state.status === 'stopped') return { level: 'neutral', title: '止损后暂停跟踪' };
   if (state.status === 'cooldown') return { level: 'neutral', title: `冷静期 · 还剩 ${state.remainingDays} 天` };
   if (!finite(drawdown) || !(stopLine > 0)) return { level: 'neutral', title: '风险待评估' };

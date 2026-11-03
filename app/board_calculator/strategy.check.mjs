@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
+  buildBandSeries,
   buildStrategyPrompt,
   DEFAULT_STRATEGY,
+  isBandConfigValid,
+  normalizeBand,
+  replayBandSignals,
+  splitBandPosition,
   normalizeStrategy,
   calculateStrategyState,
   calculateTrackedHolding,
@@ -294,4 +299,98 @@ assert.deepEqual(calculateTrackedHolding({ amount: 1000, basisNav: 2, currentNav
   principal: 1000,
   share: 500,
   cost: 2
+});
+
+const bandHistory = (navs) =>
+  navs.map((value, index) => ({
+    date: `2026-08-${String(index + 1).padStart(2, '0')}`,
+    unitNetValue: value
+  }));
+const band = { mode: 'band', bandPeriod: 5, bandSell: 10, bandBuy: 10, corePercent: 70, minHoldDays: 0 };
+const bandState = (options = {}) =>
+  calculateStrategyState({
+    cycle,
+    currentNav: 1,
+    quoteDate: '2026-09-10',
+    strategy: band,
+    history: bandHistory([1, 1, 1, 1, 1]),
+    now,
+    ...options
+  });
+
+check('估值带：未开启时保持原默认，非法周期回到 250 日', () => {
+  assert.deepEqual(normalizeStrategy({ targetRate: 25 }), { ...DEFAULT_STRATEGY, riseRate: 25 });
+  assert.equal(normalizeBand({}).mode, 'rolling');
+  assert.equal(normalizeBand({ bandPeriod: 7 }).bandPeriod, 250);
+  assert.equal(normalizeBand({ bandPeriod: '20', mode: 'band' }).bandPeriod, 20);
+});
+check('估值带：均线窗口只算最近 N 天，历史不足时不生成序列', () => {
+  assert.deepEqual(buildBandSeries(bandHistory([1, 1]), band), []);
+  const series = buildBandSeries(bandHistory([1, 1, 1, 1, 1, 2]), band);
+  assert.equal(series.length, 2);
+  assert.ok(Math.abs(series[1].ma - 1.2) < 1e-9);
+  assert.ok(Math.abs(series[1].upper - 1.32) < 1e-9);
+  assert.ok(Math.abs(series[1].lower - 1.08) < 1e-9);
+});
+check('估值带：分红日单位净值下跌不算下跌', () => {
+  const history = bandHistory([1, 1, 1, 1, 0.5]).map((item, index) => ({
+    ...item,
+    equityReturn: index ? 0 : null
+  }));
+  const last = buildBandSeries(history, band).at(-1);
+  assert.equal(last.nav, 0.5);
+  assert.ok(Math.abs(last.ma - 0.5) < 1e-9);
+});
+check('估值带：持有时到上轨卖出，已卖出时到下轨买回，另一侧不提示', () => {
+  assert.equal(bandState({ currentNav: 1.1 }).status, 'sell');
+  assert.equal(bandState({ currentNav: 1.09 }).status, 'watch');
+  assert.equal(bandState({ currentNav: 0.8 }).status, 'watch');
+  const sold = { ...cycle, phase: 'waitingBuy', anchorNav: 1.1, peakNav: 1.1 };
+  assert.equal(bandState({ cycle: sold, currentNav: 0.9 }).status, 'buy');
+  assert.equal(bandState({ cycle: sold, currentNav: 1.5 }).status, 'watch');
+});
+check('估值带：跌幅再大也不触发止损，最少持有期内只保留已到线的说明', () => {
+  assert.equal(bandState({ cycle: { ...cycle, peakNav: 5 }, currentNav: 0.5 }).status, 'watch');
+  const state = bandState({
+    cycle: { ...cycle, lastTradeAt: new Date(2026, 8, 5, 12).toISOString() },
+    currentNav: 1.2,
+    strategy: { ...band, minHoldDays: 30 }
+  });
+  assert.equal(state.status, 'cooldown');
+  assert.equal(state.remainingDays, 25);
+  assert.equal(state.triggered, 'sell');
+  assert.match(buildStrategyPrompt({ strategyState: state }).label, /卖出线，暂不提示/);
+});
+check('估值带：缺数据、历史不足和设置错误分别提示', () => {
+  assert.equal(bandState({ history: null }).status, 'pending');
+  assert.equal(bandState({ history: bandHistory([1]) }).status, 'insufficient');
+  assert.equal(bandState({ strategy: { ...band, corePercent: 100 } }).status, 'invalid');
+  assert.equal(isBandConfigValid({ ...band, minHoldDays: '' }), false);
+  assert.equal(isBandConfigValid({ ...band, bandSell: '' }), false);
+  assert.equal(buildStrategyPrompt({ strategyState: bandState({ history: bandHistory([1]) }) }).label, '暂无信号');
+});
+check('估值带：确认成交沿用原阶段流转', () => {
+  const sold = confirmStrategyTrade({ cycle, status: 'sell', nav: 1.1, now });
+  assert.equal(sold.phase, 'waitingBuy');
+  assert.equal(confirmStrategyTrade({ cycle: sold, status: 'buy', nav: 0.9, now }).phase, 'holding');
+});
+check('估值带：回放信号按最少持有期间隔，且买卖交替', () => {
+  const row = (date, nav) => ({ date, nav, ma: 1, upper: 1.1, lower: 0.9 });
+  const series = [row('2026-01-01', 1.2), row('2026-01-02', 0.8), row('2026-02-10', 0.8), row('2026-03-30', 1.2)];
+  assert.deepEqual(
+    replayBandSignals(series, 30).map((item) => [item.date, item.type]),
+    [
+      ['2026-01-01', 'sell'],
+      ['2026-02-10', 'buy'],
+      ['2026-03-30', 'sell']
+    ]
+  );
+});
+check('估值带：仓位拆分随阶段变化，无持仓时不估算', () => {
+  assert.deepEqual(splitBandPosition({ amount: 1000, corePercent: 50, phase: 'holding' }), { core: 500, sleeve: 500 });
+  assert.deepEqual(splitBandPosition({ amount: 500, corePercent: 50, phase: 'waitingBuy' }), {
+    core: 500,
+    sleeve: 500
+  });
+  assert.equal(splitBandPosition({ amount: 0, corePercent: 50 }), null);
 });

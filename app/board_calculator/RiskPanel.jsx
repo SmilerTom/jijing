@@ -260,7 +260,8 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
   const risk = classifyRisk(state);
   const stopLine = Number(strategy?.stopDrawdown);
   const peakNav = Number(reminder.cycle?.peakNav);
-  const stopNav = peakNav > 0 && stopLine > 0 && stopLine < 100 ? peakNav * (1 - stopLine / 100) : null;
+  const stopNav =
+    strategy?.mode !== 'band' && peakNav > 0 && stopLine > 0 && stopLine < 100 ? peakNav * (1 - stopLine / 100) : null;
 
   const officialNavs = toNavSeries(history);
   const quote = reminder.signalQuote;
@@ -367,7 +368,7 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
             </div>
           ) : (
             <p className={styles.riskHeadline}>
-              <span>等待有效净值后评估回落风险。</span>
+              <span>{risk.note || '等待有效净值后评估回落风险。'}</span>
             </p>
           )}
         </div>
