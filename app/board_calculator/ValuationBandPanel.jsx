@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CategoryScale, Chart as ChartJS, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { cn } from '@/lib/utils';
@@ -70,14 +70,72 @@ const bandLabels = (colors) => ({
   }
 });
 
+const MIN_SPAN = 12;
+
+function readableSpan(length, period) {
+  if (length <= 120 || Number(period) > 10) return length;
+  return Math.min(length, Number(period) <= 5 ? 60 : 90);
+}
+
+function defaultRange(length, period) {
+  const end = Math.max(0, length - 1);
+  const span = Math.min(length, Math.max(1, readableSpan(length, period)));
+  return { start: end - span + 1, end };
+}
+
+function zoomAround(current, factor, anchorRatio, length) {
+  if (length <= 1) return { start: 0, end: Math.max(0, length - 1) };
+  const span = current.end - current.start + 1;
+  const nextSpan = Math.min(length, Math.max(MIN_SPAN, Math.round(span * factor)));
+  const anchor = current.start + Math.max(0, span - 1) * anchorRatio;
+  const maxStart = Math.max(0, length - nextSpan);
+  const start = Math.min(Math.max(0, Math.round(anchor - Math.max(0, nextSpan - 1) * anchorRatio)), maxStart);
+  return { start, end: start + nextSpan - 1 };
+}
+
+function panRange(current, delta, length) {
+  const span = current.end - current.start + 1;
+  const start = Math.min(Math.max(0, current.start + delta), Math.max(0, length - span));
+  return { start, end: start + span - 1 };
+}
+
+function yWindow(rows) {
+  let min = Infinity;
+  let max = -Infinity;
+  rows.forEach((row) => {
+    ['nav', 'ma', 'upper', 'lower'].forEach((key) => {
+      const value = row[key];
+      if (Number.isFinite(value)) {
+        min = Math.min(min, value);
+        max = Math.max(max, value);
+      }
+    });
+  });
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+  const pad = Math.max((max - min) * 0.12, max * 0.004, 0.001);
+  return { min: min - pad, max: max + pad };
+}
+
 function BandChart({ series, signals, period }) {
   const colors = useChartColors();
+  const boxRef = useRef(null);
+  const dragRef = useRef(null);
+  const seriesKey = `${period}:${series.length}:${series[0]?.date ?? ''}:${series.at(-1)?.date ?? ''}`;
+  const [seriesKeySeen, setSeriesKeySeen] = useState(seriesKey);
+  const [range, setRange] = useState(() => defaultRange(series.length, period));
+  if (seriesKeySeen !== seriesKey) {
+    setSeriesKeySeen(seriesKey);
+    setRange(defaultRange(series.length, period));
+  }
+  const view = useMemo(() => series.slice(range.start, range.end + 1), [series, range.start, range.end]);
+  const span = view.length;
+  const zoomed = span < series.length;
   const data = useMemo(() => {
     if (!colors) return null;
     const line = (label, key, color, dash, width = 1.5, endLabel) => ({
       label,
       endLabel,
-      data: series.map((row) => row[key]),
+      data: view.map((row) => row[key]),
       borderColor: color,
       backgroundColor: color,
       borderWidth: width,
@@ -89,7 +147,7 @@ function BandChart({ series, signals, period }) {
       const byDate = new Map(signals.filter((item) => item.type === type).map((item) => [item.date, item.nav]));
       return {
         label,
-        data: series.map((row) => byDate.get(row.date) ?? null),
+        data: view.map((row) => byDate.get(row.date) ?? null),
         showLine: false,
         pointStyle: 'circle',
         pointRadius: 8,
@@ -101,7 +159,7 @@ function BandChart({ series, signals, period }) {
       };
     };
     return {
-      labels: series.map((row) => row.date),
+      labels: view.map((row) => row.date),
       datasets: [
         marks('卖出信号', 'sell', colors.upper, '卖'),
         marks('买回信号', 'buy', colors.lower, '买'),
@@ -111,7 +169,8 @@ function BandChart({ series, signals, period }) {
         line('买回线', 'lower', colors.lower, [6, 3], 1.5, '买回线')
       ]
     };
-  }, [colors, period, series, signals]);
+  }, [colors, period, signals, view]);
+  const bounds = zoomed ? yWindow(view) : null;
   const options = useMemo(
     () =>
       colors && {
@@ -136,26 +195,152 @@ function BandChart({ series, signals, period }) {
               autoSkipPadding: 24,
               maxRotation: 0,
               callback(value) {
-                return this.getLabelForValue(value).slice(0, 7);
+                const label = this.getLabelForValue(value);
+                return span <= 45 ? label.slice(5) : label.slice(0, 7);
               }
             }
           },
-          y: { grid: { color: colors.grid }, ticks: { color: colors.muted, maxTicksLimit: 6 } }
+          y: {
+            ...(bounds ? { min: bounds.min, max: bounds.max } : {}),
+            grid: { color: colors.grid },
+            ticks: { color: colors.muted, maxTicksLimit: 6 }
+          }
         }
       },
-    [colors]
+    [bounds?.max, bounds?.min, colors, span]
   );
   const plugins = useMemo(() => (colors ? [bandLabels(colors)] : []), [colors]);
-  if (!data) return null;
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return undefined;
+    const onWheel = (event) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const ratio = rect.width ? (event.clientX - rect.left) / rect.width : 1;
+      setRange((current) =>
+        zoomAround(current, event.deltaY > 0 ? 1.25 : 0.8, Math.min(1, Math.max(0, ratio)), series.length)
+      );
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [series.length]);
+  const showAll = () => setRange({ start: 0, end: series.length - 1 });
+  const onKeyDown = (event) => {
+    const step = Math.max(1, Math.round(span / 8));
+    if (event.key === '+' || event.key === '=') {
+      event.preventDefault();
+      setRange((current) => zoomAround(current, 2 / 3, 1, series.length));
+    } else if (event.key === '-' || event.key === '_') {
+      event.preventDefault();
+      setRange((current) => zoomAround(current, 1.5, 1, series.length));
+    } else if (event.key === 'Home' || event.key === '0') {
+      event.preventDefault();
+      showAll();
+    } else if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      setRange((current) => panRange(current, -step, series.length));
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      setRange((current) => panRange(current, step, series.length));
+    }
+  };
+  const onPointerDown = (event) => {
+    if (event.button !== 0 || !zoomed) return;
+    dragRef.current = {
+      id: event.pointerId,
+      x: event.clientX,
+      start: range.start,
+      span,
+      width: event.currentTarget.clientWidth
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const onPointerMove = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.id !== event.pointerId || !drag.width) return;
+    const delta = Math.round((-(event.clientX - drag.x) / drag.width) * drag.span);
+    if (!delta) return;
+    const start = Math.min(Math.max(0, drag.start + delta), series.length - drag.span);
+    setRange({ start, end: start + drag.span - 1 });
+  };
+  const endDrag = (event) => {
+    if (dragRef.current?.id === event.pointerId) dragRef.current = null;
+  };
+  if (!view.length) return null;
+  const rangeText = `${view[0].date} 至 ${view.at(-1).date}`;
   return (
-    <div className={styles.bandChart}>
-      <Line
-        data={data}
-        options={options}
-        plugins={plugins}
-        role="img"
-        aria-label={`净值、${period} 日均线和上下轨走势；共 ${signals.length} 次信号，明细见历史信号表。`}
-      />
+    <div className={styles.bandChartWrap}>
+      <div className={styles.bandZoomBar}>
+        <div className={styles.bandZoomActions} role="group" aria-label="图表缩放">
+          <button
+            type="button"
+            className={styles.segButton}
+            onClick={() => setRange((current) => zoomAround(current, 2 / 3, 1, series.length))}
+            disabled={span <= MIN_SPAN}
+            aria-label="放大，查看更短区间"
+          >
+            放大
+          </button>
+          <button
+            type="button"
+            className={styles.segButton}
+            onClick={() => setRange((current) => zoomAround(current, 1.5, 1, series.length))}
+            disabled={!zoomed}
+            aria-label="缩小，查看更长区间"
+          >
+            缩小
+          </button>
+          <button
+            type="button"
+            className={styles.segButton}
+            onClick={showAll}
+            disabled={!zoomed}
+            aria-label="显示全部日期"
+          >
+            全部
+          </button>
+        </div>
+        <p className={styles.bandZoomRange}>
+          {rangeText}
+          <span>共 {span} 个交易日</span>
+        </p>
+      </div>
+      <div
+        ref={boxRef}
+        className={cn(styles.bandChart, zoomed && styles.bandChartZoomed)}
+        tabIndex={0}
+        role="group"
+        aria-label={`净值、${period} 日均线和上下轨。当前 ${rangeText}。左右方向键平移，加号放大，减号缩小，Home 显示全部。拖动图表可平移，按住 Ctrl 或 Command 滚动可缩放。`}
+        onKeyDown={onKeyDown}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onDoubleClick={showAll}
+      >
+        {data ? <Line data={data} options={options} plugins={plugins} /> : null}
+      </div>
+      <label className={styles.bandZoomSliderLabel}>
+        平移
+        <input
+          type="range"
+          min={0}
+          max={Math.max(0, series.length - span)}
+          step={1}
+          value={range.start}
+          disabled={!zoomed}
+          aria-valuetext={rangeText}
+          onChange={(event) => {
+            const start = Number(event.target.value);
+            setRange({ start, end: start + span - 1 });
+          }}
+        />
+      </label>
+      <p className={styles.bandHint}>
+        拖动图表平移，按住 Ctrl 或 ⌘ 滚动缩放。
+        {Number(period) <= 10 ? '5 日和 10 日默认只显示最近一段，点「全部」可看完整历史。' : ''}
+      </p>
     </div>
   );
 }
