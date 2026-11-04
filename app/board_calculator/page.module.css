@@ -1354,12 +1354,72 @@
   align-items: center;
   gap: 6px;
 }
+.bandChartWrap {
+  min-width: 0;
+}
+.bandZoomBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 8px;
+}
+.bandZoomActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bandZoomActions .segButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.bandZoomActions .segButton:focus-visible,
+.bandChart:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.bandZoomRange {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.bandZoomRange span {
+  margin-left: 8px;
+}
+.bandZoomSliderLabel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.bandZoomSliderLabel input {
+  width: 100%;
+  height: 44px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+.bandZoomSliderLabel input:disabled {
+  opacity: 0.45;
+}
 .bandChart {
   position: relative;
   width: 100%;
   min-width: 0;
   height: 320px;
   overflow: hidden;
+  user-select: none;
+}
+.bandChartZoomed {
+  cursor: grab;
+  touch-action: pan-y;
+}
+.bandChartZoomed:active {
+  cursor: grabbing;
 }
 .bandFields .strategyInput,
 .strategyHead .strategyDefault {
