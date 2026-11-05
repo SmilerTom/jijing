@@ -16,10 +16,12 @@ import {
   buildStrategyPrompt,
   calculateTrackedHolding,
   getStrategyQuote,
+  isStrategyCycle,
   normalizeBand,
   normalizeStrategy,
   splitBandPosition
 } from './strategy.mjs';
+import { navChange, triggerDistance } from './preview.mjs';
 import { resolvePosition } from './decision.mjs';
 import useStrategyReminder, { notifyStrategyChange } from './useStrategyReminder';
 import RiskPanel from './RiskPanel';
@@ -314,6 +316,44 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
   const confirmationType = strategyState.status === 'stopped' ? 'resume' : strategyState.status;
   const canConfirm = ['sell', 'buy', 'stop', 'resume'].includes(confirmationType);
   const bandMode = strategy.mode === 'band';
+  const signalQuote = reminder.signalQuote;
+  const cycle = reminder.cycle;
+  const validCycle = isStrategyCycle(cycle);
+  const waitingBuy = validCycle && cycle.phase === 'waitingBuy';
+  const previewNav = validCycle && signalQuote?.date >= cycle.anchorDate ? signalQuote.nav : null;
+  const cycleChange = navChange(previewNav, validCycle ? cycle.anchorNav : null);
+  const triggerRate = Number(waitingBuy ? strategy.buyDropRate : strategy.riseRate);
+  const targetNav =
+    validCycle && cycle.phase !== 'stopped' && triggerRate > 0 && (!waitingBuy || triggerRate < 100)
+      ? cycle.anchorNav * (1 + (waitingBuy ? -triggerRate : triggerRate) / 100)
+      : null;
+  const distance = triggerDistance(previewNav, targetNav, waitingBuy);
+  const dailyEstimate =
+    signalQuote?.estimated && hasNumber(inputValue(marketFund?.gszzl)) ? Number(marketFund.gszzl) : null;
+  const previewMetrics = [
+    [
+      '当日预估涨跌',
+      formatRate(dailyEstimate),
+      signalQuote?.estimated ? `相对上一公布净值 · ${signalQuote.time}` : '暂无有效当日估值，不以旧数据替代'
+    ],
+    ['持仓收益率', formatRate(rateValue), '沿用账户持仓口径，仅作参考；不重复叠加当日涨跌'],
+    ...(!bandMode
+      ? [
+          [
+            '本轮累计涨跌',
+            formatRate(cycleChange),
+            `${waitingBuy ? '相对上次实际卖出' : '相对首次跟踪 / 上次实际买入'}${signalQuote?.estimated ? ' · 已含当日估值' : ' · 按正式净值'}`
+          ],
+          [
+            waitingBuy ? '距买回还需跌' : '距卖出还需涨',
+            distance === null ? '--' : `${distance.toFixed(2)}%`,
+            distance === 0
+              ? '价格已达线，仍需检查冷静期与止损条件'
+              : `相对当前价格；本轮触发线 ${formatRate(waitingBuy ? -triggerRate : triggerRate)}`
+          ]
+        ]
+      : [])
+  ];
   const bandSplit = splitBandPosition({
     amount: amountValue,
     corePercent: strategy.corePercent,
@@ -348,7 +388,7 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
       <div className={styles.strategyHead}>
         <div className={styles.bandTitle}>
           <b id={`${fundId}-strategy-title`}>{bandMode ? '估值带滚仓' : '策略设置'}</b>
-          {bandMode ? <small>底仓不动，只让机动仓在均线上下轨之间买卖</small> : null}
+          {bandMode ? <small>底仓不动。机动仓涨过上轨卖出，回到均线买回</small> : null}
         </div>
         <div className={styles.modeSwitch} role="group" aria-label="滚仓模式">
           {[
@@ -376,6 +416,15 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
             默认
           </button>
         )}
+      </div>
+      <div className={styles.bandStats} aria-label="滚仓涨跌幅预览">
+        {previewMetrics.map(([label, value, detail]) => (
+          <div key={label} className={styles.bandStat}>
+            <i>{label}</i>
+            <b>{value}</b>
+            <small>{detail}</small>
+          </div>
+        ))}
       </div>
       <div className={styles.strategyFields} hidden={bandMode}>
         <StrategyField

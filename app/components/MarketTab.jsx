@@ -186,46 +186,46 @@ export default function MarketTab({ onAddFund, getFundCardProps, isActive }) {
           const fund = info.row.original;
           const isAdded = funds?.some?.((f) => f.code === fund.bzdm);
           return (
-            <div className="w-full">
-              <div className="flex items-start gap-1.5 mb-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!isAdded && onAddFund) {
-                          onAddFund({ code: fund.bzdm, name: fund.jjjc });
-                        }
-                      }}
-                      className={cn(
-                        'focus:outline-none flex-shrink-0 mt-[2px]',
-                        isAdded
-                          ? 'text-[var(--success)] cursor-default'
-                          : 'text-muted-foreground opacity-50 hover:opacity-100 hover:text-primary transition-colors cursor-pointer'
-                      )}
-                      disabled={isAdded}
-                    >
-                      {isAdded ? <CheckCircle size={16} /> : <PlusCircle size={16} />}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{isAdded ? '已添加' : '添加'}</p>
-                  </TooltipContent>
-                </Tooltip>
+            <div className="flex w-full min-w-0 items-start gap-1.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isAdded && onAddFund) {
+                        onAddFund({ code: fund.bzdm, name: fund.jjjc });
+                      }
+                    }}
+                    className={cn(
+                      'mt-0.5 shrink-0 border-0 bg-transparent p-0 leading-none focus:outline-none',
+                      isAdded
+                        ? 'cursor-default text-[var(--success)]'
+                        : 'cursor-pointer text-muted-foreground opacity-50 transition-colors hover:text-primary hover:opacity-100'
+                    )}
+                    disabled={isAdded}
+                  >
+                    {isAdded ? <CheckCircle size={16} /> : <PlusCircle size={16} />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isAdded ? '已添加' : '添加'}</p>
+                </TooltipContent>
+              </Tooltip>
+              <div className="min-w-0">
                 <span
-                  className="font-medium text-sm whitespace-normal break-all leading-snug cursor-pointer hover:text-primary transition-colors"
+                  className="block cursor-pointer break-all text-sm font-medium leading-snug transition-colors hover:text-primary"
                   onClick={() => setDetailFund(fund)}
                 >
                   {fund.jjjc}
                 </span>
-              </div>
-              <div className="flex items-center gap-2 pl-5">
-                <span className="text-xs opacity-50">#{fund.bzdm}</span>
-                {fund.FType && (
-                  <span className="fund-tag text-[10px] px-1 rounded-sm opacity-60 border border-current">
-                    {fund.FType.split('-')[0]}
-                  </span>
-                )}
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="text-xs opacity-50">#{fund.bzdm}</span>
+                  {fund.FType && (
+                    <span className="fund-tag rounded-sm border border-current px-1 text-[10px] opacity-60">
+                      {fund.FType.split('-')[0]}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           );
@@ -660,13 +660,15 @@ export default function MarketTab({ onAddFund, getFundCardProps, isActive }) {
                         style={{ flex: 2, padding: '0 8px', display: 'flex', alignItems: 'center' }}
                       >
                         <div className="w-full">
-                          <div className="flex items-center gap-1.5 mb-1.5 mt-0.5">
-                            <Skeleton className="size-4 rounded-full flex-shrink-0" />
-                            <Skeleton className="h-[18px] w-28 sm:w-40" />
-                          </div>
-                          <div className="flex items-center gap-2 pl-5">
-                            <Skeleton className="h-3 w-12" />
-                            <Skeleton className="h-[14px] w-8" />
+                          <div className="flex items-start gap-1.5">
+                            <Skeleton className="mt-0.5 size-4 shrink-0 rounded-full" />
+                            <div className="min-w-0">
+                              <Skeleton className="h-[18px] w-28 sm:w-40" />
+                              <div className="mt-1 flex items-center gap-2">
+                                <Skeleton className="h-3 w-12" />
+                                <Skeleton className="h-[14px] w-8" />
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>

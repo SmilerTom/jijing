@@ -9,7 +9,12 @@ import { CloseIcon, SettingsIcon, SwitchIcon } from './Icons';
 import { DatePicker } from './Common';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { costFromNavAndRate, rateFromNavAndCost } from './holdingMath.mjs';
+import {
+  costFromNavAndRate,
+  profitFromAmountAndRate,
+  rateFromAmountAndProfit,
+  rateFromNavAndCost
+} from './holdingMath.mjs';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -32,6 +37,7 @@ export default function HoldingEditModal({ fund, holding, nav, onClose, onSave, 
   const [share, setShare] = useState('');
   const [cost, setCost] = useState('');
   const [amount, setAmount] = useState('');
+  const [profit, setProfit] = useState('');
   const [rate, setRate] = useState('');
   const [firstPurchaseDate, setFirstPurchaseDate] = useState('');
   const [holdingDaysInput, setHoldingDaysInput] = useState('');
@@ -62,6 +68,8 @@ export default function HoldingEditModal({ fund, holding, nav, onClose, onSave, 
         setAmount(a.toFixed(2));
         const holdingRate = rateFromNavAndCost(price, c);
         setRate(Number.isFinite(holdingRate) ? holdingRate.toFixed(2) : '');
+        const holdingProfit = profitFromAmountAndRate(a, holdingRate);
+        setProfit(Number.isFinite(holdingProfit) ? holdingProfit.toFixed(2) : '');
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -90,6 +98,8 @@ export default function HoldingEditModal({ fund, holding, nav, onClose, onSave, 
         setAmount(a.toFixed(2));
         const holdingRate = rateFromNavAndCost(dwjz, c);
         setRate(Number.isFinite(holdingRate) ? holdingRate.toFixed(2) : '');
+        const holdingProfit = profitFromAmountAndRate(a, holdingRate);
+        setProfit(Number.isFinite(holdingProfit) ? holdingProfit.toFixed(2) : '');
       }
     }
   };
@@ -161,7 +171,11 @@ export default function HoldingEditModal({ fund, holding, nav, onClose, onSave, 
   const isValid =
     mode === 'share'
       ? share && cost && !isNaN(share) && !isNaN(cost)
-      : amount && !isNaN(amount) && (!rate || (!isNaN(rate) && Number(rate) > -100)) && dwjz > 0;
+      : amount &&
+        !isNaN(amount) &&
+        (!rate || (!isNaN(rate) && Number(rate) > -100)) &&
+        (profit === '' || Number.isFinite(rateFromAmountAndProfit(Number(amount), Number(profit)))) &&
+        dwjz > 0;
 
   const handleOpenChange = (open) => {
     if (!open) {
@@ -256,12 +270,37 @@ export default function HoldingEditModal({ fund, holding, nav, onClose, onSave, 
                   step="any"
                   className={`input ${!amount ? 'error' : ''}`}
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  onChange={(e) => {
+                    const nextAmount = e.target.value;
+                    setAmount(nextAmount);
+                    const nextProfit = profitFromAmountAndRate(Number(nextAmount), Number(rate));
+                    setProfit(Number.isFinite(nextProfit) ? nextProfit.toFixed(2) : '');
+                  }}
                   placeholder="请输入持有总金额"
                   style={{
                     width: '100%',
                     border: !amount ? '1px solid var(--danger)' : undefined
                   }}
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: 16 }}>
+                <label className="muted" style={{ display: 'block', marginBottom: 8, fontSize: '14px' }}>
+                  持有收益
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  className="input"
+                  value={profit}
+                  onChange={(e) => {
+                    const nextProfit = e.target.value;
+                    setProfit(nextProfit);
+                    const nextRate = rateFromAmountAndProfit(Number(amount), Number(nextProfit));
+                    setRate(Number.isFinite(nextRate) ? nextRate.toFixed(2) : '');
+                  }}
+                  placeholder="请输入持有收益"
+                  aria-label="编辑持有收益"
+                  style={{ width: '100%' }}
                 />
               </div>
               <div className="form-group" style={{ marginBottom: 24 }}>
@@ -273,7 +312,12 @@ export default function HoldingEditModal({ fund, holding, nav, onClose, onSave, 
                   step="any"
                   className="input"
                   value={rate}
-                  onChange={(e) => setRate(e.target.value)}
+                  onChange={(e) => {
+                    const nextRate = e.target.value;
+                    setRate(nextRate);
+                    const nextProfit = profitFromAmountAndRate(Number(amount), Number(nextRate));
+                    setProfit(Number.isFinite(nextProfit) ? nextProfit.toFixed(2) : '');
+                  }}
                   placeholder="请输入持有收益率"
                   style={{ width: '100%' }}
                 />

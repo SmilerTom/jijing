@@ -40,7 +40,9 @@ const serverSnapshot = () => 'null';
 
 export default function useStrategyReminder({ fundId, fund, history = [], strategy, enabled = true }) {
   const cycleKey = `board-strategy-cycle:${fundId}`;
+  const backupKey = `board-strategy-cycle-backup:${fundId}`;
   const cycleJson = useSyncExternalStore(subscribe, () => readSnapshot(cycleKey), serverSnapshot);
+  const backupJson = useSyncExternalStore(subscribe, () => readSnapshot(backupKey), serverSnapshot);
   const settingsJson = useSyncExternalStore(
     subscribe,
     () => readSnapshot(`board-calculator:${fundId}`),
@@ -48,6 +50,7 @@ export default function useStrategyReminder({ fundId, fund, history = [], strate
   );
   const signalLogJson = useSyncExternalStore(subscribe, () => readSnapshot(signalLogKey(fundId)), serverSnapshot);
   const cycle = useMemo(() => JSON.parse(cycleJson), [cycleJson]);
+  const backupCycle = useMemo(() => JSON.parse(backupJson), [backupJson]);
   const signalLog = useMemo(() => normalizeSignalLog(JSON.parse(signalLogJson)), [signalLogJson]);
   const saved = useMemo(() => JSON.parse(settingsJson), [settingsJson]);
   const source = strategy ?? saved?.strategy;
@@ -183,11 +186,27 @@ export default function useStrategyReminder({ fundId, fund, history = [], strate
   const resetCycle = () => {
     if (!quote) return false;
     try {
-      return saveCycle(createStrategyCycle(quote.nav, quote.date));
+      const current = storageStore.getItem(cycleKey, null);
+      if (isStrategyCycle(current)) storageStore.setItem(backupKey, JSON.stringify(current));
+      const savedNext = saveCycle(createStrategyCycle(quote.nav, quote.date));
+      if (!savedNext && isStrategyCycle(current)) {
+        storageStore.removeItem(backupKey);
+        notifyStrategyChange();
+      }
+      return savedNext;
     } catch (failure) {
       setError(failure.message || '重新跟踪失败，请重试。');
       return false;
     }
+  };
+  const undoReset = () => {
+    if (!isStrategyCycle(backupCycle)) return false;
+    const restored = saveCycle(backupCycle);
+    if (restored) {
+      storageStore.removeItem(backupKey);
+      notifyStrategyChange();
+    }
+    return restored;
   };
 
   return {
@@ -197,6 +216,8 @@ export default function useStrategyReminder({ fundId, fund, history = [], strate
     strategyState,
     confirmTrade,
     resetCycle,
+    undoReset,
+    canUndoReset: isStrategyCycle(backupCycle),
     now,
     signalLog,
     saveDecision,

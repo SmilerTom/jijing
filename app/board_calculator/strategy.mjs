@@ -2,7 +2,7 @@ import lodash from 'lodash';
 
 const { isObject, isString } = lodash;
 
-export const DEFAULT_STRATEGY = Object.freeze({ riseRate: 20, buyDropRate: 5, stopDrawdown: 10, cooldownDays: 3 });
+export const DEFAULT_STRATEGY = Object.freeze({ riseRate: 20, buyDropRate: 10, stopDrawdown: 20, cooldownDays: 7 });
 const positive = (value) => value !== '' && value !== null && Number.isFinite(Number(value)) && Number(value) > 0;
 export const strategyDate = (date = new Date()) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -112,7 +112,7 @@ export function replayBandSignals(series = [], minHoldDays = 0) {
   const signals = [];
   series.forEach((row) => {
     if (dayNumber(row.date) - lastDay < Number(minHoldDays)) return;
-    const type = holding && row.nav >= row.upper ? 'sell' : !holding && row.nav <= row.lower ? 'buy' : null;
+    const type = holding && row.nav >= row.upper ? 'sell' : !holding && row.nav <= row.ma ? 'buy' : null;
     if (!type) return;
     signals.push({ ...row, type, deviation: (row.nav / row.ma - 1) * 100 });
     holding = type === 'buy';
@@ -258,7 +258,7 @@ function calculateBandState({ currentNav, quoteDate, estimated, quoteTime, cycle
   const upper = latest.ma * (1 + Number(config.bandSell) / 100);
   const lower = latest.ma * (1 - Number(config.bandBuy) / 100);
   const triggered =
-    cycle.phase === 'holding' && nav >= upper ? 'sell' : cycle.phase === 'waitingBuy' && nav <= lower ? 'buy' : null;
+    cycle.phase === 'holding' && nav >= upper ? 'sell' : cycle.phase === 'waitingBuy' && nav <= latest.ma ? 'buy' : null;
   const remainingDays = cooldownRemaining(cycle, config.minHoldDays, now);
   return {
     ...base,
@@ -383,7 +383,7 @@ function buildBandPrompt(state) {
       label: `${prefix}已到买回线`,
       tone: 'down',
       metric,
-      detail: `${source}净值低于 ${maLabel} ${gap}%，可买回机动仓。实际买回后请确认。`
+      detail: `${source}净值已回到 ${maLabel}。机动仓在这里买回，不必再等到深度下轨。实际买回后请确认。`
     };
   if (state.status === 'cooldown')
     return {
@@ -397,7 +397,7 @@ function buildBandPrompt(state) {
       label: state.estimated ? '估值观察' : '等待买回',
       tone: '',
       metric,
-      detail: `${source}机动仓已卖出。均线会随时间移动，买回线也会跟着变；当前距买回线还差 ${((1 - state.lower / state.nav) * 100).toFixed(1)}%。`
+      detail: `${source}机动仓已卖出。回到 ${maLabel} 就买回；深度下轨只作参考。当前距均线还差 ${((state.nav / state.ma - 1) * 100).toFixed(1)}%。`
     };
   return {
     label: state.estimated ? '估值观察' : '持有观察',
@@ -423,7 +423,7 @@ export function buildStrategyPrompt({ strategyState }) {
       label: `${prefix}已触发你设定的止损线`,
       tone: 'up',
       metric: `已回落 ${percentage(state.drawdown)}`,
-      detail: `${source}从已记录最高净值 ${state.peakNav.toFixed(4)} 回落 ${percentage(state.drawdown)}（止损线 ${percentage(state.stopDrawdown)}），止损优先于补仓。实际卖出后请确认。`
+      detail: `${source}从跟踪期间最高点回落 ${percentage(state.drawdown)}（止损线 ${percentage(state.stopDrawdown)}），止损优先于补仓。实际卖出后请确认。`
     };
   if (state.status === 'sell')
     return {
@@ -452,14 +452,16 @@ export function buildStrategyPrompt({ strategyState }) {
     const currentMove = waitingBuy ? -Number(state.change) || 0 : Number(state.change) || 0;
     const moveLimit = waitingBuy ? Number(state.buyDropRate) : Number(state.riseRate);
     const drawdown = Number(state.drawdown) || 0;
+    const movement =
+      Number(state.change) >= 0 ? `上涨 ${percentage(state.change)}` : `下跌 ${percentage(state.change)}`;
     const warn = nearThreshold(currentMove, moveLimit) || nearThreshold(drawdown, Number(state.stopDrawdown));
     return {
       label: state.estimated ? '估值观察' : '等待',
       tone: warn ? 'warn' : '',
-      metric: waitingBuy ? `已回落 ${percentage(currentMove)}` : `已涨 ${percentage(currentMove)}`,
+      metric: movement,
       detail: waitingBuy
-        ? `${source}已回落 ${percentage(currentMove)} / 买回线 ${percentage(state.buyDropRate)}；从最高值回落 ${percentage(state.drawdown)} / 止损线 ${percentage(state.stopDrawdown)}。`
-        : `${source}已涨 ${percentage(currentMove)} / 卖出线 ${percentage(state.riseRate)}；从最高值回落 ${percentage(state.drawdown)} / 止损线 ${percentage(state.stopDrawdown)}。`
+        ? `${source}较上次实际卖出${movement} / 买回线 −${percentage(state.buyDropRate)}；从最高值回落 ${percentage(state.drawdown)} / 止损线 ${percentage(state.stopDrawdown)}。`
+        : `${source}较本轮基准${movement} / 卖出线 +${percentage(state.riseRate)}；从最高值回落 ${percentage(state.drawdown)} / 止损线 ${percentage(state.stopDrawdown)}。`
     };
   }
   return { label: '待更新', tone: '', detail: '等待有效净值；成交确认后不使用成交日期之前的旧净值生成信号。' };

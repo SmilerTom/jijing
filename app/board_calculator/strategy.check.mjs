@@ -109,8 +109,8 @@ check('估值创新高不写入正式最高值，也不改变基准和冷静期'
 });
 check('估值买回和止损仍遵循阶段、最高值回撤和冷静期', () => {
   const sold = { ...cycle, phase: 'waitingBuy', anchorNav: 1.2, peakNav: 1.2 };
-  assert.equal(evaluate({ cycle: sold, currentNav: 1.14, estimated: true }).status, 'buy');
-  assert.equal(evaluate({ cycle: sold, currentNav: 1.05, estimated: true }).status, 'stop');
+  assert.equal(evaluate({ cycle: sold, currentNav: 1.08, estimated: true }).status, 'buy');
+  assert.equal(evaluate({ cycle: sold, currentNav: 0.96, estimated: true }).status, 'stop');
   assert.equal(
     evaluate({ cycle: { ...sold, lastTradeAt: now.toISOString() }, currentNav: 1.05, estimated: true }).status,
     'cooldown'
@@ -130,7 +130,7 @@ check('没有正式基准时即使有估值也不生成交易信号', () => {
 const confirm = (state, status, nav, date = now) => confirmStrategyTrade({ cycle: state, status, nav, now: date });
 
 check('四项默认设置，旧目标收益率迁移且删除旧均线参数', () => {
-  assert.deepEqual(DEFAULT_STRATEGY, { riseRate: 20, buyDropRate: 5, stopDrawdown: 10, cooldownDays: 3 });
+  assert.deepEqual(DEFAULT_STRATEGY, { riseRate: 20, buyDropRate: 10, stopDrawdown: 20, cooldownDays: 7 });
   assert.deepEqual(normalizeStrategy({ targetRate: 25, maPeriod: 20 }), { ...DEFAULT_STRATEGY, riseRate: 25 });
   assert.equal(normalizeStrategy({ cooldownDays: 0 }).cooldownDays, 0);
 });
@@ -142,8 +142,9 @@ check('上涨到线提示卖出，但发提示不改变基准和阶段', () => {
 check('未确认卖出，不提前提示买回', () => {
   assert.equal(evaluate({ currentNav: 0.95 }).status, 'watch');
 });
-check('从最高值回落10%止损，不是成本跌幅', () => {
-  assert.equal(evaluate({ cycle: { ...cycle, peakNav: 1.2 }, currentNav: 1.08 }).status, 'stop');
+check('从最高值回落20%止损，不是成本跌幅', () => {
+  assert.equal(evaluate({ cycle: { ...cycle, peakNav: 1.25 }, currentNav: 1 }).status, 'stop');
+  assert.equal(evaluate({ cycle: { ...cycle, peakNav: 1.25 }, currentNav: 1.1 }).status, 'watch');
 });
 check('回撤以最高净值为分母', () => {
   const state = evaluate({
@@ -160,13 +161,13 @@ check('卖出确认采用实际成交净值，保存后进入等待买回', () =
   assert.equal(sold.anchorNav, 1.23);
   assert.equal(evaluate({ cycle: JSON.parse(JSON.stringify(sold)) }).status, 'cooldown');
 });
-check('完整循环：已卖出→跌5%→已买入→新一轮', () => {
+check('完整循环：已卖出→跌10%→已买入→新一轮', () => {
   const sold = confirm(cycle, 'sell', 1.2);
   const config = { cooldownDays: 0 };
-  assert.equal(evaluate({ cycle: sold, currentNav: 1.14, strategy: config }).status, 'buy');
-  const bought = confirm(sold, 'buy', 1.13);
+  assert.equal(evaluate({ cycle: sold, currentNav: 1.08, strategy: config }).status, 'buy');
+  const bought = confirm(sold, 'buy', 1.08);
   assert.equal(bought.phase, 'holding');
-  assert.equal(bought.anchorNav, 1.13);
+  assert.equal(bought.anchorNav, 1.08);
   assert.equal(bought.peakNav, 1.2);
   assert.equal(evaluate({ cycle: bought, currentNav: 1.21, strategy: config }).status, 'watch');
 });
@@ -188,9 +189,16 @@ check('止损确认后暂停补仓，实际重买确认才恢复', () => {
 });
 check('冷静3天：9月10日确认、9月13日再检查', () => {
   const sold = confirm(cycle, 'sell', 1.2);
-  assert.equal(evaluate({ cycle: sold, now: new Date(2026, 8, 12, 23) }).remainingDays, 1);
+  const config = { cooldownDays: 3, buyDropRate: 5 };
+  assert.equal(evaluate({ cycle: sold, strategy: config, now: new Date(2026, 8, 12, 23) }).remainingDays, 1);
   assert.equal(
-    evaluate({ cycle: sold, currentNav: 1.14, quoteDate: '2026-09-13', now: new Date(2026, 8, 13) }).status,
+    evaluate({
+      cycle: sold,
+      strategy: config,
+      currentNav: 1.14,
+      quoteDate: '2026-09-13',
+      now: new Date(2026, 8, 13)
+    }).status,
     'buy'
   );
 });
@@ -262,14 +270,14 @@ check('驾驶舱和顶部提示共用四项策略文案', () => {
 });
 check('观察提示显示当前涨跌幅与阈值', () => {
   const holdingPrompt = buildStrategyPrompt({ strategyState: evaluate({ currentNav: 1.05 }) });
-  assert.match(holdingPrompt.detail, /已涨 5\.00% \/ 卖出线 20\.00%.*回落 0\.00% \/ 止损线 10\.00%/);
-  assert.equal(holdingPrompt.metric, '已涨 5.00%');
+  assert.match(holdingPrompt.detail, /较本轮基准上涨 5\.00% \/ 卖出线 \+20\.00%.*回落 0\.00% \/ 止损线 20\.00%/);
+  assert.equal(holdingPrompt.metric, '上涨 5.00%');
   assert.equal(holdingPrompt.tone, '');
   assert.doesNotMatch(holdingPrompt.detail, /1\.2000|0\.9450/);
 
   const nearSell = buildStrategyPrompt({ strategyState: evaluate({ currentNav: 1.15 }) });
   assert.equal(nearSell.tone, 'warn');
-  assert.equal(nearSell.metric, '已涨 15.00%');
+  assert.equal(nearSell.metric, '上涨 15.00%');
 
   const waitingBuy = buildStrategyPrompt({
     strategyState: evaluate({
@@ -278,8 +286,8 @@ check('观察提示显示当前涨跌幅与阈值', () => {
       strategy: { cooldownDays: 0 }
     })
   });
-  assert.match(waitingBuy.detail, /已回落 1\.67% \/ 买回线 5\.00%.*回落 1\.67% \/ 止损线 10\.00%/);
-  assert.equal(waitingBuy.metric, '已回落 1.67%');
+  assert.match(waitingBuy.detail, /较上次实际卖出下跌 1\.67% \/ 买回线 −10\.00%.*回落 1\.67% \/ 止损线 20\.00%/);
+  assert.equal(waitingBuy.metric, '下跌 1.67%');
   assert.doesNotMatch(waitingBuy.detail, /1\.1400|1\.0800/);
 });
 console.log(`策略检查：${passed} 项通过；继续检查原有持仓计算。`);
@@ -344,13 +352,14 @@ check('估值带：分红日单位净值下跌不算下跌', () => {
   assert.equal(last.nav, 0.5);
   assert.ok(Math.abs(last.ma - 0.5) < 1e-9);
 });
-check('估值带：持有时到上轨卖出，已卖出时到下轨买回，另一侧不提示', () => {
+check('估值带：持有时到上轨卖出，已卖出时回到均线买回，未回到均线不提示', () => {
   assert.equal(bandState({ currentNav: 1.1 }).status, 'sell');
   assert.equal(bandState({ currentNav: 1.09 }).status, 'watch');
   assert.equal(bandState({ currentNav: 0.8 }).status, 'watch');
   const sold = { ...cycle, phase: 'waitingBuy', anchorNav: 1.1, peakNav: 1.1 };
-  assert.equal(bandState({ cycle: sold, currentNav: 0.9 }).status, 'buy');
-  assert.equal(bandState({ cycle: sold, currentNav: 1.5 }).status, 'watch');
+  assert.equal(bandState({ cycle: sold, currentNav: 1 }).status, 'buy');
+  assert.equal(bandState({ cycle: sold, currentNav: 0.99 }).status, 'buy');
+  assert.equal(bandState({ cycle: sold, currentNav: 1.01 }).status, 'watch');
 });
 check('估值带：跌幅再大也不触发止损，最少持有期内只保留已到线的说明', () => {
   assert.equal(bandState({ cycle: { ...cycle, peakNav: 5 }, currentNav: 0.5 }).status, 'watch');
