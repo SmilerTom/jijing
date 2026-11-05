@@ -510,7 +510,7 @@ export default function Index({
                         <button
                           type="button"
                           className="icon-button"
-                          aria-label="编辑持仓金额和收益率"
+                          aria-label="编辑持仓金额、持有收益和收益率"
                           onClick={(event) => {
                             event.stopPropagation();
                             onHoldingClick?.(f);
@@ -520,7 +520,7 @@ export default function Index({
                           <PencilIcon width="13" height="13" />
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent>编辑持仓金额和收益率</TooltipContent>
+                      <TooltipContent>编辑持仓金额、持有收益和收益率</TooltipContent>
                     </Tooltip>
                   ) : null}
                 </span>
@@ -828,6 +828,21 @@ export default function Index({
                     style={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'flex-end' }}
                   >
                     持有收益{profit.profitTotal !== null && percentModes?.[f.code] ? '(%)' : ''}
+                    {layoutMode === 'drawer' && !masked ? (
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label="编辑持有收益"
+                        title={holdingLocked ? holdingLinkedTitle : '编辑持有收益'}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onHoldingClick?.(f);
+                        }}
+                        style={{ width: 24, height: 24, marginLeft: 2 }}
+                      >
+                        <PencilIcon width="12" height="12" />
+                      </button>
+                    ) : null}
                     {profit.profitTotal !== null && <SwitchIcon />}
                   </span>
                   {profit.profitTotal !== null ? (

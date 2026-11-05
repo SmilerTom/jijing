@@ -104,19 +104,19 @@ function ForecastChart({ navs, forecast, stopNav }) {
       className={styles.forecastChart}
       viewBox="0 0 600 176"
       role="img"
-      aria-label={`过去 ${past.length} 日净值和未来 ${forecast.days} 日预测区间：中位 ${signed(forecast.median)}，80% 区间 ${signed(forecast.low)} 至 ${signed(forecast.high)}`}
+      aria-label={`以预测起点为 0% 的过去 ${past.length} 日涨跌幅和未来 ${forecast.days} 日预测区间：中位 ${signed(forecast.median)}，80% 区间 ${signed(forecast.low)} 至 ${signed(forecast.high)}`}
     >
       {stopNav > 0 ? (
         <>
           <line x1="0" x2="600" y1={y(stopNav)} y2={y(stopNav)} className={styles.riskSparkStop} />
           <text x="4" y={y(stopNav) - 4} className={styles.forecastStopText}>
-            止损线 {stopNav.toFixed(4)}
+            止损线 {signed((stopNav / forecast.startNav - 1) * 100)}
           </text>
         </>
       ) : null}
       <line x1="360" x2="360" y1="4" y2="172" className={styles.forecastDivider} />
       <text x="354" y="14" textAnchor="end" className={styles.forecastAxis}>
-        今天
+        当前 0%
       </text>
       <text x="366" y="14" className={styles.forecastAxis}>
         预测
@@ -424,9 +424,16 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
                 </button>
               </span>
             ) : (
-              <button type="button" className={styles.riskLink} onClick={() => setConfirmingReset(true)}>
-                重新跟踪
-              </button>
+              <>
+                <button type="button" className={styles.riskLink} onClick={() => setConfirmingReset(true)}>
+                  重新跟踪
+                </button>
+                {reminder.canUndoReset ? (
+                  <button type="button" className={styles.riskLink} onClick={() => reminder.undoReset()}>
+                    恢复上次跟踪
+                  </button>
+                ) : null}
+              </>
             )
           ) : null}
         </p>
@@ -557,7 +564,7 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
                 </b>
                 {forecast.belowStop ? (
                   <>
-                    ，当前已低于止损线 <b>{stopNav.toFixed(4)}</b>
+                    ，当前已低于止损线（从跟踪最高值回落 <b>{signed(-stopLine)}</b>）
                   </>
                 ) : forecast.touchStop !== null ? (
                   <>
@@ -570,7 +577,7 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
               <div className={styles.forecastLegend}>
                 <span>
                   <i className={styles.legendPast} />
-                  过去净值
+                  历史涨跌（当前为 0%）
                 </span>
                 <span>
                   <i className={styles.legendInner} />

@@ -5,20 +5,20 @@ import { CategoryScale, Chart as ChartJS, LinearScale, LineElement, PointElement
 import { Line } from 'react-chartjs-2';
 import { cn } from '@/lib/utils';
 import { BAND_PERIODS, buildBandSeries, isBandConfigValid, normalizeBand, replayBandSignals } from './strategy.mjs';
+import { bandPercentageSeries, navChange, triggerDistance } from './preview.mjs';
 import styles from './page.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip);
 
 const HOLD_DRAWDOWN = 35.2;
 const LEGEND = [
-  { label: '净值（含分红）', color: 'var(--chart-1)', dash: 'none' },
-  { label: '均线', color: 'var(--muted)', dash: '2 3' },
+  { label: '相对均线', color: 'var(--chart-1)', dash: 'none' },
+  { label: '买回 · 均线', color: 'var(--muted)', dash: '2 3' },
   { label: '卖出线', color: 'var(--chart-5)', dash: '6 3' },
-  { label: '买回线', color: 'var(--chart-2)', dash: '6 3' }
+  { label: '深度下轨', color: 'var(--chart-2)', dash: '6 3' }
 ];
-const nav3 = (value) => (Number.isFinite(value) ? value.toFixed(3) : '--');
 const money = (value) => `¥${Math.round(value).toLocaleString('zh-CN')}`;
-const signed = (value) => `${value >= 0 ? '+' : '−'}${Math.abs(value).toFixed(1)}%`;
+const signed = (value) => (Number.isFinite(value) ? `${value >= 0 ? '+' : '−'}${Math.abs(value).toFixed(2)}%` : '--');
 
 function useChartColors() {
   const [colors, setColors] = useState(null);
@@ -144,7 +144,7 @@ function BandChart({ series, signals, period }) {
       pointHoverRadius: 3
     });
     const marks = (label, type, color, letter) => {
-      const byDate = new Map(signals.filter((item) => item.type === type).map((item) => [item.date, item.nav]));
+      const byDate = new Map(signals.filter((item) => item.type === type).map((item) => [item.date, item.deviation]));
       return {
         label,
         data: view.map((row) => byDate.get(row.date) ?? null),
@@ -163,10 +163,10 @@ function BandChart({ series, signals, period }) {
       datasets: [
         marks('卖出信号', 'sell', colors.upper, '卖'),
         marks('买回信号', 'buy', colors.lower, '买'),
-        line('净值', 'nav', colors.nav, [], 2),
-        line(`${period} 日均线`, 'ma', colors.muted, [2, 3]),
-        line('卖出线', 'upper', colors.upper, [6, 3], 1.5, '卖出线'),
-        line('买回线', 'lower', colors.lower, [6, 3], 1.5, '买回线')
+        line('相对均线', 'nav', colors.nav, [], 2),
+        line('买回 · 均线', 'ma', colors.muted, [2, 3], 1.5, '买回'),
+        line('卖出线', 'upper', colors.upper, [6, 3], 1.5, '卖出'),
+        line('深度下轨', 'lower', colors.lower, [6, 3], 1.5, '下轨')
       ]
     };
   }, [colors, period, signals, view]);
@@ -183,7 +183,7 @@ function BandChart({ series, signals, period }) {
           legend: { display: false },
           tooltip: {
             filter: (item) => item.raw !== null,
-            callbacks: { label: (item) => `${item.dataset.label} ${Number(item.raw).toFixed(3)}` }
+            callbacks: { label: (item) => `${item.dataset.label} ${signed(Number(item.raw))}` }
           }
         },
         scales: {
@@ -203,7 +203,7 @@ function BandChart({ series, signals, period }) {
           y: {
             ...(bounds ? { min: bounds.min, max: bounds.max } : {}),
             grid: { color: colors.grid },
-            ticks: { color: colors.muted, maxTicksLimit: 6 }
+            ticks: { color: colors.muted, maxTicksLimit: 6, callback: (value) => signed(Number(value)) }
           }
         }
       },
@@ -311,7 +311,7 @@ function BandChart({ series, signals, period }) {
         className={cn(styles.bandChart, zoomed && styles.bandChartZoomed)}
         tabIndex={0}
         role="group"
-        aria-label={`净值、${period} 日均线和上下轨。当前 ${rangeText}。左右方向键平移，加号放大，减号缩小，Home 显示全部。拖动图表可平移，按住 Ctrl 或 Command 滚动可缩放。`}
+        aria-label={`相对 ${period} 日均线的涨跌幅，均线为 0%，含卖出和买回阈值。当前 ${rangeText}。左右方向键平移，加号放大，减号缩小，Home 显示全部。拖动图表可平移，按住 Ctrl 或 Command 滚动可缩放。`}
         onKeyDown={onKeyDown}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -338,6 +338,8 @@ function BandChart({ series, signals, period }) {
         />
       </label>
       <p className={styles.bandHint}>
+        每一天的 {period} 日均线均记为
+        0%；显示相对均线的涨跌幅，不是当日涨跌或持仓收益率。图中仅含正式历史数据，盘中估值见上方预览。
         拖动图表平移，按住 Ctrl 或 ⌘ 滚动缩放。
         {Number(period) <= 10 ? '5 日和 10 日默认只显示最近一段，点「全部」可看完整历史。' : ''}
       </p>
@@ -369,6 +371,7 @@ export default function ValuationBandPanel({
     [history, period, bandSell, bandBuy]
   );
   const signals = useMemo(() => replayBandSignals(series, minHoldDays), [series, minHoldDays]);
+  const percentageSeries = useMemo(() => bandPercentageSeries(series), [series]);
   const maLabel = `${period} 日均线`;
   const isTested =
     Number(config.bandSell) === tested.sell &&
@@ -377,8 +380,11 @@ export default function ValuationBandPanel({
     Number(config.minHoldDays) === 30;
   const latest = series.at(-1);
   const ma = state.ma ?? latest?.ma;
-  const hasBand = Number.isFinite(ma);
-  const deviation = state.deviation ?? (hasBand ? (latest.nav / ma - 1) * 100 : null);
+  const currentNav = state.nav ?? latest?.nav;
+  const deviation = navChange(currentNav, ma);
+  const buying = state.phase === 'waitingBuy';
+  const target = buying ? ma : (state.upper ?? latest?.upper);
+  const distance = triggerDistance(currentNav, target, buying);
   const usable = Object.keys(BAND_PERIODS).filter((key) => Number(key) <= (history?.length ?? 0));
   const corePercent = Number(config.corePercent);
   const validCore = corePercent > 0 && corePercent < 100;
@@ -393,7 +399,15 @@ export default function ValuationBandPanel({
       step: 0.1,
       hint: `按 ${maLabel} 计算`
     },
-    { key: 'bandBuy', label: '低于均线多少买回', suffix: '%', min: 0.1, max: 89, step: 0.1, hint: '卖出后才生效' },
+    {
+      key: 'bandBuy',
+      label: '深度下轨',
+      suffix: '%',
+      min: 0.1,
+      max: 89,
+      step: 0.1,
+      hint: '只画在图上；买回以回到均线为准'
+    },
     { key: 'minHoldDays', label: '最少持有', suffix: '天', min: 0, max: 3650, step: 1, hint: '每笔成交后按日历天计算' }
   ];
 
@@ -401,10 +415,18 @@ export default function ValuationBandPanel({
     <div className={styles.bandPanel}>
       <div className={styles.bandStats}>
         {[
-          ['净值', nav3(state.nav ?? latest?.nav), state.quoteDate || latest?.date || '待更新'],
-          [maLabel, nav3(ma), hasBand ? `偏离 ${signed(deviation)}` : '数据不足'],
-          ['卖出线', nav3(state.upper ?? latest?.upper), `均线 +${bandSell}%`],
-          ['买回线', nav3(state.lower ?? latest?.lower), `均线 −${bandBuy}%`]
+          [
+            state.estimated ? '当前偏离（预估）' : '当前偏离',
+            signed(deviation),
+            `相对 ${maLabel} · ${state.quoteDate || latest?.date || '待更新'}`
+          ],
+          ['卖出阈值', signed(Number(bandSell)), `相对 ${maLabel} · 持有时生效`],
+          ['买回位置', '均线', '卖出后，回到 0% 就买回'],
+          [
+            buying ? '距买回还需跌' : '距卖出还需涨',
+            distance === null ? '--' : `${distance.toFixed(2)}%`,
+            distance === 0 ? '已到线，还要看持有期' : '按当前价格计算'
+          ]
         ].map(([label, value, sub]) => (
           <div key={label} className={styles.bandStat}>
             <i>{label}</i>
@@ -416,7 +438,7 @@ export default function ValuationBandPanel({
 
       <div className={styles.bandCard}>
         <div className={styles.bandCardHead}>
-          <h3 className={styles.bandHeading}>净值与估值带</h3>
+          <h3 className={styles.bandHeading}>涨跌幅与买卖阈值</h3>
           <ul className={styles.bandLegend}>
             {LEGEND.map((item) => (
               <li key={item.label}>
@@ -435,7 +457,7 @@ export default function ValuationBandPanel({
           </ul>
         </div>
         {series.length ? (
-          <BandChart series={series} signals={signals} period={period} />
+          <BandChart series={percentageSeries} signals={signals} period={period} />
         ) : (
           <p className={styles.bandEmpty} role={failed ? 'alert' : 'status'}>
             {loading
@@ -479,7 +501,7 @@ export default function ValuationBandPanel({
               ))}
             </div>
             <small className={styles.bandHint}>
-              切换周期时，上下轨换成该周期回测用的参数：+{tested.sell}% / −{tested.buy}%。
+              换周期时，卖出线和深度下轨改为 +{tested.sell}% / −{tested.buy}%。买回始终是均线。
             </small>
           </div>
           <div className={styles.bandFields}>
@@ -539,8 +561,7 @@ export default function ValuationBandPanel({
                 <tr>
                   <th>日期</th>
                   <th>动作</th>
-                  <th>净值</th>
-                  <th>偏离均线</th>
+                  <th>相对均线涨跌幅</th>
                 </tr>
               </thead>
               <tbody>
@@ -551,13 +572,12 @@ export default function ValuationBandPanel({
                       <td className={item.type === 'sell' ? styles.up : styles.down}>
                         {item.type === 'sell' ? '卖出机动仓' : '买回机动仓'}
                       </td>
-                      <td>{nav3(item.nav)}</td>
                       <td>{signed(item.deviation)}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="4" className={styles.emptyCell}>
+                    <td colSpan="3" className={styles.emptyCell}>
                       {series.length ? '当前参数下没有触发信号' : '暂无数据'}
                     </td>
                   </tr>
@@ -565,12 +585,12 @@ export default function ValuationBandPanel({
               </tbody>
             </table>
           </div>
-          <p className={styles.bandLabel}>回测提醒（8 只基金，5 年滚动窗口）</p>
+          <p className={styles.bandLabel}>旧规则回测，不是现在的买回成绩</p>
           <p className={styles.bandEvidence}>
-            {isTested ? '' : '当前设置没有回测过，以下是该周期默认参数（70% 底仓、最少持有 30 天）的结果。'}
-            相比一直持有：中位年化少 {tested.lessReturn}%，只有 {tested.winRate}% 的窗口跑赢；中位最大回撤{' '}
-            {tested.drawdown}%，持有为 {HOLD_DRAWDOWN}%；5 年约 {tested.trades} 笔交易（含建仓 2
-            笔）。这条规则不保证多赚。
+            <b>当时要跌到下轨才买回。</b>
+            {isTested ? '' : '当前卖出线或下轨改过，下面仍是该周期默认参数。'}8 只基金、5 年窗口：中位年化少{' '}
+            {tested.lessReturn}%，{tested.winRate}% 的窗口跑赢；回撤 {tested.drawdown}%，一直持有 {HOLD_DRAWDOWN}%；约{' '}
+            {tested.trades} 笔交易。不保证比一直持有赚得多。
           </p>
         </div>
       </div>
