@@ -8,6 +8,7 @@ import {
   normalizeBand,
   replayBandSignals,
   splitBandPosition,
+  summarizeBandSignals,
   normalizeStrategy,
   calculateStrategyState,
   calculateTrackedHolding,
@@ -397,6 +398,32 @@ check('估值带：回放信号按最少持有期间隔，且买卖交替', () =
       ['2026-03-30', 'sell']
     ]
   );
+});
+check('估值带：历史信号按当前机动仓份额估算金额和轮次盈亏', () => {
+  const signals = [
+    { date: '2026-01-01', type: 'sell', nav: 1.2 },
+    { date: '2026-02-10', type: 'buy', nav: 1 },
+    { date: '2026-03-30', type: 'sell', nav: 1.3 }
+  ];
+  const summary = summarizeBandSignals(signals, { sleeve: 500, nav: 1.25, markNav: 1 });
+  assert.equal(summary.rounds, 1);
+  assert.ok(Math.abs(summary.rows[0].amount - 480) < 1e-9);
+  assert.ok(Math.abs(summary.rows[1].roundProfit - 80) < 1e-9);
+  assert.ok(Math.abs(summary.rows[1].roundRate - (0.2 / 1.2) * 100) < 1e-9);
+  assert.ok(Math.abs(summary.realized - 80) < 1e-9);
+  assert.equal(summary.open.date, '2026-03-30');
+  assert.ok(Math.abs(summary.open.profit - 120) < 1e-9);
+  const losing = summarizeBandSignals(
+    [
+      { type: 'sell', nav: 1.2, date: '2026-01-01' },
+      { type: 'buy', nav: 1.5, date: '2026-02-01' }
+    ],
+    {}
+  );
+  assert.equal(losing.rows[0].amount, null);
+  assert.equal(losing.realized, null);
+  assert.ok(losing.perShare < 0);
+  assert.equal(summarizeBandSignals(signals, { sleeve: 0, nav: 1 }).rows[0].amount, null);
 });
 check('估值带：仓位拆分随阶段变化，无持仓时不估算', () => {
   assert.deepEqual(splitBandPosition({ amount: 1000, corePercent: 50, phase: 'holding' }), { core: 500, sleeve: 500 });
