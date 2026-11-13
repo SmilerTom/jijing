@@ -1318,6 +1318,9 @@
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: 10px;
 }
+.bandSignalStats {
+  margin-top: 10px;
+}
 .bandStat,
 .bandCard {
   min-width: 0;

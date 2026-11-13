@@ -4,21 +4,36 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { CategoryScale, Chart as ChartJS, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { cn } from '@/lib/utils';
-import { BAND_PERIODS, buildBandSeries, isBandConfigValid, normalizeBand, replayBandSignals } from './strategy.mjs';
-import { bandPercentageSeries, navChange, triggerDistance } from './preview.mjs';
+import {
+  BAND_PERIODS,
+  buildBandSeries,
+  isBandConfigValid,
+  normalizeBand,
+  replayBandSignals,
+  summarizeBandSignals
+} from './strategy.mjs';
+import { navChange, triggerDistance } from './preview.mjs';
 import styles from './page.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip);
 
 const HOLD_DRAWDOWN = 35.2;
 const LEGEND = [
-  { label: '相对均线', color: 'var(--chart-1)', dash: 'none' },
+  { label: '净值', color: 'var(--chart-1)', dash: 'none' },
   { label: '买回 · 均线', color: 'var(--muted)', dash: '2 3' },
   { label: '卖出线', color: 'var(--chart-5)', dash: '6 3' },
   { label: '深度下轨', color: 'var(--chart-2)', dash: '6 3' }
 ];
 const money = (value) => `¥${Math.round(value).toLocaleString('zh-CN')}`;
 const signed = (value) => (Number.isFinite(value) ? `${value >= 0 ? '+' : '−'}${Math.abs(value).toFixed(2)}%` : '--');
+const priceText = (value) => (Number.isFinite(value) ? Number(value).toFixed(4) : '--');
+const yuan = (value) =>
+  Number.isFinite(value)
+    ? `¥${Math.abs(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : '--';
+const signedYuan = (value) =>
+  Number.isFinite(value) ? `${value > 0 ? '+' : value < 0 ? '−' : ''}${yuan(value)}` : '--';
+const tone = (value) => (value > 0 ? styles.up : value < 0 ? styles.down : undefined);
 
 function useChartColors() {
   const [colors, setColors] = useState(null);
@@ -144,7 +159,7 @@ function BandChart({ series, signals, period }) {
       pointHoverRadius: 3
     });
     const marks = (label, type, color, letter) => {
-      const byDate = new Map(signals.filter((item) => item.type === type).map((item) => [item.date, item.deviation]));
+      const byDate = new Map(signals.filter((item) => item.type === type).map((item) => [item.date, item.nav]));
       return {
         label,
         data: view.map((row) => byDate.get(row.date) ?? null),
@@ -163,14 +178,14 @@ function BandChart({ series, signals, period }) {
       datasets: [
         marks('卖出信号', 'sell', colors.upper, '卖'),
         marks('买回信号', 'buy', colors.lower, '买'),
-        line('相对均线', 'nav', colors.nav, [], 2),
+        line('净值', 'nav', colors.nav, [], 2),
         line('买回 · 均线', 'ma', colors.muted, [2, 3], 1.5, '买回'),
         line('卖出线', 'upper', colors.upper, [6, 3], 1.5, '卖出'),
         line('深度下轨', 'lower', colors.lower, [6, 3], 1.5, '下轨')
       ]
     };
   }, [colors, period, signals, view]);
-  const bounds = zoomed ? yWindow(view) : null;
+  const bounds = yWindow(view);
   const options = useMemo(
     () =>
       colors && {
@@ -183,7 +198,13 @@ function BandChart({ series, signals, period }) {
           legend: { display: false },
           tooltip: {
             filter: (item) => item.raw !== null,
-            callbacks: { label: (item) => `${item.dataset.label} ${signed(Number(item.raw))}` }
+            callbacks: {
+              label(item) {
+                const price = Number(item.raw);
+                const deviation = navChange(price, view[item.dataIndex]?.ma);
+                return `${item.dataset.label} ${priceText(price)}${deviation === null ? '' : `（相对均线 ${signed(deviation)}）`}`;
+              }
+            }
           }
         },
         scales: {
@@ -203,11 +224,11 @@ function BandChart({ series, signals, period }) {
           y: {
             ...(bounds ? { min: bounds.min, max: bounds.max } : {}),
             grid: { color: colors.grid },
-            ticks: { color: colors.muted, maxTicksLimit: 6, callback: (value) => signed(Number(value)) }
+            ticks: { color: colors.muted, maxTicksLimit: 6, callback: (value) => priceText(Number(value)) }
           }
         }
       },
-    [bounds?.max, bounds?.min, colors, span]
+    [bounds?.max, bounds?.min, colors, span, view]
   );
   const plugins = useMemo(() => (colors ? [bandLabels(colors)] : []), [colors]);
   useEffect(() => {
@@ -311,7 +332,7 @@ function BandChart({ series, signals, period }) {
         className={cn(styles.bandChart, zoomed && styles.bandChartZoomed)}
         tabIndex={0}
         role="group"
-        aria-label={`相对 ${period} 日均线的涨跌幅，均线为 0%，含卖出和买回阈值。当前 ${rangeText}。左右方向键平移，加号放大，减号缩小，Home 显示全部。拖动图表可平移，按住 Ctrl 或 Command 滚动可缩放。`}
+        aria-label={`净值、${period} 日均线、卖出线和深度下轨。当前 ${rangeText}。左右方向键平移，加号放大，减号缩小，Home 显示全部。拖动图表可平移，按住 Ctrl 或 Command 滚动可缩放。`}
         onKeyDown={onKeyDown}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -338,9 +359,8 @@ function BandChart({ series, signals, period }) {
         />
       </label>
       <p className={styles.bandHint}>
-        每一天的 {period} 日均线均记为
-        0%；显示相对均线的涨跌幅，不是当日涨跌或持仓收益率。图中仅含正式历史数据，盘中估值见上方预览。
-        拖动图表平移，按住 Ctrl 或 ⌘ 滚动缩放。
+        曲线是分红复权后、对齐到最新单位净值的走势，和基金净值同向。{period} 日均线、卖出线和深度下轨随净值移动。
+        悬浮可看相对均线的涨跌幅。图中仅含正式历史数据，盘中估值见上方预览。 拖动图表平移，按住 Ctrl 或 ⌘ 滚动缩放。
         {Number(period) <= 10 ? '5 日和 10 日默认只显示最近一段，点「全部」可看完整历史。' : ''}
       </p>
     </div>
@@ -371,7 +391,6 @@ export default function ValuationBandPanel({
     [history, period, bandSell, bandBuy]
   );
   const signals = useMemo(() => replayBandSignals(series, minHoldDays), [series, minHoldDays]);
-  const percentageSeries = useMemo(() => bandPercentageSeries(series), [series]);
   const maLabel = `${period} 日均线`;
   const isTested =
     Number(config.bandSell) === tested.sell &&
@@ -381,6 +400,11 @@ export default function ValuationBandPanel({
   const latest = series.at(-1);
   const ma = state.ma ?? latest?.ma;
   const currentNav = state.nav ?? latest?.nav;
+  const sleeveValue = Number(split?.sleeve);
+  const sleeve = sleeveValue > 0 ? sleeveValue : null;
+  const markedNav = Number(latest?.nav);
+  const markNav = markedNav > 0 ? markedNav : null;
+  const tradeSummary = summarizeBandSignals(signals, { sleeve, nav: currentNav, markNav });
   const deviation = navChange(currentNav, ma);
   const buying = state.phase === 'waitingBuy';
   const target = buying ? ma : (state.upper ?? latest?.upper);
@@ -438,7 +462,7 @@ export default function ValuationBandPanel({
 
       <div className={styles.bandCard}>
         <div className={styles.bandCardHead}>
-          <h3 className={styles.bandHeading}>涨跌幅与买卖阈值</h3>
+          <h3 className={styles.bandHeading}>净值走势与买卖线</h3>
           <ul className={styles.bandLegend}>
             {LEGEND.map((item) => (
               <li key={item.label}>
@@ -457,7 +481,7 @@ export default function ValuationBandPanel({
           </ul>
         </div>
         {series.length ? (
-          <BandChart series={percentageSeries} signals={signals} period={period} />
+          <BandChart series={series} signals={signals} period={period} />
         ) : (
           <p className={styles.bandEmpty} role={failed ? 'alert' : 'status'}>
             {loading
@@ -550,6 +574,49 @@ export default function ValuationBandPanel({
 
         <div className={styles.bandCard}>
           <h3 className={styles.bandHeading}>当前参数下的历史信号</h3>
+          {tradeSummary.rows.length ? (
+            <>
+              <div className={cn(styles.bandStats, styles.bandSignalStats)} aria-label="历史信号统计">
+                <div className={styles.bandStat}>
+                  <i>完成轮次</i>
+                  <b>{tradeSummary.rounds}</b>
+                  <small>卖出后再买回算一轮</small>
+                </div>
+                <div className={styles.bandStat}>
+                  <i>{tradeSummary.realized === null ? '每份累计差价' : '累计盈亏'}</i>
+                  <b className={tone(tradeSummary.rounds ? (tradeSummary.realized ?? tradeSummary.perShare) : 0)}>
+                    {tradeSummary.rounds === 0
+                      ? '--'
+                      : tradeSummary.realized === null
+                        ? `${tradeSummary.perShare > 0 ? '+' : tradeSummary.perShare < 0 ? '−' : ''}${Math.abs(tradeSummary.perShare).toFixed(4)}`
+                        : signedYuan(tradeSummary.realized)}
+                  </b>
+                  <small>
+                    {tradeSummary.rounds === 0
+                      ? '还没有完成的卖出再买回'
+                      : tradeSummary.realized === null
+                        ? '填写持仓金额后换算成盈亏'
+                        : `约占当前机动仓 ${signed((tradeSummary.realized / sleeve) * 100)}，不含费用`}
+                  </small>
+                </div>
+                <div className={styles.bandStat}>
+                  <i>未买回</i>
+                  <b className={tone(tradeSummary.open?.profit ?? tradeSummary.open?.rate)}>
+                    {tradeSummary.open
+                      ? tradeSummary.open.profit === null
+                        ? signed(tradeSummary.open.rate)
+                        : signedYuan(tradeSummary.open.profit)
+                      : '无'}
+                  </b>
+                  <small>{tradeSummary.open ? `${tradeSummary.open.date} 卖出，按最新净值估算` : '卖出都已买回'}</small>
+                </div>
+              </div>
+              <p className={styles.bandHint}>
+                金额按当前机动仓金额除以当前净值，再乘以当日复权净值估算，不含申赎费。
+                {sleeve ? '' : '填写持仓金额后显示成交金额和累计盈亏。'}
+              </p>
+            </>
+          ) : null}
           <div
             className={cn(styles.tableScroll, styles.bandSignals)}
             role="region"
@@ -561,23 +628,37 @@ export default function ValuationBandPanel({
                 <tr>
                   <th>日期</th>
                   <th>动作</th>
-                  <th>相对均线涨跌幅</th>
+                  <th>净值</th>
+                  <th>相对均线</th>
+                  <th>金额</th>
+                  <th>本轮盈亏</th>
                 </tr>
               </thead>
               <tbody>
-                {signals.length ? (
-                  [...signals].reverse().map((item) => (
+                {tradeSummary.rows.length ? (
+                  [...tradeSummary.rows].reverse().map((item) => (
                     <tr key={item.date}>
                       <td>{item.date}</td>
                       <td className={item.type === 'sell' ? styles.up : styles.down}>
                         {item.type === 'sell' ? '卖出机动仓' : '买回机动仓'}
                       </td>
+                      <td>{priceText(item.nav)}</td>
                       <td>{signed(item.deviation)}</td>
+                      <td>{yuan(item.amount)}</td>
+                      <td className={tone(item.roundProfit ?? item.roundRate)}>
+                        {item.type === 'sell'
+                          ? '待买回'
+                          : !Number.isFinite(item.roundRate)
+                            ? '--'
+                            : item.roundProfit === null
+                              ? signed(item.roundRate)
+                              : `${signedYuan(item.roundProfit)} · ${signed(item.roundRate)}`}
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="3" className={styles.emptyCell}>
+                    <td colSpan="6" className={styles.emptyCell}>
                       {series.length ? '当前参数下没有触发信号' : '暂无数据'}
                     </td>
                   </tr>

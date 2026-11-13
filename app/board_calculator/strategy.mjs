@@ -121,6 +121,47 @@ export function replayBandSignals(series = [], minHoldDays = 0) {
   return signals;
 }
 
+/** 按当前机动仓份额估算每笔成交金额；买回时结算这一轮相对卖出价的盈亏 */
+export function summarizeBandSignals(signals = [], { sleeve = null, nav = null, markNav = null } = {}) {
+  const sleeveValue = Number(sleeve);
+  const latestNav = Number(nav);
+  const shares = sleeveValue > 0 && latestNav > 0 ? sleeveValue / latestNav : null;
+  let pending = null;
+  let perShare = 0;
+  let rounds = 0;
+  const rows = signals.map((signal) => {
+    const price = Number(signal.nav);
+    const amount = shares !== null && price > 0 ? shares * price : null;
+    let roundProfit = null;
+    let roundRate = null;
+    if (signal.type === 'sell' && price > 0) pending = signal;
+    else if (signal.type === 'buy' && pending && price > 0) {
+      const sold = Number(pending.nav);
+      if (sold > 0) {
+        perShare += sold - price;
+        rounds += 1;
+        roundRate = ((sold - price) / sold) * 100;
+        roundProfit = shares === null ? null : shares * (sold - price);
+        pending = null;
+      }
+    }
+    return { ...signal, amount, roundProfit, roundRate };
+  });
+  const openPrice = Number(pending?.nav);
+  const marked = Number(markNav);
+  const open =
+    pending && openPrice > 0
+      ? {
+          date: pending.date,
+          nav: openPrice,
+          amount: shares === null ? null : shares * openPrice,
+          profit: shares !== null && marked > 0 ? shares * (openPrice - marked) : null,
+          rate: marked > 0 ? ((openPrice - marked) / openPrice) * 100 : null
+        }
+      : null;
+  return { rows, rounds, perShare, realized: shares === null ? null : shares * perShare, open };
+}
+
 /** 持有时当前持仓含机动仓；卖出后持仓只剩底仓，机动仓按比例估算 */
 export function splitBandPosition({ amount, corePercent, phase }) {
   const value = Number(amount);
