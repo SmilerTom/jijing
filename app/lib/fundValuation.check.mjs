@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   hasFundEstimate,
   isMarketOpen,
+  isTradingDayQuoteWindow,
   shouldAutoRefresh,
   shouldShowTradingSessionData,
   trimValuationSeriesAtClose
@@ -38,11 +39,13 @@ assert.equal(
   }),
   true
 );
+assert.equal(isTradingDayQuoteWindow({ isTradingDay: true, currentMinutes: 12 * 60 }), true);
+assert.equal(isTradingDayQuoteWindow({ isTradingDay: false, currentMinutes: 12 * 60 }), false);
 for (const [currentMinutes, expected] of [
   [9 * 60 + 30, false],
   [11 * 60 + 30, false],
-  [11 * 60 + 31, true],
-  [12 * 60 + 59, true],
+  [11 * 60 + 31, false],
+  [12 * 60 + 59, false],
   [13 * 60, false],
   [15 * 60, false],
   [15 * 60 + 1, true]

@@ -4,9 +4,13 @@ export const hasFundEstimate = (fund) =>
   (fund?.gsz != null && fund.gsz !== '' && Number.isFinite(Number(fund.gsz))) ||
   (fund?.gszzl != null && fund.gszzl !== '' && Number.isFinite(Number(fund.gszzl)));
 
+/** 交易日 9:30–15:00，含午休。这段时间里昨天的净值不能再显示成最新涨幅。 */
+export const isTradingDayQuoteWindow = ({ isTradingDay, currentMinutes }) =>
+  Boolean(isTradingDay) && currentMinutes >= 9 * 60 + 30 && currentMinutes <= 15 * 60;
+
 export const shouldShowTradingSessionData = ({ dataDate, todayStr, isTradingDay, currentMinutes }) => {
   if (!dataDate) return false;
-  if (!isMarketOpen({ isTradingDay, currentMinutes })) return true;
+  if (!isTradingDayQuoteWindow({ isTradingDay, currentMinutes })) return true;
   return String(dataDate).startsWith(todayStr);
 };
 
