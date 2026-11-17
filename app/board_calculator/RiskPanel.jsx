@@ -253,6 +253,7 @@ function NewsList({ query, emptyText, onRead, showNoticeLevel = false, today = '
 }
 
 export default function RiskPanel({ fundId, fund, history, reminder, strategy, onReview }) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [newsTab, setNewsTab] = useState('sector');
   const [confirmingReset, setConfirmingReset] = useState(false);
   const [readingNews, setReadingNews] = useState(null);
@@ -277,7 +278,7 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
       const secid = label ? (await fetchFundSecidsBatch([label]))?.[label] || '' : '';
       return { label, secid };
     },
-    enabled: Boolean(fundId),
+    enabled: detailsOpen && Boolean(fundId),
     staleTime: 24 * 60 * 60 * 1000
   });
   const secid = sectorQuery.data?.secid || '';
@@ -285,40 +286,40 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
   const klineQuery = useQuery({
     queryKey: qk.indexKlines(secid),
     queryFn: () => fetchIndexKlines(secid),
-    enabled: Boolean(secid),
+    enabled: detailsOpen && Boolean(secid),
     staleTime: 60 * 1000,
     refetchInterval: 2 * 60 * 1000
   });
   const quoteQuery = useQuery({
     queryKey: ['boardSectorQuotes', secid],
     queryFn: () => fetchEastmoneySectorQuotesBatch([secid, BENCHMARK_SECID]),
-    enabled: Boolean(secid),
+    enabled: detailsOpen && Boolean(secid),
     refetchInterval: 60 * 1000
   });
   const flowQuery = useQuery({
     queryKey: qk.indexFundFlow(secid),
     queryFn: () => fetchIndexFundFlow(secid),
-    enabled: Boolean(secid),
+    enabled: detailsOpen && Boolean(secid),
     staleTime: 5 * 60 * 1000
   });
   const keyword = sectorLabel ? sectorKeyword(sectorLabel) : '';
   const sectorNewsQuery = useQuery({
     queryKey: qk.sectorNews(keyword),
     queryFn: () => fetchSectorNews(keyword),
-    enabled: Boolean(keyword),
+    enabled: detailsOpen && Boolean(keyword),
     staleTime: 5 * 60 * 1000
   });
   const fundNewsQuery = useQuery({
     queryKey: qk.fundAnnouncements(fundId),
     queryFn: () => fetchFundAnnouncements(fundId),
-    enabled: Boolean(fundId),
+    enabled: detailsOpen && Boolean(fundId),
     staleTime: 30 * 60 * 1000
   });
 
   const holdingsQuery = useQuery({
     queryKey: ['boardFundHoldings', fundId],
     queryFn: () => fetchFundHoldings(fundId),
-    enabled: Boolean(fundId),
+    enabled: detailsOpen && Boolean(fundId),
     staleTime: 5 * 60 * 1000
   });
   const sectorName = keyword || quoteQuery.data?.[secid]?.name || '所属板块';
@@ -437,251 +438,257 @@ export default function RiskPanel({ fundId, fund, history, reminder, strategy, o
             )
           ) : null}
         </p>
-        {Number.isFinite(fundPct) || Number.isFinite(sectorPct) ? (
-          <p className={styles.riskFacts}>
-            最新涨跌：本基金 <span className={toneClass(fundPct)}>{signed(fundPct)}</span>
-            {Number.isFinite(sectorPct) ? (
-              <>
-                {' '}
-                · {sectorName} <span className={toneClass(sectorPct)}>{signed(sectorPct)}</span>
-              </>
-            ) : null}
-            {Number.isFinite(benchmarkPct) ? (
-              <>
-                {' '}
-                · 沪深 300 <span className={toneClass(benchmarkPct)}>{signed(benchmarkPct)}</span>
-              </>
-            ) : null}
-          </p>
-        ) : null}
-        {attribution ? <AttributionLine attribution={attribution} /> : null}
-        <div className={styles.riskSection}>
-          <DecisionCard
-            fundId={fundId}
-            nav={quote?.nav}
-            estimated={Boolean(quote?.estimated)}
-            open={hot}
-            onDecide={reminder.saveDecision}
-          />
-        </div>
-
-        <div className={styles.riskSection}>
-          <div className={styles.riskSectionHead}>
-            <b>板块趋势 · {sectorName}</b>
-            {Number.isFinite(sectorPct) ? (
-              <span className={styles.riskMuted}>
-                最新交易日 <span className={toneClass(sectorPct)}>{signed(sectorPct)}</span>
-              </span>
-            ) : null}
-          </div>
-          {sectorQuery.isPending || (secid && klineQuery.isPending) ? (
-            <p className={styles.riskMuted}>正在加载板块行情…</p>
-          ) : !secid ? (
-            <p className={styles.riskMuted}>暂未匹配到本基金跟踪的板块或指数。</p>
-          ) : klineQuery.isError ? (
-            <p className={styles.riskMuted} role="status">
-              板块行情加载失败。
-              <button type="button" className={styles.riskLink} onClick={() => klineQuery.refetch()}>
-                重试
-              </button>
+        <details className={styles.riskDetails} onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
+          <summary>
+            <b>更多分析</b>
+            <span className={styles.riskMuted}>板块、走势、复盘与资讯</span>
+          </summary>
+          {Number.isFinite(fundPct) || Number.isFinite(sectorPct) ? (
+            <p className={styles.riskFacts}>
+              最新涨跌：本基金 <span className={toneClass(fundPct)}>{signed(fundPct)}</span>
+              {Number.isFinite(sectorPct) ? (
+                <>
+                  {' '}
+                  · {sectorName} <span className={toneClass(sectorPct)}>{signed(sectorPct)}</span>
+                </>
+              ) : null}
+              {Number.isFinite(benchmarkPct) ? (
+                <>
+                  {' '}
+                  · 沪深 300 <span className={toneClass(benchmarkPct)}>{signed(benchmarkPct)}</span>
+                </>
+              ) : null}
             </p>
-          ) : !trend ? (
-            <p className={styles.riskMuted}>板块历史数据不足，暂不判断趋势。</p>
-          ) : (
-            <>
-              <div className={styles.trendRow}>
-                <span className={cn(styles.trendBadge, styles[`stance_${trendTone}`])}>
-                  <TrendIcon size={16} aria-hidden="true" />
-                  {trend.label}
-                </span>
+          ) : null}
+          {attribution ? <AttributionLine attribution={attribution} /> : null}
+          <div className={styles.riskSection}>
+            <DecisionCard
+              fundId={fundId}
+              nav={quote?.nav}
+              estimated={Boolean(quote?.estimated)}
+              open={hot}
+              onDecide={reminder.saveDecision}
+            />
+          </div>
+
+          <div className={styles.riskSection}>
+            <div className={styles.riskSectionHead}>
+              <b>板块趋势 · {sectorName}</b>
+              {Number.isFinite(sectorPct) ? (
                 <span className={styles.riskMuted}>
-                  {trend.evidence.length} 项依据：偏多 {trend.bull}、偏空 {trend.bear}、中性 {trend.neutral}
+                  最新交易日 <span className={toneClass(sectorPct)}>{signed(sectorPct)}</span>
                 </span>
-              </div>
-              <div className={styles.probBlock}>
-                <div className={styles.riskMeterHead}>
-                  <span>下个交易日历史涨跌频率</span>
-                  <span>样本 {trend.stats.sampleSize} 次</span>
+              ) : null}
+            </div>
+            {sectorQuery.isPending || (secid && klineQuery.isPending) ? (
+              <p className={styles.riskMuted}>正在加载板块行情…</p>
+            ) : !secid ? (
+              <p className={styles.riskMuted}>暂未匹配到本基金跟踪的板块或指数。</p>
+            ) : klineQuery.isError ? (
+              <p className={styles.riskMuted} role="status">
+                板块行情加载失败。
+                <button type="button" className={styles.riskLink} onClick={() => klineQuery.refetch()}>
+                  重试
+                </button>
+              </p>
+            ) : !trend ? (
+              <p className={styles.riskMuted}>板块历史数据不足，暂不判断趋势。</p>
+            ) : (
+              <>
+                <div className={styles.trendRow}>
+                  <span className={cn(styles.trendBadge, styles[`stance_${trendTone}`])}>
+                    <TrendIcon size={16} aria-hidden="true" />
+                    {trend.label}
+                  </span>
+                  <span className={styles.riskMuted}>
+                    {trend.evidence.length} 项依据：偏多 {trend.bull}、偏空 {trend.bear}、中性 {trend.neutral}
+                  </span>
                 </div>
-                {trend.stats.hasEdge ? (
-                  <div
-                    className={styles.probBar}
-                    role="img"
-                    aria-label={`历史同类情形下，次日上涨 ${percent(trend.stats.upRate)}，下跌 ${percent(1 - trend.stats.upRate)}`}
-                  >
-                    <span className={styles.stance_bull} style={{ width: percent(trend.stats.upRate) }}>
-                      涨 {percent(trend.stats.upRate)}
-                    </span>
-                    <span className={styles.stance_bear} style={{ width: percent(1 - trend.stats.upRate) }}>
-                      跌 {percent(1 - trend.stats.upRate)}
-                    </span>
+                <div className={styles.probBlock}>
+                  <div className={styles.riskMeterHead}>
+                    <span>下个交易日历史涨跌频率</span>
+                    <span>样本 {trend.stats.sampleSize} 次</span>
                   </div>
-                ) : (
-                  <p className={styles.noEdge}>
-                    历史上没有明显方向（涨 {percent(trend.stats.upRate)} / 跌 {percent(1 - trend.stats.upRate)}）
+                  {trend.stats.hasEdge ? (
+                    <div
+                      className={styles.probBar}
+                      role="img"
+                      aria-label={`历史同类情形下，次日上涨 ${percent(trend.stats.upRate)}，下跌 ${percent(1 - trend.stats.upRate)}`}
+                    >
+                      <span className={styles.stance_bull} style={{ width: percent(trend.stats.upRate) }}>
+                        涨 {percent(trend.stats.upRate)}
+                      </span>
+                      <span className={styles.stance_bear} style={{ width: percent(1 - trend.stats.upRate) }}>
+                        跌 {percent(1 - trend.stats.upRate)}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className={styles.noEdge}>
+                      历史上没有明显方向（涨 {percent(trend.stats.upRate)} / 跌 {percent(1 - trend.stats.upRate)}）
+                    </p>
+                  )}
+                  <p className={styles.riskMuted}>
+                    {trend.stats.matchedSignal
+                      ? `统计近 ${trend.stats.years} 年板块同样“${trend.stats.signalText}”后的下一交易日。`
+                      : `同类信号样本不足，改用近 ${trend.stats.years} 年全部交易日统计。`}
+                    是历史频率，不是预测。
                   </p>
-                )}
-                <p className={styles.riskMuted}>
-                  {trend.stats.matchedSignal
-                    ? `统计近 ${trend.stats.years} 年板块同样“${trend.stats.signalText}”后的下一交易日。`
-                    : `同类信号样本不足，改用近 ${trend.stats.years} 年全部交易日统计。`}
-                  是历史频率，不是预测。
+                </div>
+                <ul className={styles.evidenceList}>
+                  {trend.evidence.map((item) => {
+                    const Icon = EVIDENCE_ICON[item.key];
+                    return (
+                      <li key={item.key}>
+                        <Icon size={15} aria-hidden="true" className={styles[`stanceText_${item.stance}`]} />
+                        <span>
+                          <span className={styles.riskMuted}>{item.label}</span> {item.text}
+                        </span>
+                        <span className={cn(styles.stanceTag, styles[`stance_${item.stance}`])}>
+                          {STANCE_LABEL[item.stance]}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+          </div>
+
+          <details className={styles.riskFold}>
+            <summary>
+              <b>未来 {forecast?.days || 5} 个交易日波动范围</b>
+              <span className={styles.riskMuted}>未经回测，只用来了解波动</span>
+            </summary>
+            {!forecast ? (
+              <p className={styles.riskMuted}>净值数据不足 20 个交易日，暂不估算。</p>
+            ) : (
+              <>
+                <p className={styles.forecastSummary}>
+                  按近期波动，80% 区间约{' '}
+                  <b>
+                    {signed(forecast.low, 1)} ~ {signed(forecast.high, 1)}
+                  </b>
+                  {forecast.belowStop ? (
+                    <>
+                      ，当前已低于止损线（从跟踪最高值回落 <b>{signed(-stopLine)}</b>）
+                    </>
+                  ) : forecast.touchStop !== null ? (
+                    <>
+                      ，有 <b>{percent(forecast.touchStop)}</b> 的可能在 {forecast.days} 日内触及止损线
+                    </>
+                  ) : null}
+                  。
                 </p>
-              </div>
-              <ul className={styles.evidenceList}>
-                {trend.evidence.map((item) => {
-                  const Icon = EVIDENCE_ICON[item.key];
+                <ForecastChart navs={navs} forecast={forecast} stopNav={stopNav} />
+                <div className={styles.forecastLegend}>
+                  <span>
+                    <i className={styles.legendPast} />
+                    历史涨跌（当前为 0%）
+                  </span>
+                  <span>
+                    <i className={styles.legendInner} />
+                    50% 区间
+                  </span>
+                  <span>
+                    <i className={styles.legendOuter} />
+                    80% 区间
+                  </span>
+                </div>
+                <div className={styles.scenarioGrid}>
+                  <div>
+                    <span>反弹 · 涨超 2%</span>
+                    <b className={styles.up}>{percent(forecast.scenarios.up)}</b>
+                  </div>
+                  <div>
+                    <span>震荡 · ±2% 内</span>
+                    <b>{percent(forecast.scenarios.flat)}</b>
+                  </div>
+                  <div>
+                    <span>续跌 · 跌超 2%</span>
+                    <b className={styles.down}>{percent(forecast.scenarios.down)}</b>
+                  </div>
+                </div>
+                <details className={styles.forecastMethod}>
+                  <summary>怎么算的</summary>
+                  <ul>
+                    <li>
+                      区间宽度：本基金近 {forecast.sampleDays} 个交易日波动率（年化 {forecast.annualVol.toFixed(0)}%）
+                    </li>
+                    <li>
+                      中位方向：
+                      {trend
+                        ? `板块同类信号后 5 日收益中位数 ${signed(trend.stats.medianForward5, 1)}，按波动率封顶`
+                        : '板块数据缺失，按无方向处理'}
+                    </li>
+                    <li>触及止损概率：模拟 2000 条 5 日路径，统计跌破止损线的比例</li>
+                    <li>不含突发消息、政策和资金面变化，越往后误差越大</li>
+                  </ul>
+                </details>
+              </>
+            )}
+          </details>
+
+          <div className={styles.riskSection}>
+            <b>风险走势提醒</b>
+            {stopLine > 0 ? <DrawdownChart points={points} stopLine={stopLine} level={risk.level} /> : null}
+            {alerts.length ? (
+              <ul className={styles.alertList}>
+                {alerts.map((item) => {
+                  const Icon = ALERT_ICON[item.icon];
                   return (
-                    <li key={item.key}>
-                      <Icon size={15} aria-hidden="true" className={styles[`stanceText_${item.stance}`]} />
-                      <span>
-                        <span className={styles.riskMuted}>{item.label}</span> {item.text}
-                      </span>
-                      <span className={cn(styles.stanceTag, styles[`stance_${item.stance}`])}>
-                        {STANCE_LABEL[item.stance]}
-                      </span>
+                    <li key={item.icon}>
+                      <Icon size={15} aria-hidden="true" className={styles[`alertTone_${item.tone}`]} />
+                      {item.text}
                     </li>
                   );
                 })}
               </ul>
-            </>
-          )}
-        </div>
-
-        <details className={styles.riskFold}>
-          <summary>
-            <b>未来 {forecast?.days || 5} 个交易日波动范围</b>
-            <span className={styles.riskMuted}>未经回测，只用来了解波动</span>
-          </summary>
-          {!forecast ? (
-            <p className={styles.riskMuted}>净值数据不足 20 个交易日，暂不估算。</p>
-          ) : (
-            <>
-              <p className={styles.forecastSummary}>
-                按近期波动，80% 区间约{' '}
-                <b>
-                  {signed(forecast.low, 1)} ~ {signed(forecast.high, 1)}
-                </b>
-                {forecast.belowStop ? (
-                  <>
-                    ，当前已低于止损线（从跟踪最高值回落 <b>{signed(-stopLine)}</b>）
-                  </>
-                ) : forecast.touchStop !== null ? (
-                  <>
-                    ，有 <b>{percent(forecast.touchStop)}</b> 的可能在 {forecast.days} 日内触及止损线
-                  </>
-                ) : null}
-                。
-              </p>
-              <ForecastChart navs={navs} forecast={forecast} stopNav={stopNav} />
-              <div className={styles.forecastLegend}>
-                <span>
-                  <i className={styles.legendPast} />
-                  历史涨跌（当前为 0%）
-                </span>
-                <span>
-                  <i className={styles.legendInner} />
-                  50% 区间
-                </span>
-                <span>
-                  <i className={styles.legendOuter} />
-                  80% 区间
-                </span>
-              </div>
-              <div className={styles.scenarioGrid}>
-                <div>
-                  <span>反弹 · 涨超 2%</span>
-                  <b className={styles.up}>{percent(forecast.scenarios.up)}</b>
-                </div>
-                <div>
-                  <span>震荡 · ±2% 内</span>
-                  <b>{percent(forecast.scenarios.flat)}</b>
-                </div>
-                <div>
-                  <span>续跌 · 跌超 2%</span>
-                  <b className={styles.down}>{percent(forecast.scenarios.down)}</b>
-                </div>
-              </div>
-              <details className={styles.forecastMethod}>
-                <summary>怎么算的</summary>
-                <ul>
-                  <li>
-                    区间宽度：本基金近 {forecast.sampleDays} 个交易日波动率（年化 {forecast.annualVol.toFixed(0)}%）
-                  </li>
-                  <li>
-                    中位方向：
-                    {trend
-                      ? `板块同类信号后 5 日收益中位数 ${signed(trend.stats.medianForward5, 1)}，按波动率封顶`
-                      : '板块数据缺失，按无方向处理'}
-                  </li>
-                  <li>触及止损概率：模拟 2000 条 5 日路径，统计跌破止损线的比例</li>
-                  <li>不含突发消息、政策和资金面变化，越往后误差越大</li>
-                </ul>
-              </details>
-            </>
-          )}
-        </details>
-
-        <div className={styles.riskSection}>
-          <b>风险走势提醒</b>
-          {stopLine > 0 ? <DrawdownChart points={points} stopLine={stopLine} level={risk.level} /> : null}
-          {alerts.length ? (
-            <ul className={styles.alertList}>
-              {alerts.map((item) => {
-                const Icon = ALERT_ICON[item.icon];
-                return (
-                  <li key={item.icon}>
-                    <Icon size={15} aria-hidden="true" className={styles[`alertTone_${item.tone}`]} />
-                    {item.text}
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className={styles.riskMuted}>近期没有连续下跌或跌势加快。</p>
-          )}
-        </div>
-
-        <details className={styles.riskFold}>
-          <summary>
-            <b>提示复盘</b>
-            <span className={styles.riskMuted}>只保存在这台设备上</span>
-          </summary>
-          <SignalReview log={reminder.signalLog} latestNav={quote?.nav} />
-        </details>
-
-        <div className={styles.riskSection}>
-          <div className={styles.riskSectionHead}>
-            <b>最新资讯</b>
-            <div className={styles.newsTabs} role="group" aria-label="资讯范围">
-              <button
-                type="button"
-                aria-pressed={newsTab === 'sector'}
-                onClick={() => setNewsTab('sector')}
-                disabled={!keyword}
-              >
-                {keyword || '板块'}
-              </button>
-              <button type="button" aria-pressed={newsTab === 'fund'} onClick={() => setNewsTab('fund')}>
-                本基金公告
-              </button>
-            </div>
+            ) : (
+              <p className={styles.riskMuted}>近期没有连续下跌或跌势加快。</p>
+            )}
           </div>
-          {newsTab === 'sector' && keyword ? (
-            <NewsList query={sectorNewsQuery} emptyText="暂无板块资讯。" onRead={setReadingNews} />
-          ) : (
-            <NewsList
-              query={fundNewsQuery}
-              emptyText="暂无基金公告。"
-              onRead={setReadingNews}
-              showNoticeLevel
-              today={beijingToday}
-            />
-          )}
-          <p className={styles.riskMuted}>
-            资讯来自东方财富。趋势、频率和波动范围基于历史统计，仅作提醒，买卖由你决定，不构成投资建议。
-          </p>
-        </div>
+
+          <details className={styles.riskFold}>
+            <summary>
+              <b>提示复盘</b>
+              <span className={styles.riskMuted}>只保存在这台设备上</span>
+            </summary>
+            <SignalReview log={reminder.signalLog} latestNav={quote?.nav} />
+          </details>
+
+          <div className={styles.riskSection}>
+            <div className={styles.riskSectionHead}>
+              <b>最新资讯</b>
+              <div className={styles.newsTabs} role="group" aria-label="资讯范围">
+                <button
+                  type="button"
+                  aria-pressed={newsTab === 'sector'}
+                  onClick={() => setNewsTab('sector')}
+                  disabled={!keyword}
+                >
+                  {keyword || '板块'}
+                </button>
+                <button type="button" aria-pressed={newsTab === 'fund'} onClick={() => setNewsTab('fund')}>
+                  本基金公告
+                </button>
+              </div>
+            </div>
+            {newsTab === 'sector' && keyword ? (
+              <NewsList query={sectorNewsQuery} emptyText="暂无板块资讯。" onRead={setReadingNews} />
+            ) : (
+              <NewsList
+                query={fundNewsQuery}
+                emptyText="暂无基金公告。"
+                onRead={setReadingNews}
+                showNoticeLevel
+                today={beijingToday}
+              />
+            )}
+            <p className={styles.riskMuted}>
+              资讯来自东方财富。趋势、频率和波动范围基于历史统计，仅作提醒，买卖由你决定，不构成投资建议。
+            </p>
+          </div>
+        </details>
       </div>
       <NewsReader item={readingNews} onClose={() => setReadingNews(null)} />
     </section>

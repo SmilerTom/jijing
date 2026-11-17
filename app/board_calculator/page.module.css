@@ -1104,9 +1104,25 @@
   border-radius: 8px;
   font-size: 13px;
 }
+.riskDetails,
 .riskFold,
 .decisionFold {
   min-width: 0;
+}
+.riskDetails {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.riskDetails > summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  cursor: pointer;
+}
+.riskDetails > summary .riskMuted {
+  margin: 0;
 }
 .riskFold {
   margin-top: 14px;
@@ -1125,6 +1141,7 @@
 .decisionFold > summary .riskMuted {
   margin: 0;
 }
+.riskDetails > summary:focus-visible,
 .riskFold > summary:focus-visible,
 .decisionFold > summary:focus-visible,
 .decisionScroll:focus-visible {
