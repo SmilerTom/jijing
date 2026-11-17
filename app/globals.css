@@ -5362,15 +5362,15 @@ html::-webkit-scrollbar-thumb:active,
     backdrop-filter: blur(2px) !important;
   }
 }
-/* 首页策略提示：复用详情页策略结果，持续横向滚动。 */
+/* 首页策略入口。 */
 .strategy-ticker {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   min-height: 40px;
   margin: 8px 0;
   padding: 0 12px;
-  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--muted-foreground);
@@ -5383,83 +5383,57 @@ html::-webkit-scrollbar-thumb:active,
   font-weight: 700;
 }
 
-.strategy-ticker-viewport {
+.strategy-ticker-count {
   min-width: 0;
   flex: 1;
   overflow: hidden;
-}
-
-.strategy-ticker-track,
-.strategy-ticker-group,
-.strategy-ticker-item {
-  display: flex;
-  align-items: center;
-  width: max-content;
-}
-
-.strategy-ticker-track {
-  animation: strategy-ticker-scroll 36s linear infinite;
-}
-
-.strategy-ticker:hover .strategy-ticker-track {
-  animation-play-state: paused;
-}
-
-.strategy-ticker-item {
-  gap: 8px;
-  padding-right: 48px;
-  white-space: nowrap;
-  font-size: 13px;
-}
-
-.strategy-ticker-item b {
-  color: var(--foreground);
-}
-
-.strategy-ticker-item strong {
   color: var(--muted-foreground);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.strategy-ticker-metric {
-  color: var(--danger);
-  font-style: normal;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
+.strategy-ticker-signals {
+  display: flex;
+  min-width: 0;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.strategy-ticker-signal {
+  flex: none;
+  max-width: 240px;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .strategy-ticker-up {
-  color: var(--danger) !important;
-}
-
-.strategy-ticker-down {
-  color: var(--success) !important;
-}
-
-.strategy-ticker-warn .strategy-ticker-metric,
-.strategy-ticker-up .strategy-ticker-metric {
   color: var(--danger);
 }
 
-.strategy-ticker-item.strategy-ticker-up,
-.strategy-ticker-item.strategy-ticker-warn {
-  color: var(--foreground);
+.strategy-ticker-down {
+  color: var(--success);
 }
 
-.strategy-ticker-item.strategy-ticker-up .strategy-ticker-metric,
-.strategy-ticker-item.strategy-ticker-warn .strategy-ticker-metric {
-  padding: 0 4px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--danger) 16%, transparent);
+.strategy-ticker-warn {
+  color: var(--warning, #b45309);
 }
 
-@keyframes strategy-ticker-scroll {
-  to {
-    transform: translateX(-50%);
-  }
+.strategy-ticker-link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .strategy-ticker-track {
-    animation: none;
-  }
+.strategy-ticker-link:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
 }
