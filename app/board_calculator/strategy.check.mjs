@@ -353,14 +353,52 @@ check('估值带：分红日单位净值下跌不算下跌', () => {
   assert.equal(last.nav, 0.5);
   assert.ok(Math.abs(last.ma - 0.5) < 1e-9);
 });
-check('估值带：持有时到上轨卖出，已卖出时回到均线买回，未回到均线不提示', () => {
+check('估值带：持有时到上轨卖出，已卖出时只在下轨或以下买回', () => {
   assert.equal(bandState({ currentNav: 1.1 }).status, 'sell');
   assert.equal(bandState({ currentNav: 1.09 }).status, 'watch');
   assert.equal(bandState({ currentNav: 0.8 }).status, 'watch');
   const sold = { ...cycle, phase: 'waitingBuy', anchorNav: 1.1, peakNav: 1.1 };
-  assert.equal(bandState({ cycle: sold, currentNav: 1 }).status, 'buy');
-  assert.equal(bandState({ cycle: sold, currentNav: 0.99 }).status, 'buy');
+  assert.equal(bandState({ cycle: sold, currentNav: 1 }).status, 'watch');
+  assert.equal(bandState({ cycle: sold, currentNav: 0.99 }).status, 'watch');
+  assert.equal(bandState({ cycle: sold, currentNav: 0.9 }).status, 'buy');
+  assert.equal(bandState({ cycle: sold, currentNav: 0.89 }).status, 'buy');
+  assert.equal(bandState({ cycle: sold, currentNav: 0.91 }).status, 'watch');
   assert.equal(bandState({ cycle: sold, currentNav: 1.01 }).status, 'watch');
+});
+check('估值带：5日历史回放跳过均线与下轨之间的买回点', () => {
+  const series = buildBandSeries(bandHistory([1, 1, 1, 1, 1.5, 1.2, 1.19, 0.8]), band);
+  const signals = replayBandSignals(series, 0);
+  assert.deepEqual(
+    signals.map((item) => item.type),
+    ['sell', 'buy']
+  );
+  assert.equal(signals[1].date, series.at(-1).date);
+  assert.ok(signals[1].nav <= signals[1].lower);
+  assert.ok(signals[0].nav >= signals[0].upper);
+});
+check('估值带：调整买回百分比同步改变实时和历史买回条件', () => {
+  const sold = { ...cycle, phase: 'waitingBuy', anchorNav: 1.1, peakNav: 1.1 };
+  for (const estimated of [false, true]) {
+    assert.equal(
+      bandState({ cycle: sold, currentNav: 0.94, estimated, strategy: { ...band, bandBuy: 5 } }).status,
+      'buy'
+    );
+    assert.equal(
+      bandState({ cycle: sold, currentNav: 0.94, estimated, strategy: { ...band, bandBuy: 10 } }).status,
+      'watch'
+    );
+  }
+  const history = bandHistory([1, 1, 1, 1, 1.5, 1.2, 1.1]);
+  const loose = replayBandSignals(buildBandSeries(history, { ...band, bandBuy: 5 }), 0);
+  const strict = replayBandSignals(buildBandSeries(history, { ...band, bandBuy: 10 }), 0);
+  assert.deepEqual(
+    loose.map((item) => item.type),
+    ['sell', 'buy']
+  );
+  assert.deepEqual(
+    strict.map((item) => item.type),
+    ['sell']
+  );
 });
 check('估值带：跌幅再大也不触发止损，最少持有期内只保留已到线的说明', () => {
   assert.equal(bandState({ cycle: { ...cycle, peakNav: 5 }, currentNav: 0.5 }).status, 'watch');

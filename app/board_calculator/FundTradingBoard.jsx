@@ -388,7 +388,7 @@ export default function FundTradingBoard({ fundId, fundName, embedded = false })
       <div className={styles.strategyHead}>
         <div className={styles.bandTitle}>
           <b id={`${fundId}-strategy-title`}>{bandMode ? '估值带滚仓' : '策略设置'}</b>
-          {bandMode ? <small>底仓不动。机动仓涨过上轨卖出，回到均线买回</small> : null}
+          {bandMode ? <small>底仓不动。机动仓到达上轨卖出，到达下轨买回</small> : null}
         </div>
         <div className={styles.modeSwitch} role="group" aria-label="滚仓模式">
           {[
