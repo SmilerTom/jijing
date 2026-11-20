@@ -112,7 +112,7 @@ export function replayBandSignals(series = [], minHoldDays = 0) {
   const signals = [];
   series.forEach((row) => {
     if (dayNumber(row.date) - lastDay < Number(minHoldDays)) return;
-    const type = holding && row.nav >= row.upper ? 'sell' : !holding && row.nav <= row.ma ? 'buy' : null;
+    const type = holding && row.nav >= row.upper ? 'sell' : !holding && row.nav <= row.lower ? 'buy' : null;
     if (!type) return;
     signals.push({ ...row, type, deviation: (row.nav / row.ma - 1) * 100 });
     holding = type === 'buy';
@@ -299,7 +299,7 @@ function calculateBandState({ currentNav, quoteDate, estimated, quoteTime, cycle
   const upper = latest.ma * (1 + Number(config.bandSell) / 100);
   const lower = latest.ma * (1 - Number(config.bandBuy) / 100);
   const triggered =
-    cycle.phase === 'holding' && nav >= upper ? 'sell' : cycle.phase === 'waitingBuy' && nav <= latest.ma ? 'buy' : null;
+    cycle.phase === 'holding' && nav >= upper ? 'sell' : cycle.phase === 'waitingBuy' && nav <= lower ? 'buy' : null;
   const remainingDays = cooldownRemaining(cycle, config.minHoldDays, now);
   return {
     ...base,
@@ -424,7 +424,7 @@ function buildBandPrompt(state) {
       label: `${prefix}已到买回线`,
       tone: 'down',
       metric,
-      detail: `${source}净值已回到 ${maLabel}。机动仓在这里买回，不必再等到深度下轨。实际买回后请确认。`
+      detail: `${source}净值已到达或跌破 ${maLabel} 下方的买回线，可买回机动仓。实际买回后请确认。`
     };
   if (state.status === 'cooldown')
     return {
@@ -438,7 +438,7 @@ function buildBandPrompt(state) {
       label: state.estimated ? '估值观察' : '等待买回',
       tone: '',
       metric,
-      detail: `${source}机动仓已卖出。回到 ${maLabel} 就买回；深度下轨只作参考。当前距均线还差 ${((state.nav / state.ma - 1) * 100).toFixed(1)}%。`
+      detail: `${source}机动仓已卖出，等待净值到达或跌破买回下轨。当前还需下跌 ${((1 - state.lower / state.nav) * 100).toFixed(1)}%。`
     };
   return {
     label: state.estimated ? '估值观察' : '持有观察',

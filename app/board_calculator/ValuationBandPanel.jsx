@@ -20,9 +20,9 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
 const HOLD_DRAWDOWN = 35.2;
 const LEGEND = [
   { label: '净值', color: 'var(--chart-1)', dash: 'none' },
-  { label: '买回 · 均线', color: 'var(--muted)', dash: '2 3' },
+  { label: '均线', color: 'var(--muted)', dash: '2 3' },
   { label: '卖出线', color: 'var(--chart-5)', dash: '6 3' },
-  { label: '深度下轨', color: 'var(--chart-2)', dash: '6 3' }
+  { label: '买回线 · 下轨', color: 'var(--chart-2)', dash: '6 3' }
 ];
 const money = (value) => `¥${Math.round(value).toLocaleString('zh-CN')}`;
 const signed = (value) => (Number.isFinite(value) ? `${value >= 0 ? '+' : '−'}${Math.abs(value).toFixed(2)}%` : '--');
@@ -179,9 +179,9 @@ function BandChart({ series, signals, period }) {
         marks('卖出信号', 'sell', colors.upper, '卖'),
         marks('买回信号', 'buy', colors.lower, '买'),
         line('净值', 'nav', colors.nav, [], 2),
-        line('买回 · 均线', 'ma', colors.muted, [2, 3], 1.5, '买回'),
+        line('均线', 'ma', colors.muted, [2, 3], 1.5, '均线'),
         line('卖出线', 'upper', colors.upper, [6, 3], 1.5, '卖出'),
-        line('深度下轨', 'lower', colors.lower, [6, 3], 1.5, '下轨')
+        line('买回线 · 下轨', 'lower', colors.lower, [6, 3], 1.5, '买回')
       ]
     };
   }, [colors, period, signals, view]);
@@ -332,7 +332,7 @@ function BandChart({ series, signals, period }) {
         className={cn(styles.bandChart, zoomed && styles.bandChartZoomed)}
         tabIndex={0}
         role="group"
-        aria-label={`净值、${period} 日均线、卖出线和深度下轨。当前 ${rangeText}。左右方向键平移，加号放大，减号缩小，Home 显示全部。拖动图表可平移，按住 Ctrl 或 Command 滚动可缩放。`}
+        aria-label={`净值、${period} 日均线、卖出线和买回下轨。当前 ${rangeText}。左右方向键平移，加号放大，减号缩小，Home 显示全部。拖动图表可平移，按住 Ctrl 或 Command 滚动可缩放。`}
         onKeyDown={onKeyDown}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -359,7 +359,7 @@ function BandChart({ series, signals, period }) {
         />
       </label>
       <p className={styles.bandHint}>
-        曲线是分红复权后、对齐到最新单位净值的走势，和基金净值同向。{period} 日均线、卖出线和深度下轨随净值移动。
+        曲线是分红复权后、对齐到最新单位净值的走势，和基金净值同向。{period} 日均线、卖出线和买回下轨随净值移动。
         悬浮可看相对均线的涨跌幅。图中仅含正式历史数据，盘中估值见上方预览。 拖动图表平移，按住 Ctrl 或 ⌘ 滚动缩放。
         {Number(period) <= 10 ? '5 日和 10 日默认只显示最近一段，点「全部」可看完整历史。' : ''}
       </p>
@@ -382,13 +382,11 @@ export default function ValuationBandPanel({
   const config = normalizeBand(strategy);
   const period = config.bandPeriod;
   const tested = BAND_PERIODS[period];
-  const effective = isBandConfigValid(config)
-    ? config
-    : { ...config, bandSell: tested.sell, bandBuy: tested.buy, minHoldDays: 30 };
-  const { bandSell, bandBuy, minHoldDays } = effective;
+  const validConfig = isBandConfigValid(config);
+  const { bandSell, bandBuy, minHoldDays } = config;
   const series = useMemo(
-    () => buildBandSeries(history, { bandPeriod: period, bandSell, bandBuy }),
-    [history, period, bandSell, bandBuy]
+    () => (validConfig ? buildBandSeries(history, { bandPeriod: period, bandSell, bandBuy }) : []),
+    [history, period, bandSell, bandBuy, validConfig]
   );
   const signals = useMemo(() => replayBandSignals(series, minHoldDays), [series, minHoldDays]);
   const maLabel = `${period} 日均线`;
@@ -398,8 +396,8 @@ export default function ValuationBandPanel({
     Number(config.corePercent) === 70 &&
     Number(config.minHoldDays) === 30;
   const latest = series.at(-1);
-  const ma = state.ma ?? latest?.ma;
-  const currentNav = state.nav ?? latest?.nav;
+  const ma = validConfig ? (state.ma ?? latest?.ma) : null;
+  const currentNav = validConfig ? (state.nav ?? latest?.nav) : null;
   const sleeveValue = Number(split?.sleeve);
   const sleeve = sleeveValue > 0 ? sleeveValue : null;
   const markedNav = Number(latest?.nav);
@@ -407,7 +405,7 @@ export default function ValuationBandPanel({
   const tradeSummary = summarizeBandSignals(signals, { sleeve, nav: currentNav, markNav });
   const deviation = navChange(currentNav, ma);
   const buying = state.phase === 'waitingBuy';
-  const target = buying ? ma : (state.upper ?? latest?.upper);
+  const target = buying ? (state.lower ?? latest?.lower) : (state.upper ?? latest?.upper);
   const distance = triggerDistance(currentNav, target, buying);
   const usable = Object.keys(BAND_PERIODS).filter((key) => Number(key) <= (history?.length ?? 0));
   const corePercent = Number(config.corePercent);
@@ -425,12 +423,12 @@ export default function ValuationBandPanel({
     },
     {
       key: 'bandBuy',
-      label: '深度下轨',
+      label: '低于均线多少买回',
       suffix: '%',
       min: 0.1,
       max: 89,
       step: 0.1,
-      hint: '只画在图上；买回以回到均线为准'
+      hint: '卖出后，到达或跌破此下轨才买回'
     },
     { key: 'minHoldDays', label: '最少持有', suffix: '天', min: 0, max: 3650, step: 1, hint: '每笔成交后按日历天计算' }
   ];
@@ -445,7 +443,7 @@ export default function ValuationBandPanel({
             `相对 ${maLabel} · ${state.quoteDate || latest?.date || '待更新'}`
           ],
           ['卖出阈值', signed(Number(bandSell)), `相对 ${maLabel} · 持有时生效`],
-          ['买回位置', '均线', '卖出后，回到 0% 就买回'],
+          ['买回位置', `−${bandBuy}%`, '卖出后，到达或跌破下轨才买回'],
           [
             buying ? '距买回还需跌' : '距卖出还需涨',
             distance === null ? '--' : `${distance.toFixed(2)}%`,
@@ -484,11 +482,13 @@ export default function ValuationBandPanel({
           <BandChart series={series} signals={signals} period={period} />
         ) : (
           <p className={styles.bandEmpty} role={failed ? 'alert' : 'status'}>
-            {loading
-              ? '正在加载历史净值…'
-              : failed
-                ? '历史净值更新失败，已暂停生成新信号，刷新成功后自动恢复。'
-                : `这只基金的净值历史不足 ${period} 个交易日，暂不生成信号。${usable.length ? `可在下方改用 ${usable.join('、')} 日均线。` : ''}`}
+            {!validConfig
+              ? '请填写有效的策略参数，历史模拟已暂停，不使用默认参数替代。'
+              : loading
+                ? '正在加载历史净值…'
+                : failed
+                  ? '历史净值更新失败，已暂停生成新信号，刷新成功后自动恢复。'
+                  : `这只基金的净值历史不足 ${period} 个交易日，暂不生成信号。${usable.length ? `可在下方改用 ${usable.join('、')} 日均线。` : ''}`}
           </p>
         )}
         {failed && series.length ? (
@@ -525,7 +525,7 @@ export default function ValuationBandPanel({
               ))}
             </div>
             <small className={styles.bandHint}>
-              换周期时，卖出线和深度下轨改为 +{tested.sell}% / −{tested.buy}%。买回始终是均线。
+              换周期时，卖出线和买回线改为 +{tested.sell}% / −{tested.buy}%。区间内不触发买卖。
             </small>
           </div>
           <div className={styles.bandFields}>
@@ -666,9 +666,9 @@ export default function ValuationBandPanel({
               </tbody>
             </table>
           </div>
-          <p className={styles.bandLabel}>旧规则回测，不是现在的买回成绩</p>
+          <p className={styles.bandLabel}>历史参考统计，不是当前基金的模拟成绩</p>
           <p className={styles.bandEvidence}>
-            <b>当时要跌到下轨才买回。</b>
+            <b>按上轨卖出、下轨买回统计。</b>
             {isTested ? '' : '当前卖出线或下轨改过，下面仍是该周期默认参数。'}8 只基金、5 年窗口：中位年化少{' '}
             {tested.lessReturn}%，{tested.winRate}% 的窗口跑赢；回撤 {tested.drawdown}%，一直持有 {HOLD_DRAWDOWN}%；约{' '}
             {tested.trades} 笔交易。不保证比一直持有赚得多。
