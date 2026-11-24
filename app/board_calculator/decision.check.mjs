@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import {
   addTradingDays,
+  applyTradeToBook,
+  pickTradeBook,
   buildLots,
   estimateFee,
   findFeeSaving,
@@ -132,6 +134,33 @@ check('跨过下一费率档的日期和可省金额', () => {
   assert.equal(saving.tradeDate, '2026-11-04');
   near(saving.saving, 20 * 100 * (0.015 - 0.005));
   assert.equal(findFeeSaving({ lots: [], unknownShare: 0, tiers, share: 0, nav: 100, settlement }), null);
+});
+
+check('一次记账：买入加权成本，卖出只减份额，清仓成本归零', () => {
+  const bought = applyTradeToBook(
+    { share: 100, cost: 1 },
+    { type: 'buy', share: 100, amount: 120, date: '2026-11-24' }
+  );
+  near(bought.share, 200);
+  near(bought.cost, 1.1);
+  assert.equal(bought.firstPurchaseDate, '2026-11-24');
+  const sold = applyTradeToBook(
+    { share: 100, cost: 1.2, firstPurchaseDate: '2025-01-01' },
+    { type: 'sell', share: 30 }
+  );
+  near(sold.share, 70);
+  near(sold.cost, 1.2);
+  assert.equal(sold.firstPurchaseDate, '2025-01-01');
+  assert.deepEqual(applyTradeToBook({ share: 10, cost: 1 }, { type: 'sell', share: 50 }), { share: 0, cost: 0 });
+});
+
+check('多个账本持有同一基金时不自动记账', () => {
+  assert.deepEqual(pickTradeBook(null), { groupId: null });
+  assert.deepEqual(pickTradeBook(resolvePosition('1', {}, { g: { 1: { share: 5, cost: 1 } } })), { groupId: 'g' });
+  assert.equal(
+    pickTradeBook(resolvePosition('1', { 1: { share: 5, cost: 1 } }, { g: { 1: { share: 5, cost: 1 } } })),
+    null
+  );
 });
 
 console.log(`决策检查：${passed} 项通过`);

@@ -327,7 +327,7 @@ const bandState = (options = {}) =>
     ...options
   });
 
-check('估值带：默认开启，自动存下的 rolling 不算选择，非法周期回到 250 日', () => {
+check('均线带：默认开启，自动存下的 rolling 不算选择，非法周期回到 250 日', () => {
   assert.deepEqual(normalizeStrategy({ targetRate: 25 }), { ...DEFAULT_STRATEGY, riseRate: 25 });
   assert.equal(normalizeBand({}).mode, 'band');
   assert.equal(normalizeBand(null).mode, 'band');
@@ -336,7 +336,7 @@ check('估值带：默认开启，自动存下的 rolling 不算选择，非法�
   assert.equal(normalizeBand({ bandPeriod: 7 }).bandPeriod, 250);
   assert.equal(normalizeBand({ bandPeriod: '20', mode: 'band' }).bandPeriod, 20);
 });
-check('估值带：均线窗口只算最近 N 天，历史不足时不生成序列', () => {
+check('均线带：均线窗口只算最近 N 天，历史不足时不生成序列', () => {
   assert.deepEqual(buildBandSeries(bandHistory([1, 1]), band), []);
   const series = buildBandSeries(bandHistory([1, 1, 1, 1, 1, 2]), band);
   assert.equal(series.length, 2);
@@ -344,7 +344,7 @@ check('估值带：均线窗口只算最近 N 天，历史不足时不生成序�
   assert.ok(Math.abs(series[1].upper - 1.32) < 1e-9);
   assert.ok(Math.abs(series[1].lower - 1.08) < 1e-9);
 });
-check('估值带：分红日单位净值下跌不算下跌', () => {
+check('均线带：分红日单位净值下跌不算下跌', () => {
   const history = bandHistory([1, 1, 1, 1, 0.5]).map((item, index) => ({
     ...item,
     equityReturn: index ? 0 : null
@@ -353,7 +353,7 @@ check('估值带：分红日单位净值下跌不算下跌', () => {
   assert.equal(last.nav, 0.5);
   assert.ok(Math.abs(last.ma - 0.5) < 1e-9);
 });
-check('估值带：持有时到上轨卖出，已卖出时只在下轨或以下买回', () => {
+check('均线带：持有时到上轨卖出，已卖出时只在下轨或以下买回', () => {
   assert.equal(bandState({ currentNav: 1.1 }).status, 'sell');
   assert.equal(bandState({ currentNav: 1.09 }).status, 'watch');
   assert.equal(bandState({ currentNav: 0.8 }).status, 'watch');
@@ -365,7 +365,7 @@ check('估值带：持有时到上轨卖出，已卖出时只在下轨或以下�
   assert.equal(bandState({ cycle: sold, currentNav: 0.91 }).status, 'watch');
   assert.equal(bandState({ cycle: sold, currentNav: 1.01 }).status, 'watch');
 });
-check('估值带：5日历史回放跳过均线与下轨之间的买回点', () => {
+check('均线带：5日历史回放跳过均线与下轨之间的买回点', () => {
   const series = buildBandSeries(bandHistory([1, 1, 1, 1, 1.5, 1.2, 1.19, 0.8]), band);
   const signals = replayBandSignals(series, 0);
   assert.deepEqual(
@@ -376,7 +376,7 @@ check('估值带：5日历史回放跳过均线与下轨之间的买回点', () 
   assert.ok(signals[1].nav <= signals[1].lower);
   assert.ok(signals[0].nav >= signals[0].upper);
 });
-check('估值带：调整买回百分比同步改变实时和历史买回条件', () => {
+check('均线带：调整买回百分比同步改变实时和历史买回条件', () => {
   const sold = { ...cycle, phase: 'waitingBuy', anchorNav: 1.1, peakNav: 1.1 };
   for (const estimated of [false, true]) {
     assert.equal(
@@ -400,7 +400,7 @@ check('估值带：调整买回百分比同步改变实时和历史买回条件'
     ['sell']
   );
 });
-check('估值带：跌幅再大也不触发止损，最少持有期内只保留已到线的说明', () => {
+check('均线带：跌幅再大也不触发止损，最少持有期内只保留已到线的说明', () => {
   assert.equal(bandState({ cycle: { ...cycle, peakNav: 5 }, currentNav: 0.5 }).status, 'watch');
   const state = bandState({
     cycle: { ...cycle, lastTradeAt: new Date(2026, 8, 5, 12).toISOString() },
@@ -412,7 +412,7 @@ check('估值带：跌幅再大也不触发止损，最少持有期内只保留�
   assert.equal(state.triggered, 'sell');
   assert.match(buildStrategyPrompt({ strategyState: state }).label, /卖出线，暂不提示/);
 });
-check('估值带：缺数据、历史不足和设置错误分别提示', () => {
+check('均线带：缺数据、历史不足和设置错误分别提示', () => {
   assert.equal(bandState({ history: null }).status, 'pending');
   assert.equal(bandState({ history: bandHistory([1]) }).status, 'insufficient');
   assert.equal(bandState({ strategy: { ...band, corePercent: 100 } }).status, 'invalid');
@@ -420,12 +420,12 @@ check('估值带：缺数据、历史不足和设置错误分别提示', () => {
   assert.equal(isBandConfigValid({ ...band, bandSell: '' }), false);
   assert.equal(buildStrategyPrompt({ strategyState: bandState({ history: bandHistory([1]) }) }).label, '暂无信号');
 });
-check('估值带：确认成交沿用原阶段流转', () => {
+check('均线带：确认成交沿用原阶段流转', () => {
   const sold = confirmStrategyTrade({ cycle, status: 'sell', nav: 1.1, now });
   assert.equal(sold.phase, 'waitingBuy');
   assert.equal(confirmStrategyTrade({ cycle: sold, status: 'buy', nav: 0.9, now }).phase, 'holding');
 });
-check('估值带：回放信号按最少持有期间隔，且买卖交替', () => {
+check('均线带：回放信号按最少持有期间隔，且买卖交替', () => {
   const row = (date, nav) => ({ date, nav, ma: 1, upper: 1.1, lower: 0.9 });
   const series = [row('2026-01-01', 1.2), row('2026-01-02', 0.8), row('2026-02-10', 0.8), row('2026-03-30', 1.2)];
   assert.deepEqual(
@@ -437,7 +437,7 @@ check('估值带：回放信号按最少持有期间隔，且买卖交替', () =
     ]
   );
 });
-check('估值带：历史信号按当前机动仓份额估算金额和轮次盈亏', () => {
+check('均线带：历史信号按当前机动仓份额估算金额和轮次盈亏', () => {
   const signals = [
     { date: '2026-01-01', type: 'sell', nav: 1.2 },
     { date: '2026-02-10', type: 'buy', nav: 1 },
@@ -463,7 +463,7 @@ check('估值带：历史信号按当前机动仓份额估算金额和轮次盈�
   assert.ok(losing.perShare < 0);
   assert.equal(summarizeBandSignals(signals, { sleeve: 0, nav: 1 }).rows[0].amount, null);
 });
-check('估值带：仓位拆分随阶段变化，无持仓时不估算', () => {
+check('均线带：仓位拆分随阶段变化，无持仓时不估算', () => {
   assert.deepEqual(splitBandPosition({ amount: 1000, corePercent: 50, phase: 'holding' }), { core: 500, sleeve: 500 });
   assert.deepEqual(splitBandPosition({ amount: 500, corePercent: 50, phase: 'waitingBuy' }), {
     core: 500,

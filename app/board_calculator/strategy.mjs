@@ -417,14 +417,14 @@ function buildBandPrompt(state) {
       label: `${prefix}已到卖出线`,
       tone: 'up',
       metric,
-      detail: `${source}净值高于 ${maLabel} ${gap}%，可卖出机动仓，底仓不动。实际卖出后请确认。`
+      detail: `${source}净值高于 ${maLabel} ${gap}%，已超过卖出线。`
     };
   if (state.status === 'buy')
     return {
       label: `${prefix}已到买回线`,
       tone: 'down',
       metric,
-      detail: `${source}净值已到达或跌破 ${maLabel} 下方的买回线，可买回机动仓。实际买回后请确认。`
+      detail: `${source}净值已到达或跌破 ${maLabel} 下方的买回线。`
     };
   if (state.status === 'cooldown')
     return {
@@ -438,13 +438,13 @@ function buildBandPrompt(state) {
       label: state.estimated ? '估值观察' : '等待买回',
       tone: '',
       metric,
-      detail: `${source}机动仓已卖出，等待净值到达或跌破买回下轨。当前还需下跌 ${((1 - state.lower / state.nav) * 100).toFixed(1)}%。`
+      detail: `${source}机动仓已卖出，等待净值到达或跌破买回下轨。`
     };
   return {
     label: state.estimated ? '估值观察' : '持有观察',
     tone: '',
     metric,
-    detail: `${source}${state.nav <= state.lower ? '净值已低于买回线，但机动仓本来就在手，无需操作。' : '机动仓持有中。'}距卖出线还差 ${((state.upper / state.nav - 1) * 100).toFixed(1)}%。`
+    detail: `${source}${state.nav <= state.lower ? '净值已低于买回线，但机动仓本来就在手，无需操作。' : '机动仓持有中，到达卖出线前无需操作。'}`
   };
 }
 

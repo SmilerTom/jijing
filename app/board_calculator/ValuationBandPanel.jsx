@@ -359,26 +359,15 @@ function BandChart({ series, signals, period }) {
         />
       </label>
       <p className={styles.bandHint}>
-        曲线是分红复权后、对齐到最新单位净值的走势，和基金净值同向。{period} 日均线、卖出线和买回下轨随净值移动。
-        悬浮可看相对均线的涨跌幅。图中仅含正式历史数据，盘中估值见上方预览。 拖动图表平移，按住 Ctrl 或 ⌘ 滚动缩放。
-        {Number(period) <= 10 ? '5 日和 10 日默认只显示最近一段，点「全部」可看完整历史。' : ''}
+        分红复权后的走势，仅含正式净值。拖动平移，Ctrl / ⌘ 加滚轮缩放。
+        {Number(period) <= 10 ? '短均线默认只显示最近一段，点「全部」看完整历史。' : ''}
       </p>
     </div>
   );
 }
 
-export default function ValuationBandPanel({
-  fundId,
-  strategy,
-  state,
-  history,
-  loading,
-  failed,
-  split,
-  onPeriod,
-  onField,
-  onReset
-}) {
+/** 均线带共用计算：图表、设置和历史表现三处读同一份结果 */
+export function useBandModel({ strategy, state, history, split }) {
   const config = normalizeBand(strategy);
   const period = config.bandPeriod;
   const tested = BAND_PERIODS[period];
@@ -389,38 +378,111 @@ export default function ValuationBandPanel({
     [history, period, bandSell, bandBuy, validConfig]
   );
   const signals = useMemo(() => replayBandSignals(series, minHoldDays), [series, minHoldDays]);
-  const maLabel = `${period} 日均线`;
-  const isTested =
-    Number(config.bandSell) === tested.sell &&
-    Number(config.bandBuy) === tested.buy &&
-    Number(config.corePercent) === 70 &&
-    Number(config.minHoldDays) === 30;
   const latest = series.at(-1);
   const ma = validConfig ? (state.ma ?? latest?.ma) : null;
   const currentNav = validConfig ? (state.nav ?? latest?.nav) : null;
   const sleeveValue = Number(split?.sleeve);
   const sleeve = sleeveValue > 0 ? sleeveValue : null;
   const markedNav = Number(latest?.nav);
-  const markNav = markedNav > 0 ? markedNav : null;
-  const tradeSummary = summarizeBandSignals(signals, { sleeve, nav: currentNav, markNav });
-  const deviation = navChange(currentNav, ma);
+  const tradeSummary = summarizeBandSignals(signals, {
+    sleeve,
+    nav: currentNav,
+    markNav: markedNav > 0 ? markedNav : null
+  });
   const buying = state.phase === 'waitingBuy';
   const target = buying ? (state.lower ?? latest?.lower) : (state.upper ?? latest?.upper);
-  const distance = triggerDistance(currentNav, target, buying);
-  const usable = Object.keys(BAND_PERIODS).filter((key) => Number(key) <= (history?.length ?? 0));
   const corePercent = Number(config.corePercent);
-  const validCore = corePercent > 0 && corePercent < 100;
+  return {
+    config,
+    period,
+    tested,
+    validConfig,
+    series,
+    signals,
+    latest,
+    sleeve,
+    tradeSummary,
+    buying,
+    maLabel: `${period} 日均线`,
+    deviation: navChange(currentNav, ma),
+    distance: triggerDistance(currentNav, target, buying),
+    usable: Object.keys(BAND_PERIODS).filter((key) => Number(key) <= (history?.length ?? 0)),
+    corePercent,
+    validCore: corePercent > 0 && corePercent < 100,
+    isTested:
+      Number(config.bandSell) === tested.sell &&
+      Number(config.bandBuy) === tested.buy &&
+      Number(config.corePercent) === 70 &&
+      Number(config.minHoldDays) === 30
+  };
+}
+
+export function BandChartCard({ model, loading, failed }) {
+  const { series, signals, period, validConfig, usable } = model;
+  return (
+    <div className={styles.advisorCard}>
+      <div className={styles.bandCardHead}>
+        <h3 className={styles.advisorCardTitle}>净值与买卖线</h3>
+        <ul className={styles.bandLegend}>
+          {LEGEND.map((item) => (
+            <li key={item.label}>
+              <svg width="20" height="4" aria-hidden="true">
+                <line x1="0" y1="2" x2="20" y2="2" stroke={item.color} strokeWidth="2" strokeDasharray={item.dash} />
+              </svg>
+              {item.label}
+            </li>
+          ))}
+        </ul>
+      </div>
+      {series.length ? (
+        <BandChart series={series} signals={signals} period={period} />
+      ) : (
+        <p className={styles.bandEmpty} role={failed ? 'alert' : 'status'}>
+          {!validConfig
+            ? '策略参数无效，历史模拟已暂停。请在「设置」里修正。'
+            : loading
+              ? '正在加载历史净值…'
+              : failed
+                ? '历史净值更新失败，已暂停生成新信号，刷新成功后自动恢复。'
+                : `这只基金的净值历史不足 ${period} 个交易日，暂不生成信号。${usable.length ? `可在「设置」改用 ${usable.join('、')} 日均线。` : ''}`}
+        </p>
+      )}
+      {failed && series.length ? (
+        <p className={styles.strategyNote} role="alert">
+          历史净值更新失败，图中是上次成功获取的数据。
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+export function BandAllocation({ model, split, phase }) {
+  const { corePercent, validCore } = model;
+  if (!validCore) return null;
+  const sold = phase === 'waitingBuy';
+  return (
+    <div className={styles.allocation}>
+      <div className={styles.bandBar} aria-hidden="true">
+        <i style={{ width: `${corePercent}%` }} />
+        <i className={sold ? styles.bandBarCash : styles.bandBarSleeve} />
+      </div>
+      <div className={styles.bandSplit}>
+        <span>
+          底仓 {corePercent}%{split ? ` · ${money(split.core)}` : ''} · 长期持有
+        </span>
+        <span>
+          {sold ? '机动仓（已卖出）' : '机动仓'} {100 - corePercent}%{split ? ` · ${money(split.sleeve)}` : ''}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export function BandSettings({ fundId, model, strategy, onPeriod, onField, onReset }) {
+  const { period, tested, maLabel } = model;
   const fields = [
     { key: 'corePercent', label: '底仓比例', suffix: '%', min: 1, max: 99, step: 1, hint: '这部分始终不交易' },
-    {
-      key: 'bandSell',
-      label: '高于均线多少卖',
-      suffix: '%',
-      min: 0.1,
-      max: 199,
-      step: 0.1,
-      hint: `按 ${maLabel} 计算`
-    },
+    { key: 'bandSell', label: '高于均线多少卖', suffix: '%', min: 0.1, max: 199, step: 0.1, hint: `按 ${maLabel}` },
     {
       key: 'bandBuy',
       label: '低于均线多少买回',
@@ -428,253 +490,150 @@ export default function ValuationBandPanel({
       min: 0.1,
       max: 89,
       step: 0.1,
-      hint: '卖出后，到达或跌破此下轨才买回'
+      hint: '卖出后到达此下轨才买回'
     },
-    { key: 'minHoldDays', label: '最少持有', suffix: '天', min: 0, max: 3650, step: 1, hint: '每笔成交后按日历天计算' }
+    { key: 'minHoldDays', label: '最少持有', suffix: '天', min: 0, max: 3650, step: 1, hint: '每笔成交后按日历天' }
   ];
-
   return (
-    <div className={styles.bandPanel}>
-      <div className={styles.bandStats}>
-        {[
-          [
-            state.estimated ? '当前偏离（预估）' : '当前偏离',
-            signed(deviation),
-            `相对 ${maLabel} · ${state.quoteDate || latest?.date || '待更新'}`
-          ],
-          ['卖出阈值', signed(Number(bandSell)), `相对 ${maLabel} · 持有时生效`],
-          ['买回位置', `−${bandBuy}%`, '卖出后，到达或跌破下轨才买回'],
-          [
-            buying ? '距买回还需跌' : '距卖出还需涨',
-            distance === null ? '--' : `${distance.toFixed(2)}%`,
-            distance === 0 ? '已到线，还要看持有期' : '按当前价格计算'
-          ]
-        ].map(([label, value, sub]) => (
-          <div key={label} className={styles.bandStat}>
-            <i>{label}</i>
-            <b>{value}</b>
-            <small>{sub}</small>
-          </div>
+    <div className={styles.settingsBlock}>
+      <div className={styles.bandCardHead}>
+        <p id={`${fundId}-band-period`} className={styles.bandLabel}>
+          均线周期
+        </p>
+        <button type="button" className={styles.segButton} onClick={onReset} aria-label="恢复默认策略">
+          恢复默认
+        </button>
+      </div>
+      <div className={styles.periodGrid} role="group" aria-labelledby={`${fundId}-band-period`}>
+        {Object.keys(BAND_PERIODS).map((key) => (
+          <button
+            key={key}
+            type="button"
+            className={cn(styles.segButton, Number(key) === period && styles.segActive)}
+            aria-pressed={Number(key) === period}
+            aria-label={`${key} 日均线`}
+            onClick={() => onPeriod(Number(key))}
+          >
+            {key} 日
+          </button>
         ))}
       </div>
-
-      <div className={styles.bandCard}>
-        <div className={styles.bandCardHead}>
-          <h3 className={styles.bandHeading}>净值走势与买卖线</h3>
-          <ul className={styles.bandLegend}>
-            {LEGEND.map((item) => (
-              <li key={item.label}>
-                <svg width="20" height="4" aria-hidden="true">
-                  <line x1="0" y1="2" x2="20" y2="2" stroke={item.color} strokeWidth="2" strokeDasharray={item.dash} />
-                </svg>
-                {item.label}
-              </li>
-            ))}
-            <li>
-              <i className={cn(styles.bandMark, styles.bandMarkSell)}>卖</i>卖出信号
-            </li>
-            <li>
-              <i className={cn(styles.bandMark, styles.bandMarkBuy)}>买</i>买回信号
-            </li>
-          </ul>
-        </div>
-        {series.length ? (
-          <BandChart series={series} signals={signals} period={period} />
-        ) : (
-          <p className={styles.bandEmpty} role={failed ? 'alert' : 'status'}>
-            {!validConfig
-              ? '请填写有效的策略参数，历史模拟已暂停，不使用默认参数替代。'
-              : loading
-                ? '正在加载历史净值…'
-                : failed
-                  ? '历史净值更新失败，已暂停生成新信号，刷新成功后自动恢复。'
-                  : `这只基金的净值历史不足 ${period} 个交易日，暂不生成信号。${usable.length ? `可在下方改用 ${usable.join('、')} 日均线。` : ''}`}
-          </p>
-        )}
-        {failed && series.length ? (
-          <p className={styles.strategyNote} role="alert">
-            历史净值更新失败，图中是上次成功获取的数据。
-          </p>
-        ) : null}
+      <small className={styles.bandHint}>
+        换周期时，卖出线和买回线改为 +{tested.sell}% / −{tested.buy}%。
+      </small>
+      <div className={styles.bandFields}>
+        {fields.map((field) => (
+          <label key={field.key} className={styles.strategyField} htmlFor={`${fundId}-${field.key}`}>
+            <span>{field.label}</span>
+            <span className={styles.strategyInputWrap}>
+              <input
+                id={`${fundId}-${field.key}`}
+                className={styles.strategyInput}
+                type="number"
+                min={field.min}
+                max={field.max}
+                step={field.step}
+                value={strategy[field.key]}
+                onChange={(event) => onField(field.key, event.target.value)}
+                aria-describedby={`${fundId}-${field.key}-hint`}
+              />
+              <em>{field.suffix}</em>
+            </span>
+            <small id={`${fundId}-${field.key}-hint`}>{field.hint}</small>
+          </label>
+        ))}
       </div>
+    </div>
+  );
+}
 
-      <div className={styles.bandColumns}>
-        <div className={styles.bandCard}>
-          <div className={styles.bandCardHead}>
-            <h3 className={styles.bandHeading}>策略设置</h3>
-            <button type="button" className={styles.segButton} onClick={onReset} aria-label="恢复默认策略">
-              默认
-            </button>
-          </div>
-          <div role="group" aria-labelledby={`${fundId}-band-period`}>
-            <p id={`${fundId}-band-period`} className={styles.bandLabel}>
-              均线周期
-            </p>
-            <div className={styles.periodGrid}>
-              {Object.keys(BAND_PERIODS).map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={cn(styles.segButton, Number(key) === period && styles.segActive)}
-                  aria-pressed={Number(key) === period}
-                  aria-label={`${key} 日均线`}
-                  onClick={() => onPeriod(Number(key))}
-                >
-                  {key} 日
-                </button>
-              ))}
-            </div>
-            <small className={styles.bandHint}>
-              换周期时，卖出线和买回线改为 +{tested.sell}% / −{tested.buy}%。区间内不触发买卖。
-            </small>
-          </div>
-          <div className={styles.bandFields}>
-            {fields.map((field) => (
-              <label key={field.key} className={styles.strategyField} htmlFor={`${fundId}-${field.key}`}>
-                <span>{field.label}</span>
-                <span className={styles.strategyInputWrap}>
-                  <input
-                    id={`${fundId}-${field.key}`}
-                    className={styles.strategyInput}
-                    type="number"
-                    min={field.min}
-                    max={field.max}
-                    step={field.step}
-                    value={strategy[field.key]}
-                    onChange={(event) => onField(field.key, event.target.value)}
-                    aria-describedby={`${fundId}-${field.key}-hint`}
-                  />
-                  <em>{field.suffix}</em>
-                </span>
-                <small id={`${fundId}-${field.key}-hint`}>{field.hint}</small>
-              </label>
-            ))}
-          </div>
-          <p className={styles.bandLabel}>
-            仓位拆分{split ? (state.phase === 'waitingBuy' ? '（假设卖出已记入持仓）' : '（按当前持仓估算）') : ''}
-          </p>
-          {validCore ? (
-            <>
-              <div className={styles.bandBar} aria-hidden="true">
-                <i style={{ width: `${corePercent}%` }} />
-                <i className={state.phase === 'waitingBuy' ? styles.bandBarCash : styles.bandBarSleeve} />
-              </div>
-              <div className={styles.bandSplit}>
-                <span>
-                  底仓 {corePercent}%{split ? ` · ${money(split.core)}` : ''} · 不交易
-                </span>
-                <span>
-                  {state.phase === 'waitingBuy' ? '机动仓（现金）' : '机动仓'} {100 - corePercent}%
-                  {split ? ` · ${money(split.sleeve)}` : ''}
-                </span>
-              </div>
-            </>
-          ) : null}
+export function BandHistory({ model }) {
+  const { tradeSummary, sleeve, series, tested, isTested } = model;
+  const realizedTone = tradeSummary.rounds ? (tradeSummary.realized ?? tradeSummary.perShare) : 0;
+  return (
+    <div className={styles.historyBlock}>
+      <div className={styles.kpiMini} aria-label="当前参数下的历史信号统计">
+        <div>
+          <span>完成轮次</span>
+          <b>{tradeSummary.rounds}</b>
         </div>
-
-        <div className={styles.bandCard}>
-          <h3 className={styles.bandHeading}>当前参数下的历史信号</h3>
-          {tradeSummary.rows.length ? (
-            <>
-              <div className={cn(styles.bandStats, styles.bandSignalStats)} aria-label="历史信号统计">
-                <div className={styles.bandStat}>
-                  <i>完成轮次</i>
-                  <b>{tradeSummary.rounds}</b>
-                  <small>卖出后再买回算一轮</small>
-                </div>
-                <div className={styles.bandStat}>
-                  <i>{tradeSummary.realized === null ? '每份累计差价' : '累计盈亏'}</i>
-                  <b className={tone(tradeSummary.rounds ? (tradeSummary.realized ?? tradeSummary.perShare) : 0)}>
-                    {tradeSummary.rounds === 0
-                      ? '--'
-                      : tradeSummary.realized === null
-                        ? `${tradeSummary.perShare > 0 ? '+' : tradeSummary.perShare < 0 ? '−' : ''}${Math.abs(tradeSummary.perShare).toFixed(4)}`
-                        : signedYuan(tradeSummary.realized)}
-                  </b>
-                  <small>
-                    {tradeSummary.rounds === 0
-                      ? '还没有完成的卖出再买回'
-                      : tradeSummary.realized === null
-                        ? '填写持仓金额后换算成盈亏'
-                        : `约占当前机动仓 ${signed((tradeSummary.realized / sleeve) * 100)}，不含费用`}
-                  </small>
-                </div>
-                <div className={styles.bandStat}>
-                  <i>未买回</i>
-                  <b className={tone(tradeSummary.open?.profit ?? tradeSummary.open?.rate)}>
-                    {tradeSummary.open
-                      ? tradeSummary.open.profit === null
-                        ? signed(tradeSummary.open.rate)
-                        : signedYuan(tradeSummary.open.profit)
-                      : '无'}
-                  </b>
-                  <small>{tradeSummary.open ? `${tradeSummary.open.date} 卖出，按最新净值估算` : '卖出都已买回'}</small>
-                </div>
-              </div>
-              <p className={styles.bandHint}>
-                金额按当前机动仓金额除以当前净值，再乘以当日复权净值估算，不含申赎费。
-                {sleeve ? '' : '填写持仓金额后显示成交金额和累计盈亏。'}
-              </p>
-            </>
-          ) : null}
-          <div
-            className={cn(styles.tableScroll, styles.bandSignals)}
-            role="region"
-            aria-label="历史信号，可横向滚动"
-            tabIndex={0}
-          >
-            <table className={styles.miniTable}>
-              <thead>
-                <tr>
-                  <th>日期</th>
-                  <th>动作</th>
-                  <th>净值</th>
-                  <th>相对均线</th>
-                  <th>金额</th>
-                  <th>本轮盈亏</th>
+        <div>
+          <span>{tradeSummary.realized === null ? '每份累计差价' : '累计盈亏'}</span>
+          <b className={tone(realizedTone)}>
+            {tradeSummary.rounds === 0
+              ? '--'
+              : tradeSummary.realized === null
+                ? `${tradeSummary.perShare > 0 ? '+' : tradeSummary.perShare < 0 ? '−' : ''}${Math.abs(tradeSummary.perShare).toFixed(4)}`
+                : signedYuan(tradeSummary.realized)}
+          </b>
+        </div>
+        <div>
+          <span>未买回</span>
+          <b className={tone(tradeSummary.open?.profit ?? tradeSummary.open?.rate)}>
+            {tradeSummary.open
+              ? tradeSummary.open.profit === null
+                ? signed(tradeSummary.open.rate)
+                : signedYuan(tradeSummary.open.profit)
+              : '无'}
+          </b>
+        </div>
+      </div>
+      <div
+        className={cn(styles.tableScroll, styles.bandSignals)}
+        role="region"
+        aria-label="历史信号，可横向滚动"
+        tabIndex={0}
+      >
+        <table className={styles.miniTable}>
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>动作</th>
+              <th>净值</th>
+              <th>相对均线</th>
+              <th>金额</th>
+              <th>本轮盈亏</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tradeSummary.rows.length ? (
+              [...tradeSummary.rows].reverse().map((item) => (
+                <tr key={item.date}>
+                  <td>{item.date}</td>
+                  <td className={item.type === 'sell' ? styles.up : styles.down}>
+                    {item.type === 'sell' ? '卖出机动仓' : '买回机动仓'}
+                  </td>
+                  <td>{priceText(item.nav)}</td>
+                  <td>{signed(item.deviation)}</td>
+                  <td>{yuan(item.amount)}</td>
+                  <td className={tone(item.roundProfit ?? item.roundRate)}>
+                    {item.type === 'sell'
+                      ? '待买回'
+                      : !Number.isFinite(item.roundRate)
+                        ? '--'
+                        : item.roundProfit === null
+                          ? signed(item.roundRate)
+                          : `${signedYuan(item.roundProfit)} · ${signed(item.roundRate)}`}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {tradeSummary.rows.length ? (
-                  [...tradeSummary.rows].reverse().map((item) => (
-                    <tr key={item.date}>
-                      <td>{item.date}</td>
-                      <td className={item.type === 'sell' ? styles.up : styles.down}>
-                        {item.type === 'sell' ? '卖出机动仓' : '买回机动仓'}
-                      </td>
-                      <td>{priceText(item.nav)}</td>
-                      <td>{signed(item.deviation)}</td>
-                      <td>{yuan(item.amount)}</td>
-                      <td className={tone(item.roundProfit ?? item.roundRate)}>
-                        {item.type === 'sell'
-                          ? '待买回'
-                          : !Number.isFinite(item.roundRate)
-                            ? '--'
-                            : item.roundProfit === null
-                              ? signed(item.roundRate)
-                              : `${signedYuan(item.roundProfit)} · ${signed(item.roundRate)}`}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="6" className={styles.emptyCell}>
-                      {series.length ? '当前参数下没有触发信号' : '暂无数据'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <p className={styles.bandLabel}>历史参考统计，不是当前基金的模拟成绩</p>
-          <p className={styles.bandEvidence}>
-            <b>按上轨卖出、下轨买回统计。</b>
-            {isTested ? '' : '当前卖出线或下轨改过，下面仍是该周期默认参数。'}8 只基金、5 年窗口：中位年化少{' '}
-            {tested.lessReturn}%，{tested.winRate}% 的窗口跑赢；回撤 {tested.drawdown}%，一直持有 {HOLD_DRAWDOWN}%；约{' '}
-            {tested.trades} 笔交易。不保证比一直持有赚得多。
-          </p>
-        </div>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="6" className={styles.emptyCell}>
+                  {series.length ? '当前参数下没有触发信号' : '暂无数据'}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
+      <p className={styles.bandHint}>按当前机动仓金额回放，不含申赎费。{sleeve ? '' : '填写持仓后显示金额。'}</p>
+      <p className={styles.bandEvidence}>
+        <b>多基金参考：</b>
+        {isTested ? '' : '（当前参数改过，下面是该周期默认参数的结果）'}8 只基金、5 年窗口，中位年化少{' '}
+        {tested.lessReturn}%，{tested.winRate}% 的窗口跑赢一直持有；回撤 {tested.drawdown}%（一直持有 {HOLD_DRAWDOWN}
+        %）。不保证比一直持有赚得多。
+      </p>
     </div>
   );
 }
