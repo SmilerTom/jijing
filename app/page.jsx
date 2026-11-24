@@ -2837,7 +2837,8 @@ export default function HomePage() {
           const cleanedFunds = deduped.map(stripLegacyTagsFromFundObject);
           setFundTagRecords(normalizedTags);
           const codes = Array.from(new Set(cleanedFunds.map((f) => f.code)));
-          if (codes.length && shouldRefreshFromLocal) autoRefresh(codes);
+          // 启动时必须拉取一次行情；交易时段限制只用于之后的定时刷新，否则收盘后重开列表会一直空白
+          if (codes.length && shouldRefreshFromLocal) refreshAll(codes);
         } else {
           try {
             const t = storageStore.getItem('tags', []);
