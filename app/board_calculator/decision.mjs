@@ -42,7 +42,7 @@ export function parseRedemptionTiers(rows) {
   return tiers.every(Boolean) ? tiers.sort((a, b) => a.minDays - b.minDays) : null;
 }
 
-const rateForDays = (tiers, days) => tiers?.find((tier) => days >= tier.minDays && days < tier.maxDays)?.rate;
+export const rateForDays = (tiers, days) => tiers?.find((tier) => days >= tier.minDays && days < tier.maxDays)?.rate;
 
 const validShare = (holding) => Number.isFinite(Number(holding?.share)) && Number(holding.share) > 0;
 
@@ -215,4 +215,31 @@ export function findFeeSaving({
   const later = estimateFee({ ...params, sellConfirmDate: confirmDate }).fee;
   const saving = current - later;
   return saving > 0.005 ? { tradeDate, saving } : null;
+}
+
+/** 与首页交易同一算法：买入按含费总额加权成本，卖出只减份额、单位成本不变 */
+export function applyTradeToBook(current, { type, share, amount, date }) {
+  const base = { share: Number(current?.share) || 0, cost: Number(current?.cost) || 0 };
+  const firstPurchaseDate = current?.firstPurchaseDate;
+  if (type === 'buy') {
+    const nextShare = base.share + share;
+    return {
+      share: nextShare,
+      cost: (base.cost * base.share + amount) / nextShare,
+      ...(firstPurchaseDate || date ? { firstPurchaseDate: firstPurchaseDate || date } : {})
+    };
+  }
+  const nextShare = Math.max(0, base.share - share);
+  return {
+    share: nextShare,
+    cost: nextShare > EPSILON ? base.cost : 0,
+    ...(firstPurchaseDate ? { firstPurchaseDate } : {})
+  };
+}
+
+/** 一只基金只在一个账本里有持仓时才能自动记账；多个账本需要用户到首页指定 */
+export function pickTradeBook(position) {
+  if (!position) return { groupId: null };
+  if (position.books.length === 1) return { groupId: position.books[0].groupId };
+  return null;
 }

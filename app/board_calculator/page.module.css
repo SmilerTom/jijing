@@ -40,116 +40,7 @@
   font-weight: 700;
   line-height: 1.25;
 }
-.subtitle,
-.subtitleBottom {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-}
-.boardOptions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  margin: 24px 0 0;
-}
-.boardOption {
-  min-width: 0;
-  overflow: hidden;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.18);
-  cursor: pointer;
-  transition:
-    transform 0.2s ease,
-    border-color 0.2s ease;
-}
-.boardOption:hover,
-.boardOption:focus-visible,
-.boardSelected {
-  border-color: var(--primary);
-}
-.boardOption:hover {
-  transform: none;
-}
-.boardOption:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 3px;
-}
-.cardImage {
-  background: var(--secondary);
-}
-.mockup {
-  height: 100%;
-}
-.mockupHeader {
-  padding: 12px 18px;
-  color: var(--muted);
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
-  letter-spacing: 0.08em;
-}
-.mockupBody {
-  padding: 0;
-}
-.cardBody {
-  padding: 18px 22px 20px;
-  background: var(--card);
-  border-top: 1px solid var(--border);
-}
-.cardBody h2,
-.cardBody h3 {
-  margin: 0;
-  color: var(--text);
-  font-size: 18px;
-}
-.cardBody p {
-  margin: 8px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.55;
-}
-.boardPreview {
-  container-type: inline-size;
-  min-height: 0;
-  padding: 24px;
-  box-sizing: border-box;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 14px;
-}
-.previewHead {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 8px;
-  padding-bottom: 18px;
-  border-bottom: 1px solid var(--border);
-}
-.previewHead strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text);
-  font-family: inherit;
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.2;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  text-overflow: ellipsis;
-}
-.previewHead > span,
-.previewTools > span {
-  color: var(--primary);
-  font-size: 12px;
-}
-.previewTools {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 8px;
-}
-.previewEdit,
+
 .flowSubmit {
   padding: 7px 12px;
   color: var(--text);
@@ -160,11 +51,7 @@
   font-size: 12px;
   cursor: pointer;
 }
-.previewEdit:hover,
-.previewEdit:focus-visible {
-  color: var(--primary);
-  border-color: var(--primary);
-}
+
 .flowSubmit {
   color: var(--primary-foreground);
   background: var(--primary);
@@ -177,104 +64,7 @@
   background: var(--accent);
   border-color: var(--accent);
 }
-.riskPanel {
-  --risk-warn: #fbbf24;
-  --risk-color: var(--muted);
-  margin-top: 10px;
-  overflow: hidden;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-:global([data-theme='light']) .riskPanel {
-  --risk-warn: #b45309;
-}
-.riskLevel_low {
-  --risk-color: var(--success);
-}
-.riskLevel_mid {
-  --risk-color: var(--risk-warn);
-  border: 2px solid var(--risk-color);
-}
-.riskLevel_high {
-  --risk-color: var(--danger);
-  border: 2px solid var(--risk-color);
-}
-.riskHero {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 14px;
-  align-items: center;
-  padding: 14px 16px;
-  color: var(--risk-color);
-  background: color-mix(in srgb, var(--risk-color) 14%, var(--card));
-  border-bottom: 2px solid var(--risk-color);
-}
-.riskIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: var(--card);
-  border-radius: 50%;
-}
-.riskHeroText {
-  min-width: 0;
-}
-.riskTitleRow {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 15px;
-}
-.riskPulse {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 auto;
-  background: var(--risk-color);
-  border-radius: 50%;
-  animation: riskPulse 1.4s ease-in-out infinite;
-}
-@keyframes riskPulse {
-  50% {
-    opacity: 0.3;
-  }
-}
-.riskHeadline {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  align-items: baseline;
-  margin: 4px 0 0;
-  color: var(--text);
-  font-size: 13px;
-}
-.riskHeadline b {
-  color: var(--risk-color);
-  font-size: 30px;
-  line-height: 1.1;
-}
-.riskAction {
-  padding: 8px 14px;
-  color: var(--risk-color);
-  background: var(--card);
-  border: 1px solid var(--risk-color);
-  border-radius: 8px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.riskAction:hover,
-.riskAction:focus-visible {
-  color: var(--card);
-  background: var(--risk-color);
-}
-.riskBody {
-  padding: 14px 16px;
-  font-size: 13px;
-}
+
 .riskMeterHead,
 .riskSectionHead {
   display: flex;
@@ -585,113 +375,13 @@
   color: var(--primary);
   text-decoration: underline;
 }
-.riskAction:focus-visible,
 .newsTabs button:focus-visible,
 .riskLink:focus-visible,
 .forecastMethod summary:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
-.riskSettings {
-  margin-top: 9px;
-  overflow-x: auto;
-}
-.riskSettingsTitle {
-  display: block;
-  margin-bottom: 5px;
-  color: var(--muted);
-  font-size: 11px;
-}
-.riskControls {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-.riskGroup {
-  display: block;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  white-space: nowrap;
-}
-.riskGroup legend {
-  display: inline;
-  float: left;
-  margin: 0 2px 0 0;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 22px;
-}
-.riskGroup legend::after {
-  content: '：';
-}
-.riskChip {
-  display: inline-block;
-  padding: 5px 9px;
-  color: var(--text);
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-family: inherit;
-  font-size: 11px;
-  cursor: pointer;
-  vertical-align: middle;
-}
-.riskChip:hover,
-.riskChip:focus-visible,
-.selected {
-  color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 10%, var(--card));
-  border-color: var(--primary);
-}
-.stats {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
-  margin: 18px 0;
-}
-.stat {
-  min-width: 0;
-  padding: 14px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-.stat i {
-  display: block;
-  margin-bottom: 8px;
-  color: var(--muted);
-  font-style: normal;
-  font-size: 11px;
-}
-.statValue {
-  overflow-wrap: anywhere;
-  display: block;
-  min-height: 24px;
-  color: var(--text);
-  font-size: 21px;
-}
-.statSubvalue {
-  display: block;
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 400;
-}
-.statEdit {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 5px 6px;
-  color: var(--text);
-  background: var(--input);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-family: inherit;
-  font-size: 16px;
-  font-weight: 600;
-}
-.statEdit:focus,
+
 .flowForm input:focus,
 .flowForm select:focus {
   outline: 2px solid var(--primary);
@@ -707,15 +397,11 @@
   max-width: 100%;
   overflow-x: auto;
 }
-.tableScroll:focus-visible,
-.boardPreview button:focus-visible {
+.tableScroll:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
-.boardPreview input,
-.boardPreview select {
-  font-size: 16px;
-}
+
 .miniTable th,
 .miniTable td {
   padding: 11px 8px;
@@ -772,29 +458,7 @@
 .sell {
   color: var(--danger) !important;
 }
-.flowBox {
-  margin-top: 20px;
-  padding: 16px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-.flowBoxHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.flowBoxHead b {
-  color: var(--text);
-  font-size: 14px;
-}
-.flowBoxHead span,
-.flowBox small {
-  color: var(--muted);
-  font-size: 11px;
-}
+
 .flowForm {
   display: grid;
   grid-template-columns: 100px minmax(0, 1fr) minmax(0, 240px) auto;
@@ -832,29 +496,7 @@
 .flowSubmit {
   height: 44px;
 }
-.flowBox small {
-  display: block;
-  margin-top: 10px;
-}
-.strategyBox {
-  margin-top: 18px;
-  padding: 14px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-.strategyHead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-.strategyHead b {
-  color: var(--text);
-  font-size: 14px;
-}
+
 .strategyDefault {
   padding: 6px 12px;
   color: var(--text);
@@ -915,9 +557,7 @@
   border: 0;
   font-family: inherit;
 }
-.boardPreview .strategyInput {
-  font-size: 16px;
-}
+
 .strategyInput:focus {
   outline: none;
 }
@@ -934,37 +574,7 @@
   color: var(--muted);
   font-size: 10px;
 }
-.strategyStatus {
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-  margin-top: 12px;
-  padding: 9px 10px;
-  color: var(--muted);
-  background: var(--secondary);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--primary);
-  font-size: 12px;
-}
-.strategyStatusHot {
-  border-left-color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 8%, var(--secondary));
-}
-.strategyMetric {
-  flex: 0 0 auto;
-  color: var(--danger);
-  font-style: normal;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-.strategyStatus strong {
-  flex: 0 0 auto;
-  color: var(--text);
-  font-size: 13px;
-}
-.strategyStatus span {
-  min-width: 0;
-}
+
 .strategyNote {
   display: block;
   margin: 10px 0 0;
@@ -998,51 +608,8 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
-.subtitleBottom {
-  margin-top: 22px;
-}
-.risk {
-  display: grid;
-  gap: 8px;
-  margin: 10px 0;
-  padding: 9px 10px;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, var(--card));
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
-  border-left: 3px solid var(--accent);
-}
-.risk.ok {
-  color: var(--success);
-  background: color-mix(in srgb, var(--success) 12%, var(--card));
-  border-left-color: var(--success);
-}
-.signalGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-top: 13px;
-}
-.signal {
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-.signal small {
-  display: block;
-  color: var(--muted);
-}
-.signal strong {
-  display: block;
-  margin-top: 5px;
-  color: var(--text);
-}
+
 @media (max-width: 900px) {
-  .boardOptions {
-    max-width: 560px;
-  }
-  .stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
   .strategyFields {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1087,10 +654,7 @@
   gap: 4px 12px;
   justify-content: space-between;
 }
-.riskFacts {
-  margin: 8px 0 0;
-  font-size: 13px;
-}
+
 .resetConfirm {
   display: inline;
   margin-left: 4px;
@@ -1104,32 +668,10 @@
   border-radius: 8px;
   font-size: 13px;
 }
-.riskDetails,
-.riskFold,
 .decisionFold {
   min-width: 0;
 }
-.riskDetails {
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-}
-.riskDetails > summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  align-items: baseline;
-  cursor: pointer;
-}
-.riskDetails > summary .riskMuted {
-  margin: 0;
-}
-.riskFold {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
-}
-.riskFold > summary,
+
 .decisionFold > summary {
   display: flex;
   flex-wrap: wrap;
@@ -1137,12 +679,9 @@
   align-items: baseline;
   cursor: pointer;
 }
-.riskFold > summary .riskMuted,
 .decisionFold > summary .riskMuted {
   margin: 0;
 }
-.riskDetails > summary:focus-visible,
-.riskFold > summary:focus-visible,
 .decisionFold > summary:focus-visible,
 .decisionScroll:focus-visible {
   outline: 2px solid var(--primary);
@@ -1220,49 +759,19 @@
   .page {
     padding: 24px 14px 36px;
   }
-  .boardPreview {
-    min-height: 0;
-    padding: 12px;
-  }
-  .previewHead {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .previewHead strong {
-    overflow: visible;
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-  .stats {
-    grid-template-columns: 1fr 1fr;
-  }
+
   .flowForm {
     grid-template-columns: 1fr 1fr;
   }
   .strategyFields {
     grid-template-columns: 1fr 1fr;
   }
-  .strategyStatus {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 3px;
-  }
+
   .flowSubmit {
     min-height: 28px;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .boardOption {
-    transition: none;
-  }
-  .riskPulse {
-    animation: none;
-  }
-}
 @container (max-width: 860px) {
-  .stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
   .strategyFields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1271,28 +780,13 @@
   }
 }
 @container (max-width: 560px) {
-  .stats,
   .strategyFields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .flowForm {
     grid-template-columns: 1fr;
   }
-  .previewHead,
-  .strategyStatus,
-  .flowBoxHead {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .riskHero {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .riskAction {
-    grid-column: 1 / -1;
-  }
-  .riskHeadline b {
-    font-size: 26px;
-  }
+
   .scenarioGrid {
     grid-template-columns: 1fr;
   }
@@ -1324,41 +818,7 @@
   background: var(--tabs-trigger-active-bg);
   border-color: var(--primary);
 }
-.bandPanel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 12px;
-}
-.bandStats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 10px;
-}
-.bandSignalStats {
-  margin-top: 10px;
-}
-.bandStat,
-.bandCard {
-  min-width: 0;
-  box-sizing: border-box;
-  padding: 12px 14px;
-  background: var(--secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-.bandStat i,
-.bandStat small {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-  font-style: normal;
-}
-.bandStat b {
-  display: block;
-  font-size: 20px;
-  font-variant-numeric: tabular-nums;
-}
+
 .bandLegend {
   display: flex;
   flex-wrap: wrap;
@@ -1441,8 +901,7 @@
 .bandChartZoomed:active {
   cursor: grabbing;
 }
-.bandFields .strategyInput,
-.strategyHead .strategyDefault {
+.bandFields .strategyInput {
   min-height: 44px;
 }
 .bandEmpty {
@@ -1451,23 +910,13 @@
   color: var(--muted);
   text-align: center;
 }
-.bandColumns {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-.bandColumns > .bandCard {
-  flex: 1 1 340px;
-}
+
 .bandLabel {
   margin: 14px 0 6px;
   font-size: 13px;
   font-weight: 600;
 }
-.bandCard > :first-child > .bandLabel,
-.bandCard > .bandLabel:first-child {
-  margin-top: 0;
-}
+
 .periodGrid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -1528,38 +977,7 @@
 .strategyFields[hidden] {
   display: none;
 }
-.bandMetric {
-  color: var(--text);
-}
 
-.bandTitle {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  margin-right: auto;
-}
-.bandTitle b {
-  font-size: 18px;
-}
-.bandTitle small {
-  color: var(--muted);
-  font-size: 12px;
-}
-.bandStatus {
-  flex-wrap: wrap;
-  padding: 14px 16px;
-  color: var(--text);
-  background: var(--card);
-  border-color: var(--primary);
-  font-size: 13px;
-}
-.bandStatus.strategyStatusHot {
-  border-color: currentColor;
-}
-.bandStatus strong {
-  font-size: 18px;
-}
 .bandCardHead {
   display: flex;
   flex-wrap: wrap;
@@ -1568,28 +986,7 @@
   gap: 6px 16px;
   margin-bottom: 8px;
 }
-.bandHeading {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-}
-.bandMark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  color: var(--card);
-  border-radius: 50%;
-  font-size: 10px;
-  font-style: normal;
-}
-.bandMarkSell {
-  background: var(--chart-5);
-}
-.bandMarkBuy {
-  background: var(--chart-2);
-}
+
 .bandSignals {
   max-height: 320px;
   overflow-y: auto;
@@ -1602,4 +999,845 @@
 .periodGrid .segButton {
   padding: 0 2px;
   white-space: nowrap;
+}
+
+/* 更多分析：今日对比 + 分页内容 */
+.todayGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.todayTile {
+  min-width: 0;
+  padding: 10px 12px;
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.todayTile span,
+.todayTile small {
+  display: block;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.todayTile b {
+  display: block;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.todayTile small.down {
+  color: var(--danger);
+}
+
+@media (max-width: 640px) {
+  .todayGrid {
+    gap: 6px;
+  }
+  .todayTile {
+    padding: 8px;
+  }
+  .todayTile b {
+    font-size: 16px;
+  }
+}
+
+/* ===== 顾问看板 ===== */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.advisor {
+  --risk-warn: #fbbf24;
+  --risk-color: var(--muted);
+  container-type: inline-size;
+  display: grid;
+  gap: 16px;
+  max-width: 980px;
+  margin: 16px auto 0;
+  color: var(--text);
+  font-size: 14px;
+}
+:global([data-theme='light']) .advisor {
+  --risk-warn: #b45309;
+}
+.riskTone_low {
+  --risk-color: var(--success);
+}
+.riskTone_mid {
+  --risk-color: var(--risk-warn);
+}
+.riskTone_high {
+  --risk-color: var(--danger);
+}
+.advisor button:focus-visible,
+.advisor [role='tabpanel']:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.advisor input,
+.advisor select {
+  font-size: 16px;
+}
+.advisor .strategyNote {
+  margin: 0;
+}
+.eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+.advisorHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.advisorTitle {
+  min-width: 0;
+}
+.advisorTitle h2 {
+  margin: 4px 0 0;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.advisorQuote {
+  display: flex;
+  gap: 24px;
+  margin: 0;
+}
+.advisorQuote div {
+  text-align: right;
+}
+.advisorQuote dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.advisorQuote dd {
+  margin: 2px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.verdict {
+  --verdict-color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--verdict-color);
+  border-radius: var(--radius);
+}
+.verdict_alert {
+  --verdict-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 6%, var(--card));
+}
+.verdict_chance {
+  --verdict-color: var(--success);
+  background: color-mix(in srgb, var(--success) 6%, var(--card));
+}
+.verdict_calm {
+  --verdict-color: var(--primary);
+}
+.verdictMain {
+  flex: 1 1 420px;
+  min-width: 0;
+}
+.verdictMain h3 {
+  margin: 6px 0 0;
+  color: var(--verdict-color);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.verdict_calm .verdictMain h3 {
+  color: var(--text);
+}
+.verdictAdvice {
+  margin: 8px 0 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+.verdictDetail {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.verdictMeter {
+  max-width: 420px;
+  margin-top: 12px;
+  --risk-color: var(--verdict-color);
+}
+.primaryAction {
+  min-height: 44px;
+  padding: 0 20px;
+  color: var(--primary-foreground);
+  background: var(--primary);
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.primaryAction:hover {
+  filter: brightness(1.08);
+}
+.primaryAction:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.kpi {
+  min-width: 0;
+  padding: 16px 20px;
+}
+.kpi + .kpi {
+  border-left: 1px solid var(--border);
+}
+.kpi span,
+.kpi small {
+  display: block;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.kpi b {
+  display: block;
+  margin: 6px 0 4px;
+  overflow: hidden;
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.kpi small.up {
+  color: var(--danger);
+}
+.kpi small.down {
+  color: var(--success);
+}
+.holdingEdit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: flex-end;
+  justify-content: flex-end;
+  margin-top: -8px;
+}
+.holdingForm {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.holdingForm label {
+  display: grid;
+  flex: 1 1 140px;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.holdingForm input {
+  width: 100%;
+  min-height: 40px;
+  background: var(--input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.textButton {
+  min-height: 36px;
+  padding: 0 4px;
+  color: var(--primary);
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.textButton:hover {
+  text-decoration: underline;
+}
+
+.advisorCard {
+  min-width: 0;
+  padding: 20px 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.advisorCardTitle,
+.paneTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.paneTitle {
+  margin-top: 4px;
+  font-size: 14px;
+}
+.allocation {
+  margin-top: 4px;
+}
+.advisorFootnote {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.tabList {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--border);
+}
+.tabList button {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 14px;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.tabList button:hover {
+  color: var(--text);
+}
+.tabList button[aria-selected='true'] {
+  color: var(--text);
+  border-bottom-color: var(--primary);
+  font-weight: 600;
+}
+.tabListLine {
+  margin-top: 16px;
+}
+.tabListLine button {
+  min-height: 40px;
+  font-size: 13px;
+}
+.tabBadge {
+  position: absolute;
+  top: 10px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  background: var(--danger);
+  border-radius: 50%;
+}
+.tabPanel {
+  min-width: 0;
+  padding-top: 16px;
+}
+.actionPane {
+  display: grid;
+  gap: 14px;
+}
+.actionPane > .riskMuted,
+.marketAnalysis > .riskMuted {
+  margin: 0;
+}
+.actionPane .strategyConfirmation {
+  margin: 0;
+}
+.modeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+}
+.modeRow .modeSwitch {
+  flex: 0 1 auto;
+}
+.settingsBlock {
+  display: grid;
+  gap: 10px;
+}
+.historyBlock {
+  display: grid;
+  gap: 10px;
+}
+.kpiMini {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.kpiMini div {
+  min-width: 0;
+  padding: 10px 12px;
+  background: var(--secondary);
+  border-radius: 8px;
+}
+.kpiMini span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.kpiMini b {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.marketAnalysis {
+  display: grid;
+  gap: 4px;
+}
+.marketAnalysis .todayGrid {
+  margin-top: 0;
+}
+.actionPane .decisionFold {
+  margin: 0;
+}
+
+@container (max-width: 720px) {
+  .kpiGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .kpi:nth-child(3) {
+    border-left: 0;
+  }
+  .kpi:nth-child(n + 3) {
+    border-top: 1px solid var(--border);
+  }
+}
+@media (max-width: 640px) {
+  .advisor {
+    gap: 12px;
+    margin-top: 8px;
+  }
+  .advisorTitle h2 {
+    font-size: 20px;
+  }
+  .advisorQuote {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .advisorQuote div {
+    text-align: left;
+  }
+  .verdict,
+  .advisorCard {
+    padding: 16px;
+  }
+  .verdictMain h3 {
+    font-size: 19px;
+  }
+  .primaryAction {
+    width: 100%;
+  }
+  .kpi {
+    padding: 12px 14px;
+  }
+  .kpi b {
+    font-size: 18px;
+  }
+  .tabList button {
+    padding: 0 10px;
+  }
+  .kpiMini {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== 分析师模块 ===== */
+.headerActions {
+  display: flex;
+  gap: 8px;
+}
+.headerActions .segButton {
+  min-height: 36px;
+}
+.cardHeadRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+.periodSwitch {
+  display: flex;
+  gap: 2px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 3px;
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  scrollbar-width: none;
+}
+.periodSwitch button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 10px;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.periodSwitch button[aria-pressed='true'] {
+  color: var(--text);
+  background: var(--card);
+  font-weight: 600;
+}
+.periodSwitch button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 16px;
+  overflow: hidden;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.metric {
+  min-width: 0;
+  padding: 12px 14px;
+  background: var(--card);
+}
+.metric span,
+.metric small {
+  display: block;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.metric b {
+  display: block;
+  margin: 4px 0 2px;
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.moreFold {
+  margin-top: 14px;
+}
+.moreFold > summary {
+  min-height: 32px;
+  color: var(--primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+.moreFold > summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.foldGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 20px;
+  margin-top: 10px;
+}
+.plainList {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.plainList li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.plainList li small {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 12px;
+}
+.plainList b {
+  font-variant-numeric: tabular-nums;
+}
+
+.tradeForm {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.tradeFields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.tradeFields label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.fieldInput {
+  width: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  color: var(--text);
+  background: var(--input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+}
+.fieldInput:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 0;
+}
+.checkRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.checkRow input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+.tradeActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+}
+.tradeActions .riskMuted {
+  margin: 0;
+}
+
+.backtestVerdict {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.backtestVerdict b {
+  margin: 0 2px;
+}
+.curveFigure {
+  margin: 0;
+}
+.curveChart {
+  display: block;
+  width: 100%;
+  height: 140px;
+}
+.curveHold,
+.curveStrategy {
+  fill: none;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.curveHold {
+  stroke: var(--muted);
+  stroke-dasharray: 4 3;
+}
+.curveStrategy {
+  stroke: var(--primary);
+}
+.legendStrategy {
+  background: var(--primary);
+}
+.legendHold {
+  background: var(--muted);
+}
+
+.noticeList {
+  margin: 0;
+  padding: 10px 14px 10px 30px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--risk-warn) 12%, var(--card));
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.sectorBar {
+  display: flex;
+  height: 22px;
+  overflow: hidden;
+  border-radius: 6px;
+}
+.sectorBar span {
+  min-width: 2px;
+  overflow: hidden;
+  color: var(--primary-foreground);
+  font-size: 11px;
+  line-height: 22px;
+  text-align: center;
+  white-space: nowrap;
+}
+.sectorBar span:nth-child(6n + 1) {
+  background: var(--chart-1);
+}
+.sectorBar span:nth-child(6n + 2) {
+  background: var(--chart-2);
+}
+.sectorBar span:nth-child(6n + 3) {
+  background: var(--chart-3);
+}
+.sectorBar span:nth-child(6n + 4) {
+  background: var(--chart-4);
+}
+.sectorBar span:nth-child(6n + 5) {
+  background: var(--chart-5);
+}
+.sectorBar span:nth-child(6n) {
+  background: var(--muted);
+}
+.rowSelf td {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+.cellSub {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.factGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.factGrid > div {
+  min-width: 0;
+  padding: 12px 14px;
+  background: var(--card);
+}
+.factGrid dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.factGrid dd {
+  margin: 4px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.factGrid dd.factSub {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.scoreList {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.scoreList li {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 32px;
+  gap: 10px;
+  align-items: center;
+  font-size: 13px;
+}
+.scoreList b {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.scoreBar {
+  height: 6px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--muted) 18%, transparent);
+  border-radius: 3px;
+}
+.scoreBar i {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}
+
+@container (max-width: 720px) {
+  .metricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .foldGrid,
+  .tradeFields {
+    grid-template-columns: 1fr;
+  }
+  .factGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .headerActions {
+    width: 100%;
+  }
+  .headerActions .segButton {
+    flex: 1 1 0;
+  }
+  .metric b {
+    font-size: 16px;
+  }
+}
+
+@media print {
+  .backHome,
+  .headerActions,
+  .tabList,
+  .holdingEdit,
+  .primaryAction,
+  .tradeForm,
+  .periodSwitch {
+    display: none !important;
+  }
+  .advisor {
+    max-width: none;
+    margin: 0;
+  }
+  .advisorCard,
+  .verdict,
+  .kpiGrid {
+    break-inside: avoid;
+  }
 }

@@ -35,9 +35,10 @@ const feeText = (option, rulesFailed) => {
 const profitText = (value) => (value === null ? '缺少成本' : `${value >= 0 ? '+' : '−'}${money(value)}`);
 const toneOf = (value) => (value > 0 ? styles.up : value < 0 ? styles.down : '');
 
-export default function DecisionCard({ fundId, nav, estimated, open, onDecide }) {
+export default function DecisionCard({ fundId, nav, estimated, presetRatio = null, onDecide }) {
   const { holdings, groupHoldings, transactions } = useStorageStore();
-  const [ratioPercent, setRatioPercent] = useState(50);
+  const preset = presetRatio > 0 && presetRatio < 1 ? Math.round(presetRatio * 20) / 20 : null;
+  const [ratioPercent, setRatioPercent] = useState(() => (preset ? Math.round(preset * 100) : 50));
   const [now, setNow] = useState(() => new Date());
   const [decisionNote, setDecisionNote] = useState('');
   const sliderId = useId();
@@ -105,7 +106,10 @@ export default function DecisionCard({ fundId, nav, estimated, open, onDecide })
     tiers,
     sellConfirmDate: settlement.confirmDate
   };
-  const options = OPTIONS.map((option) => ({ ...option, ...simulateSale({ ...params, ratio: option.ratio }) }));
+  const presetOptions = preset
+    ? [OPTIONS[0], { label: `卖出机动仓 ${Math.round(preset * 100)}%`, ratio: preset }, OPTIONS[2]]
+    : OPTIONS;
+  const options = presetOptions.map((option) => ({ ...option, ...simulateSale({ ...params, ratio: option.ratio }) }));
   const custom = simulateSale({ ...params, ratio: ratioPercent / 100 });
   const saving = findFeeSaving({
     lots,
@@ -121,11 +125,8 @@ export default function DecisionCard({ fundId, nav, estimated, open, onDecide })
   const redeemBlocked = rules?.redeemStatus && !rules.redeemStatus.includes('开放');
 
   return (
-    <details className={styles.decisionFold} open={open}>
-      <summary>
-        <b>如果现在操作</b>
-        <span className={styles.riskMuted}>费用、盈亏和到账估算</span>
-      </summary>
+    <div className={styles.decisionFold}>
+      <h4 className={styles.paneTitle}>如果现在卖出</h4>
       {redeemBlocked ? (
         <p className={styles.decisionAlert} role="alert">
           当前赎回状态：{rules.redeemStatus}，可能无法按下面的时间卖出。
@@ -264,6 +265,6 @@ export default function DecisionCard({ fundId, nav, estimated, open, onDecide })
           </button>
         ) : null}
       </p>
-    </details>
+    </div>
   );
 }
