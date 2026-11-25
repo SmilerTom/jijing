@@ -18,12 +18,12 @@ export function normalizeStrategy(saved = {}) {
 }
 
 export const BAND_PERIODS = Object.freeze({
-  5: { sell: 5, buy: 5, lessReturn: 0.17, winRate: 31.9, drawdown: 33.8, trades: 4 },
-  10: { sell: 5, buy: 5, lessReturn: 1.27, winRate: 19.0, drawdown: 33.9, trades: 7 },
-  20: { sell: 10, buy: 5, lessReturn: 0.77, winRate: 20.0, drawdown: 35.2, trades: 4 },
-  60: { sell: 10, buy: 5, lessReturn: 0.86, winRate: 23.2, drawdown: 34.2, trades: 6 },
-  120: { sell: 15, buy: 10, lessReturn: 0.97, winRate: 20.6, drawdown: 32.1, trades: 5 },
-  250: { sell: 25, buy: 10, lessReturn: 0.11, winRate: 22.6, drawdown: 33.8, trades: 4 }
+  5: { sell: 5, buy: 5 },
+  10: { sell: 5, buy: 5 },
+  20: { sell: 10, buy: 5 },
+  60: { sell: 10, buy: 5 },
+  120: { sell: 15, buy: 10 },
+  250: { sell: 25, buy: 10 }
 });
 export const BAND_HISTORY_RANGE = 'all';
 export const DEFAULT_BAND = Object.freeze({
