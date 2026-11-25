@@ -32,7 +32,6 @@ const UpdateChecker = dynamic(() => import('./components/UpdateChecker'), { ssr:
 import MarketIndexAccordion from './components/MarketIndexAccordion';
 import DailyBrief from './components/DailyBrief';
 import TodaySignals from './components/TodaySignals';
-import StrategyTicker, { getTrackedFunds } from './components/StrategyTicker';
 import { mergeHeldPositions } from './board_calculator/decision.mjs';
 import githubImg from './assets/github.svg';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
@@ -517,7 +516,6 @@ export default function HomePage() {
   } = useSummaryCalculations({ currentTab, setCurrentTab, getHoldingProfit });
 
   const heldPositions = useMemo(() => mergeHeldPositions(holdings, groupHoldings), [holdings, groupHoldings]);
-  const hasStrategyTicker = useMemo(() => getTrackedFunds(funds, heldPositions).length > 0, [funds, heldPositions]);
 
   const getHoldingProfitForTab = useCallback(
     (fund, holding) => {
@@ -4845,17 +4843,10 @@ export default function HomePage() {
               />
             </div>
           </div>
-          <StrategyTicker
-            funds={funds}
-            holdings={heldPositions}
-            getHoldingProfit={getHoldingProfit}
-            navbarHeight={navbarHeight}
-            containerPadding={isMobile ? 12 : 24}
-          />
           {shouldShowMarketIndex && (
             <MarketIndexAccordion
               navbarHeight={navbarHeight}
-              marginTop={hasStrategyTicker ? 0 : navbarHeight}
+              marginTop={navbarHeight}
               onCustomSettingsChange={triggerCustomSettingsSync}
               refreshing={refreshing}
             />
@@ -4875,7 +4866,7 @@ export default function HomePage() {
                   className="filter-bar"
                   style={{
                     top: `calc(${navbarHeight}px + var(--market-index-height, 0px))`,
-                    marginTop: !shouldShowMarketIndex && !hasStrategyTicker ? navbarHeight : 0,
+                    marginTop: !shouldShowMarketIndex ? navbarHeight : 0,
                     marginBottom: 8,
                     display: 'flex',
                     justifyContent: 'space-between',

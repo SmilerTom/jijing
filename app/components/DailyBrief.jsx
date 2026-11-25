@@ -22,16 +22,7 @@ import {
   resolvePosition
 } from '@/app/board_calculator/decision.mjs';
 import { attributeMove, buildExposure, classifyAnnouncement, outflowStreak } from '@/app/board_calculator/insights.mjs';
-import { classifyRisk, sectorKeyword, toNavSeries } from '@/app/board_calculator/risk.mjs';
-import {
-  buildStrategyPrompt,
-  calculateStrategyState,
-  getStrategyQuote,
-  BAND_HISTORY_RANGE,
-  normalizeBand,
-  normalizeStrategy,
-  observeStrategyPeak
-} from '@/app/board_calculator/strategy.mjs';
+import { sectorKeyword, toNavSeries } from '@/app/board_calculator/risk.mjs';
 import * as qk from '@/app/lib/query-keys';
 import { isTradingDay, loadHolidaysForYears } from '@/app/lib/tradingCalendar';
 import { storageStore } from '@/app/stores/storageStore';
@@ -48,29 +39,6 @@ const percent = (value) => `${Math.round(value * 100)}%`;
 const toneClass = (value) => (value > 0 ? styles.up : value < 0 ? styles.down : '');
 const boardHref = (fund) =>
   `/board_calculator?fundCode=${encodeURIComponent(fund.code)}&fundName=${encodeURIComponent(fund.name)}`;
-
-const readFundSignal = (fund, history, bandHistory, now) => {
-  try {
-    const cycle = storageStore.getItem(`board-strategy-cycle:${fund.code}`, null);
-    if (!cycle) return null;
-    const settings = storageStore.getItem(`board-calculator:${fund.code}`, null);
-    const official = getStrategyQuote(fund, history);
-    const quote = getStrategyQuote(fund, history, { preferEstimate: true, now });
-    const state = calculateStrategyState({
-      currentNav: quote?.nav,
-      quoteDate: quote?.date,
-      estimated: Boolean(quote?.estimated),
-      quoteTime: quote?.time,
-      cycle: observeStrategyPeak(cycle, official, history),
-      strategy: { ...normalizeStrategy(settings?.strategy), ...normalizeBand(settings?.strategy) },
-      history: bandHistory,
-      now
-    });
-    return { state, prompt: buildStrategyPrompt({ strategyState: state }), risk: classifyRisk(state) };
-  } catch {
-    return null;
-  }
-};
 
 function FeedItem({ item, masked, onRead }) {
   const body = (
@@ -175,14 +143,6 @@ export default function DailyBrief({ funds, holdings, groupHoldings, getHoldingP
       staleTime: 10 * 60 * 1000
     }))
   });
-  const bandQueries = useQueries({
-    queries: positions.map((fund) => ({
-      queryKey: qk.fundHistory(fund.code, BAND_HISTORY_RANGE),
-      queryFn: () => fetchFundHistory(fund.code, BAND_HISTORY_RANGE),
-      enabled: normalizeBand(storageStore.getItem(`board-calculator:${fund.code}`, null)?.strategy).mode === 'band',
-      staleTime: 10 * 60 * 1000
-    }))
-  });
   const noticeQueries = useQueries({
     queries: positions.map((fund) => ({
       queryKey: qk.fundAnnouncements(fund.code),
@@ -239,29 +199,8 @@ export default function DailyBrief({ funds, holdings, groupHoldings, getHoldingP
     const notices = noticeQueries[index].data || [];
     const stockData = stockQueries[index].data;
     const rules = ruleQueries[index].data;
-    const signal = readFundSignal(fund, history, bandQueries[index].data ?? null, now);
     const navs = toNavSeries(history);
     const estimated = Number(fund.gsz) > 0 && String(fund.gztime || '').startsWith(today) && fund.jzrq !== today;
-
-    if (signal && ['stop', 'sell', 'buy'].includes(signal.state.status)) {
-      items.push({
-        id: `${fund.code}-signal`,
-        level: 'action',
-        tag: '策略提醒',
-        title: `${fund.name}：${signal.prompt.label}`,
-        meta: signal.prompt.metric || '',
-        href: boardHref(fund)
-      });
-    } else if (signal?.risk.level === 'mid') {
-      items.push({
-        id: `${fund.code}-near`,
-        level: 'action',
-        tag: '接近止损',
-        title: `${fund.name}：距你设定的止损线还差 ${signal.risk.remaining.toFixed(2)}%`,
-        meta: `已回落 ${signal.risk.drawdown.toFixed(1)}%`,
-        href: boardHref(fund)
-      });
-    }
 
     notices.forEach((notice) => {
       const { level, tag } = classifyAnnouncement(notice.title, notice.date, today);
