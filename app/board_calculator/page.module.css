@@ -962,18 +962,6 @@
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
-.bandEvidence {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.55;
-}
-.bandEvidence b {
-  display: block;
-  margin-bottom: 4px;
-  color: var(--text);
-  font-weight: 600;
-}
 .strategyFields[hidden] {
   display: none;
 }
@@ -1840,4 +1828,267 @@
   .kpiGrid {
     break-inside: avoid;
   }
+}
+
+/* ===== 基金详情 · 回测 ===== */
+.lab {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+.labToolbar,
+.labZoom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+}
+.labSeg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.labSeg button {
+  min-height: 32px;
+  padding: 0 10px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.labSeg button:hover {
+  border-color: var(--primary);
+}
+.labSeg button[aria-pressed='true'] {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border-color: var(--primary);
+  font-weight: 600;
+}
+.labSeg button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.labSeg button:focus-visible,
+.labChart:focus-visible,
+.labParams > summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.labParams {
+  padding: 10px 12px;
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.labParams > summary {
+  min-height: 28px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.labGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.labField {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.labInput {
+  display: flex;
+  align-items: center;
+  background: var(--input);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+.labInput input,
+.labField select {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 8px;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  font-family: inherit;
+  font-size: 16px;
+}
+.labField select {
+  background: var(--input);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+.labInput em {
+  padding-right: 8px;
+  color: var(--muted);
+  font-style: normal;
+}
+.labInput:focus-within,
+.labField select:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 0;
+}
+.labCheck {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+}
+.labCheck input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+.labVerdict {
+  margin: 0;
+  font-size: 14px;
+}
+.labLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 12px;
+  list-style: none;
+}
+.labLegend li {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.labChart {
+  position: relative;
+  height: 260px;
+  touch-action: pan-y;
+}
+.labChartZoomed {
+  cursor: grab;
+}
+.labChartMid {
+  height: 180px;
+}
+.labChartLow {
+  height: 100px;
+}
+.labSection {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.labSection .riskMuted {
+  margin: 0;
+}
+.labSectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+.labProgress {
+  height: 6px;
+  overflow: hidden;
+  background: var(--border);
+  border-radius: 3px;
+}
+.labProgress i {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}
+.labLog {
+  max-height: 360px;
+  overflow: auto;
+}
+@media (max-width: 640px) {
+  .labGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .labChart {
+    height: 220px;
+  }
+}
+.labGroupLabel {
+  color: var(--muted);
+  font-size: 12px;
+}
+.labToolbar .labGroupLabel + .labSeg,
+.labZoom .labGroupLabel + .labSeg {
+  margin-left: -8px;
+}
+
+/* 今日信号 */
+.signalCard {
+  --signal-color: var(--muted);
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--signal-color);
+  border-radius: 8px;
+}
+.signal_sell {
+  --signal-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 6%, var(--card));
+}
+.signal_buy {
+  --signal-color: var(--success);
+  background: color-mix(in srgb, var(--success) 6%, var(--card));
+}
+.signal_warn {
+  --signal-color: var(--chart-5);
+}
+.signal_calm {
+  --signal-color: var(--primary);
+}
+.signalEyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.signalCard h4 {
+  margin: 0;
+  color: var(--signal-color);
+  font-size: 18px;
+  font-weight: 600;
+}
+.signal_calm h4 {
+  color: var(--text);
+}
+.signalReason {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.signalFacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px 16px;
+  margin: 4px 0;
+}
+.signalFacts div {
+  min-width: 0;
+}
+.signalFacts dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.signalFacts dd {
+  margin: 0;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }

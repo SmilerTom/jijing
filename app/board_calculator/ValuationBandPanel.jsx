@@ -17,7 +17,6 @@ import styles from './page.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip);
 
-const HOLD_DRAWDOWN = 35.2;
 const LEGEND = [
   { label: '净值', color: 'var(--chart-1)', dash: 'none' },
   { label: '均线', color: 'var(--muted)', dash: '2 3' },
@@ -85,7 +84,7 @@ const bandLabels = (colors) => ({
   }
 });
 
-const MIN_SPAN = 12;
+export const MIN_SPAN = 12;
 
 function readableSpan(length, period) {
   if (length <= 120 || Number(period) > 10) return length;
@@ -98,7 +97,7 @@ function defaultRange(length, period) {
   return { start: end - span + 1, end };
 }
 
-function zoomAround(current, factor, anchorRatio, length) {
+export function zoomAround(current, factor, anchorRatio, length) {
   if (length <= 1) return { start: 0, end: Math.max(0, length - 1) };
   const span = current.end - current.start + 1;
   const nextSpan = Math.min(length, Math.max(MIN_SPAN, Math.round(span * factor)));
@@ -108,7 +107,7 @@ function zoomAround(current, factor, anchorRatio, length) {
   return { start, end: start + nextSpan - 1 };
 }
 
-function panRange(current, delta, length) {
+export function panRange(current, delta, length) {
   const span = current.end - current.start + 1;
   const start = Math.min(Math.max(0, current.start + delta), Math.max(0, length - span));
   return { start, end: start + span - 1 };
@@ -408,12 +407,7 @@ export function useBandModel({ strategy, state, history, split }) {
     distance: triggerDistance(currentNav, target, buying),
     usable: Object.keys(BAND_PERIODS).filter((key) => Number(key) <= (history?.length ?? 0)),
     corePercent,
-    validCore: corePercent > 0 && corePercent < 100,
-    isTested:
-      Number(config.bandSell) === tested.sell &&
-      Number(config.bandBuy) === tested.buy &&
-      Number(config.corePercent) === 70 &&
-      Number(config.minHoldDays) === 30
+    validCore: corePercent > 0 && corePercent < 100
   };
 }
 
@@ -548,7 +542,7 @@ export function BandSettings({ fundId, model, strategy, onPeriod, onField, onRes
 }
 
 export function BandHistory({ model }) {
-  const { tradeSummary, sleeve, series, tested, isTested } = model;
+  const { tradeSummary, sleeve, series } = model;
   const realizedTone = tradeSummary.rounds ? (tradeSummary.realized ?? tradeSummary.perShare) : 0;
   return (
     <div className={styles.historyBlock}>
@@ -628,12 +622,6 @@ export function BandHistory({ model }) {
         </table>
       </div>
       <p className={styles.bandHint}>按当前机动仓金额回放，不含申赎费。{sleeve ? '' : '填写持仓后显示金额。'}</p>
-      <p className={styles.bandEvidence}>
-        <b>多基金参考：</b>
-        {isTested ? '' : '（当前参数改过，下面是该周期默认参数的结果）'}8 只基金、5 年窗口，中位年化少{' '}
-        {tested.lessReturn}%，{tested.winRate}% 的窗口跑赢一直持有；回撤 {tested.drawdown}%（一直持有 {HOLD_DRAWDOWN}
-        %）。不保证比一直持有赚得多。
-      </p>
     </div>
   );
 }

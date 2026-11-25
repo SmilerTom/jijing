@@ -24,6 +24,7 @@ import FundValuationTrendChart from '../FundValuationTrendChart';
 import FundIntradayChart from '../FundIntradayChart';
 import FundDailyEarnings from '../FundDailyEarnings';
 import FundTradingBoard from '@/app/board_calculator/FundTradingBoard';
+import dynamic from 'next/dynamic';
 import { ChevronIcon, CloseIcon, PencilIcon, SettingsIcon, StarIcon, SwitchIcon, LinkIcon } from '../Icons';
 import { getTagThemeBadgeProps } from '../AddTagDialog';
 
@@ -34,6 +35,10 @@ dayjs.extend(isSameOrAfter);
 import { DEFAULT_TZ } from '@/app/constants';
 import { isNavUpdated } from '@/app/lib/fundHelpers';
 import { shouldShowTradingSessionData, trimValuationSeriesAtClose } from '@/app/lib/fundValuation.mjs';
+
+// 回测只在打开「回测」标签时加载
+const BacktestLab = dynamic(() => import('@/app/board_calculator/BacktestLab'), { ssr: false });
+
 const getBrowserTimeZone = () => {
   if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -933,6 +938,7 @@ export default function Index({
         <Tabs defaultValue="trade" className="w-full">
           <TabsList className="w-full flex">
             <TabsTrigger value="trade">交易</TabsTrigger>
+            <TabsTrigger value="backtest">回测</TabsTrigger>
             <TabsTrigger value="trend">业绩走势</TabsTrigger>
             {showValuationTrend && <TabsTrigger value="valuation_trend">估值走势</TabsTrigger>}
             <TabsTrigger value="earnings">我的收益</TabsTrigger>
@@ -944,6 +950,9 @@ export default function Index({
             ) : (
               <FundTradingBoard key={f.code} fundId={f.code} fundName={f.name} embedded />
             )}
+          </TabsContent>
+          <TabsContent value="backtest" className="mt-3 outline-none">
+            <BacktestLab key={f.code} fundId={f.code} fund={f} />
           </TabsContent>
           {hasHoldings ? (
             <TabsContent value="holdings" className="mt-3 outline-none">
