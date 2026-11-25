@@ -23,7 +23,6 @@ import FundTrendChart from '../FundTrendChart';
 import FundValuationTrendChart from '../FundValuationTrendChart';
 import FundIntradayChart from '../FundIntradayChart';
 import FundDailyEarnings from '../FundDailyEarnings';
-import FundTradingBoard from '@/app/board_calculator/FundTradingBoard';
 import dynamic from 'next/dynamic';
 import { ChevronIcon, CloseIcon, PencilIcon, SettingsIcon, StarIcon, SwitchIcon, LinkIcon } from '../Icons';
 import { getTagThemeBadgeProps } from '../AddTagDialog';
@@ -935,24 +934,16 @@ export default function Index({
       })()}
 
       {layoutMode === 'drawer' ? (
-        <Tabs defaultValue="trade" className="w-full">
+        <Tabs defaultValue="backtest" className="w-full">
           <TabsList className="w-full flex">
-            <TabsTrigger value="trade">交易</TabsTrigger>
             <TabsTrigger value="backtest">回测</TabsTrigger>
             <TabsTrigger value="trend">业绩走势</TabsTrigger>
             {showValuationTrend && <TabsTrigger value="valuation_trend">估值走势</TabsTrigger>}
             <TabsTrigger value="earnings">我的收益</TabsTrigger>
             <TabsTrigger value="holdings">前10重仓</TabsTrigger>
           </TabsList>
-          <TabsContent value="trade" className="mt-3 outline-none">
-            {masked ? (
-              <p className="py-6 text-sm text-[var(--muted)]">金额已隐藏，取消隐藏后可查看策略与交易。</p>
-            ) : (
-              <FundTradingBoard key={f.code} fundId={f.code} fundName={f.name} embedded />
-            )}
-          </TabsContent>
           <TabsContent value="backtest" className="mt-3 outline-none">
-            <BacktestLab key={f.code} fundId={f.code} fund={f} />
+            <BacktestLab key={f.code} fundId={f.code} fund={f} masked={masked} />
           </TabsContent>
           {hasHoldings ? (
             <TabsContent value="holdings" className="mt-3 outline-none">
