@@ -31,6 +31,7 @@ import RefreshButton from './components/RefreshButton';
 const UpdateChecker = dynamic(() => import('./components/UpdateChecker'), { ssr: false });
 import MarketIndexAccordion from './components/MarketIndexAccordion';
 import DailyBrief from './components/DailyBrief';
+import TodaySignals from './components/TodaySignals';
 import StrategyTicker, { getTrackedFunds } from './components/StrategyTicker';
 import { mergeHeldPositions } from './board_calculator/decision.mjs';
 import githubImg from './assets/github.svg';
@@ -5307,6 +5308,7 @@ export default function HomePage() {
                     )}
                     {currentTab !== SUMMARY_TAB_ID && (
                       <>
+                        <TodaySignals funds={displayFunds} positions={heldPositions} masked={maskAmounts} />
                         {shouldShowGroupFundSearch && (
                           <SearchFund value={groupFundSearchTerm} onSearch={(next) => setGroupFundSearchTerm(next)} />
                         )}

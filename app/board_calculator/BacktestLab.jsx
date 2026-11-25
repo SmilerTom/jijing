@@ -4,14 +4,19 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CategoryScale, Chart as ChartJS, Filler, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import { isObject } from 'lodash';
 import { fetchFundHistory, fetchFundPingzhongdata, fetchFundTradeRules } from '@/app/api/fund';
 import * as qk from '@/app/lib/query-keys';
 import { storageStore, useStorageStore } from '@/app/stores/storageStore';
 import { cn } from '@/lib/utils';
-import { toAdjustedSeries } from './analytics.mjs';
-import { DEFAULTS, optimizeRobust, prepare, robustComboCount, simulate, todaySignal } from './backtestEngine.mjs';
-import { parseRedemptionTiers, resolvePosition } from './decision.mjs';
+import { optimizeRobust, robustComboCount, simulate, todaySignal } from './backtestEngine.mjs';
+import { resolvePosition } from './decision.mjs';
+import {
+  backtestStorageKey,
+  cleanBacktestParams,
+  describeSignal,
+  loadBacktestParams,
+  prepareBacktestData
+} from './backtestSignal';
 import { getStrategyQuote } from './strategy.mjs';
 import { MIN_SPAN, panRange, zoomAround } from './ValuationBandPanel';
 import styles from './page.module.css';
@@ -65,23 +70,6 @@ const alpha = (hex, a) => {
     : `rgba(128, 128, 128, ${a})`;
 };
 const pctTick = (value) => `${value > 0 ? '+' : ''}${Number(value).toFixed(Math.abs(value) < 10 ? 1 : 0)}%`;
-
-/** 本基金均线带策略设置 → 回测参数，作为第一次打开时的起点 */
-function paramsFromStrategy(fundId) {
-  const saved = storageStore.getItem(`board-calculator:${fundId}`, null)?.strategy;
-  if (!isObject(saved)) return {};
-  const num = (value) => (Number.isFinite(Number(value)) && value !== '' ? Number(value) : undefined);
-  const mapped = {
-    n: num(saved.bandPeriod),
-    sell: num(saved.bandSell),
-    buy: num(saved.bandBuy),
-    core: num(saved.corePercent),
-    interval: num(saved.minHoldDays),
-    batch: 1,
-    buyback: 'lower'
-  };
-  return Object.fromEntries(Object.entries(mapped).filter(([, value]) => value !== undefined));
-}
 
 function useColors() {
   const [colors, setColors] = useState(null);
@@ -180,50 +168,10 @@ function Legend({ items }) {
   );
 }
 
-const SIGNAL_TITLE = { sell: '卖出', buy: '买回', stop: '止损清仓', reenter: '重新买入' };
-
 /** 今日信号卡：按当前回测参数和今天的估值（或最新正式净值）给出规则信号与依据 */
 function SignalCard({ signal, params, positionValue, quoteTime }) {
   if (!signal) return null;
-  const trade = signal.trades[0];
-  const money = (value) => `¥${Math.round(value).toLocaleString('zh-CN')}`;
-  const amountText = (share) =>
-    positionValue > 0
-      ? `约 ${money(share * positionValue)}（持仓的 ${(share * 100).toFixed(0)}%）`
-      : `约占持仓的 ${(share * 100).toFixed(0)}%`;
-  let headline = '不操作';
-  let reason = '净值在买回线和卖出线之间，按规则不交易。';
-  let toneName = 'calm';
-  if (trade) {
-    headline = `${SIGNAL_TITLE[trade.type]} ${amountText(trade.share)}`;
-    toneName = trade.type === 'sell' || trade.type === 'stop' ? 'sell' : 'buy';
-    reason =
-      trade.type === 'sell'
-        ? `净值高于 ${params.n} 日均线 ${signal.deviation.toFixed(2)}%，超过卖出线 +${params.sell}%。`
-        : trade.type === 'buy'
-          ? params.buyback === 'ma'
-            ? `净值回到 ${params.n} 日均线附近（${pct(signal.deviation)}），满足“回到均线买回”。`
-            : `净值低于均线 ${Math.abs(signal.deviation).toFixed(2)}%，到达买回线 −${params.buy}%。`
-          : trade.type === 'stop'
-            ? `净值从跟踪高点回落超过 ${params.stop}%，触发回撤止损，含底仓全部卖出。`
-            : `止损后净值重新站上 ${params.n} 日均线，按底仓比例买回。`;
-    if (trade.pnl !== null)
-      reason += ` 这部分按回测成本估算${trade.pnl >= 0 ? '盈利' : '亏损'} ${pct(trade.pnlRate)}。`;
-  } else if (signal.state.stopped) {
-    reason = `回测处于止损后空仓状态，等净值重新站上 ${params.n} 日均线再买回（当前偏离 ${pct(signal.deviation)}）。`;
-  } else if (signal.waitDays > 0 && (signal.price >= signal.upper || signal.price <= signal.lower)) {
-    headline = '已到线，暂不操作';
-    reason = `距上次交易还没满 ${params.interval} 天，还需等 ${signal.waitDays} 天。`;
-    toneName = 'warn';
-  } else if (signal.trendBlocks && signal.price >= signal.upper) {
-    headline = '已到卖出线，暂不卖';
-    reason = `开启了趋势过滤，${params.n} 日均线仍在向上，按规则不卖出。`;
-    toneName = 'warn';
-  } else if (signal.price >= signal.upper && signal.state.sleeveShare < 0.001) {
-    reason = '已高于卖出线，但回测里机动仓已经卖完，没有可卖的部分。';
-  } else if (signal.price <= signal.lower && signal.state.cashShare < 0.001) {
-    reason = '已低于买回线，但回测里没有待买回的现金，机动仓本来就在手。';
-  }
+  const { headline, reason, tone: toneName } = describeSignal(signal, params, positionValue);
   const sleeveState =
     signal.state.cashShare > 0.001
       ? `机动仓已卖出一部分，现金占 ${(signal.state.cashShare * 100).toFixed(0)}%`
@@ -269,13 +217,10 @@ function SignalCard({ signal, params, positionValue, quoteTime }) {
   );
 }
 
-export default function BacktestLab({ fundId, fund = null }) {
+export default function BacktestLab({ fundId, fund = null, masked = false }) {
   const colors = useColors();
-  const storageKey = `board-backtest:${fundId}`;
-  const [params, setParams] = useState(() => {
-    const saved = storageStore.getItem(storageKey, null);
-    return { ...DEFAULTS, cashYield: 1.5, ...paramsFromStrategy(fundId), ...(isObject(saved) ? saved : {}) };
-  });
+  const storageKey = backtestStorageKey(fundId);
+  const [params, setParams] = useState(() => loadBacktestParams(fundId));
   const [range, setRange] = useState('all');
   const [view, setView] = useState(null);
   const [rebase, setRebase] = useState(true);
@@ -311,20 +256,10 @@ export default function BacktestLab({ fundId, fund = null }) {
     queryFn: () => fetchFundPingzhongdata(fundId),
     staleTime: 60 * 60 * 1000
   });
-  const tiers = useMemo(() => parseRedemptionTiers(rulesQuery.data?.redeemRows), [rulesQuery.data]);
-  const buyFee = Number(profileQuery.data?.fund_Rate) / 100 || 0;
-  const data = useMemo(() => {
-    const series = toAdjustedSeries(historyQuery.data);
-    if (series.length < 30) return null;
-    return prepare({
-      dates: series.map((row) => row.date),
-      nav: series.map((row) => row.nav),
-      tiers: tiers
-        ? tiers.map((tier) => [tier.minDays, Number.isFinite(tier.maxDays) ? tier.maxDays : null, tier.rate])
-        : [[0, null, 0]],
-      buyFee
-    });
-  }, [historyQuery.data, tiers, buyFee]);
+  const data = useMemo(
+    () => prepareBacktestData(historyQuery.data, rulesQuery.data?.redeemRows, profileQuery.data?.fund_Rate),
+    [historyQuery.data, rulesQuery.data, profileQuery.data]
+  );
 
   const from = useMemo(() => {
     if (!data || range === 'all') return 0;
@@ -335,21 +270,7 @@ export default function BacktestLab({ fundId, fund = null }) {
       data.dates.findIndex((date) => date >= cutoff)
     );
   }, [data, range]);
-  const clean = useMemo(
-    () => ({
-      ...params,
-      n: Math.max(2, Math.round(Number(params.n) || DEFAULTS.n)),
-      sell: Math.max(0.1, Number(params.sell) || 0.1),
-      buy: Math.max(0, Number(params.buy) || 0),
-      core: Math.min(100, Math.max(0, Number(params.core) || 0)),
-      interval: Math.max(0, Number(params.interval) || 0),
-      stop: Math.min(90, Math.max(0, Number(params.stop) || 0)),
-      cashYield: Math.max(0, Number(params.cashYield) || 0),
-      trendLookback: Math.max(1, Math.round(Number(params.trendLookback) || 20)),
-      timeoutDays: Math.max(1, Math.round(Number(params.timeoutDays) || 60))
-    }),
-    [params]
-  );
+  const clean = useMemo(() => cleanBacktestParams(params), [params]);
   const result = useMemo(() => (data ? simulate(data, clean, { from }) : null), [data, clean, from]);
   const { holdings, groupHoldings } = useStorageStore();
   const quote = useMemo(
@@ -361,7 +282,8 @@ export default function BacktestLab({ fundId, fund = null }) {
     [data, clean, quote, from]
   );
   const position = useMemo(() => resolvePosition(fundId, holdings, groupHoldings), [fundId, holdings, groupHoldings]);
-  const positionValue = Number(position?.share) > 0 && quote?.nav > 0 ? Number(position.share) * quote.nav : 0;
+  const positionValue =
+    !masked && Number(position?.share) > 0 && quote?.nav > 0 ? Number(position.share) * quote.nav : 0;
 
   // 区间或周期变化后，缩放回到全部
   const windowKey = result ? `${result.start}-${result.end}` : '';
@@ -651,6 +573,89 @@ export default function BacktestLab({ fundId, fund = null }) {
     <div className={styles.lab}>
       <SignalCard signal={signal} params={clean} positionValue={positionValue} quoteTime={quote?.time} />
 
+      <section className={styles.labSection} aria-labelledby={`${fundId}-bt-opt`}>
+        <div className={styles.labSectionHead}>
+          <h4 id={`${fundId}-bt-opt`} className={styles.paneTitle}>
+            稳健寻优
+          </h4>
+          <button
+            type="button"
+            className={styles.segButton}
+            onClick={runOptimizer}
+            disabled={optimizer.status === 'running'}
+          >
+            {optimizer.status === 'running'
+              ? `计算中 ${Math.round((optimizer.done / optimizer.total) * 100)}%`
+              : '开始寻优'}
+          </button>
+        </div>
+        <p className={styles.riskMuted}>
+          遍历 {robustComboCount().toLocaleString('zh-CN')} 组参数（含 0/15/25% 止损），分别回放前 70% 和后 30%
+          历史，两段平均仓位都不低于
+          60%，按两段中较差的卡玛比率排序。回测区间、现金年化和方向回看沿用下方设置，点「应用」后下方参数和图表随之更新。
+        </p>
+        {optimizer.status === 'running' ? (
+          <div className={styles.labProgress} aria-hidden="true">
+            <i style={{ width: `${(optimizer.done / optimizer.total) * 100}%` }} />
+          </div>
+        ) : null}
+        {optimizer.status === 'done' ? (
+          optimizer.best.length ? (
+            <div className={styles.tableScroll} role="region" aria-label="寻优结果" tabIndex={0}>
+              <table className={styles.miniTable}>
+                <thead>
+                  <tr>
+                    <th>参数</th>
+                    <th>前段年化 / 回撤</th>
+                    <th>后段年化 / 回撤</th>
+                    <th>后段持有</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {optimizer.best.map((item, index) => {
+                    const p = item.params;
+                    return (
+                      <tr key={index}>
+                        <td>
+                          {p.n}日 +{p.sell}/−{p.buy}% · 底仓{p.core}% ·{' '}
+                          {p.batch >= 1 ? '整仓' : `1/${Math.round(1 / p.batch)}`}
+                          {p.interval ? ` · 隔${p.interval}天` : ''}
+                          {p.buyback === 'ma' ? ' · 回均线买' : ''}
+                          {p.trend ? ' · 趋势过滤' : ''}
+                          {p.stop ? ` · 止损${p.stop}%` : ''}
+                        </td>
+                        <td>
+                          <span className={tone(item.inSample.annual)}>{pct(item.inSample.annual, 1)}</span> /{' '}
+                          {item.inSample.dd.toFixed(1)}%
+                        </td>
+                        <td>
+                          <span className={tone(item.outSample.annual)}>{pct(item.outSample.annual, 1)}</span> /{' '}
+                          {item.outSample.dd.toFixed(1)}%
+                        </td>
+                        <td>
+                          {pct(item.holdOut.annual, 1)} / {item.holdOut.dd.toFixed(1)}%
+                        </td>
+                        <td>
+                          <button type="button" className={styles.segButton} onClick={() => applyPreset(p)}>
+                            应用
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <p className={styles.riskMuted}>
+                后段从 {optimizer.mid} 开始。参数越多越容易贴合历史，后段也稳定的组合才更可信。
+              </p>
+            </div>
+          ) : (
+            <p className={styles.riskMuted}>没有两段都满足仓位要求的组合，试试选更长的区间。</p>
+          )
+        ) : null}
+      </section>
+
       <div className={styles.labToolbar}>
         <span className={styles.labGroupLabel}>回测区间</span>
         <div className={styles.labSeg} role="group" aria-label="回测区间">
@@ -937,88 +942,6 @@ export default function BacktestLab({ fundId, fund = null }) {
             </>
           ) : null}
 
-          <section className={styles.labSection} aria-labelledby={`${fundId}-bt-opt`}>
-            <div className={styles.labSectionHead}>
-              <h4 id={`${fundId}-bt-opt`} className={styles.paneTitle}>
-                稳健寻优
-              </h4>
-              <button
-                type="button"
-                className={styles.segButton}
-                onClick={runOptimizer}
-                disabled={optimizer.status === 'running'}
-              >
-                {optimizer.status === 'running'
-                  ? `计算中 ${Math.round((optimizer.done / optimizer.total) * 100)}%`
-                  : '开始寻优'}
-              </button>
-            </div>
-            <p className={styles.riskMuted}>
-              遍历 {robustComboCount().toLocaleString('zh-CN')} 组参数（含 0/15/25% 止损），分别回放前 70% 和后 30%
-              历史，两段平均仓位都不低于 60%，按两段中较差的卡玛比率排序。现金年化和方向回看沿用上面的设置。
-            </p>
-            {optimizer.status === 'running' ? (
-              <div className={styles.labProgress} aria-hidden="true">
-                <i style={{ width: `${(optimizer.done / optimizer.total) * 100}%` }} />
-              </div>
-            ) : null}
-            {optimizer.status === 'done' ? (
-              optimizer.best.length ? (
-                <div className={styles.tableScroll} role="region" aria-label="寻优结果" tabIndex={0}>
-                  <table className={styles.miniTable}>
-                    <thead>
-                      <tr>
-                        <th>参数</th>
-                        <th>前段年化 / 回撤</th>
-                        <th>后段年化 / 回撤</th>
-                        <th>后段持有</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {optimizer.best.map((item, index) => {
-                        const p = item.params;
-                        return (
-                          <tr key={index}>
-                            <td>
-                              {p.n}日 +{p.sell}/−{p.buy}% · 底仓{p.core}% ·{' '}
-                              {p.batch >= 1 ? '整仓' : `1/${Math.round(1 / p.batch)}`}
-                              {p.interval ? ` · 隔${p.interval}天` : ''}
-                              {p.buyback === 'ma' ? ' · 回均线买' : ''}
-                              {p.trend ? ' · 趋势过滤' : ''}
-                              {p.stop ? ` · 止损${p.stop}%` : ''}
-                            </td>
-                            <td>
-                              <span className={tone(item.inSample.annual)}>{pct(item.inSample.annual, 1)}</span> /{' '}
-                              {item.inSample.dd.toFixed(1)}%
-                            </td>
-                            <td>
-                              <span className={tone(item.outSample.annual)}>{pct(item.outSample.annual, 1)}</span> /{' '}
-                              {item.outSample.dd.toFixed(1)}%
-                            </td>
-                            <td>
-                              {pct(item.holdOut.annual, 1)} / {item.holdOut.dd.toFixed(1)}%
-                            </td>
-                            <td>
-                              <button type="button" className={styles.segButton} onClick={() => applyPreset(p)}>
-                                应用
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  <p className={styles.riskMuted}>
-                    后段从 {optimizer.mid} 开始。参数越多越容易贴合历史，后段也稳定的组合才更可信。
-                  </p>
-                </div>
-              ) : (
-                <p className={styles.riskMuted}>没有两段都满足仓位要求的组合，试试选更长的区间。</p>
-              )
-            ) : null}
-          </section>
-
           <section className={styles.labSection} aria-labelledby={`${fundId}-bt-log`}>
             <h4 id={`${fundId}-bt-log`} className={styles.paneTitle}>
               交易记录
@@ -1065,7 +988,8 @@ export default function BacktestLab({ fundId, fund = null }) {
             ) : null}
             <p className={styles.riskMuted}>
               卖出的涨跌幅是本笔收益率（相对买入成本），买回的涨跌幅是相对上次卖出价。按当日正式净值成交，申购费{' '}
-              {(buyFee * 100).toFixed(2)}%，赎回费{tiers ? '按持有天数分档' : '规则未获取，按 0 计'}
+              {(Number(profileQuery.data?.fund_Rate) || 0).toFixed(2)}%，赎回费
+              {rulesQuery.data?.redeemRows?.length ? '按持有天数分档' : '规则未获取，按 0 计'}
               ；历史回放不代表未来收益，不构成投资建议。
             </p>
           </section>
