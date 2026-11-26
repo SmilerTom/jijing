@@ -76,15 +76,31 @@ check('赎回费按持有天数先进先出计算', () => {
   assert.ok(sells[1].fee > 0); // 买回后 1 天内又卖出，收 1.5%
 });
 
-check('稳健寻优要求两段都有足够仓位，并给出样本内外结果', () => {
+check('稳健寻优只用前段选参：改动后段行情不影响选出的参数，后段只做检验', () => {
   const nav = Array.from({ length: 400 }, (_, i) => 1 + 0.3 * Math.sin(i / 15) + i / 800);
-  let last;
-  for (const step of optimizeRobust(fund(nav), { cashYield: 1.5 }, { topN: 3 })) last = step;
-  assert.ok(last.best.length > 0);
-  last.best.forEach((b) => {
-    assert.ok(b.inSample.exposure >= 60 && b.outSample.exposure >= 60);
-    near(b.score, Math.min(b.inSample.calmar, b.outSample.calmar));
+  const run = (series) => {
+    let last;
+    for (const step of optimizeRobust(fund(series), { cashYield: 1.5 }, { topN: 3 })) last = step;
+    return last;
+  };
+  const base = run(nav);
+  assert.ok(base.best.length > 0);
+  base.best.forEach((b) => {
+    assert.ok(b.inSample.exposure >= 60);
+    near(b.score, b.inSample.calmar);
+    assert.ok(b.outSample);
   });
+  // 后段改成单边下跌：排序和参数必须完全一样，只有后段成绩变化
+  const crashed = nav.map((v, i) => (i > base.mid ? v * (1 - (i - base.mid) / 400) : v));
+  const other = run(crashed);
+  assert.deepEqual(
+    other.best.map((b) => b.params),
+    base.best.map((b) => b.params)
+  );
+  assert.notDeepEqual(
+    other.best.map((b) => b.outSample.annual),
+    base.best.map((b) => b.outSample.annual)
+  );
 });
 
 check('今日信号：今天估值超过卖出线时给出卖出，未超过时不操作', () => {

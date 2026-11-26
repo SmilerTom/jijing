@@ -590,9 +590,9 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
           </button>
         </div>
         <p className={styles.riskMuted}>
-          遍历 {robustComboCount().toLocaleString('zh-CN')} 组参数（含 0/15/25% 止损），分别回放前 70% 和后 30%
-          历史，两段平均仓位都不低于
-          60%，按两段中较差的卡玛比率排序。回测区间、现金年化和方向回看沿用下方设置，点「应用」后下方参数和图表随之更新。
+          遍历 {robustComboCount().toLocaleString('zh-CN')} 组参数（含 0/15/25% 止损），只用前 70%
+          历史挑选：平均仓位不低于 60%，按卡玛比率排序。后 30%
+          不参与挑选，只用来检验，相当于“用过去选、在没见过的行情上考”。回测区间、现金年化和方向回看沿用下方设置，点「应用」后下方参数和图表随之更新。
         </p>
         {optimizer.status === 'running' ? (
           <div className={styles.labProgress} aria-hidden="true">
@@ -609,12 +609,17 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
                     <th>前段年化 / 回撤</th>
                     <th>后段年化 / 回撤</th>
                     <th>后段持有</th>
+                    <th>后段检验</th>
                     <th />
                   </tr>
                 </thead>
                 <tbody>
                   {optimizer.best.map((item, index) => {
                     const p = item.params;
+                    const out = item.outSample;
+                    const hold = item.holdOut;
+                    const beatRet = out && hold ? out.annual >= hold.annual : null;
+                    const beatDd = out && hold ? out.dd <= hold.dd : null;
                     return (
                       <tr key={index}>
                         <td>
@@ -630,11 +635,19 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
                           {item.inSample.dd.toFixed(1)}%
                         </td>
                         <td>
-                          <span className={tone(item.outSample.annual)}>{pct(item.outSample.annual, 1)}</span> /{' '}
-                          {item.outSample.dd.toFixed(1)}%
+                          {out ? (
+                            <>
+                              <span className={tone(out.annual)}>{pct(out.annual, 1)}</span> / {out.dd.toFixed(1)}%
+                            </>
+                          ) : (
+                            '--'
+                          )}
                         </td>
+                        <td>{hold ? `${pct(hold.annual, 1)} / ${hold.dd.toFixed(1)}%` : '--'}</td>
                         <td>
-                          {pct(item.holdOut.annual, 1)} / {item.holdOut.dd.toFixed(1)}%
+                          {beatRet === null
+                            ? '--'
+                            : `收益${beatRet ? '跑赢' : '跑输'} · 回撤${beatDd ? '更小' : '更大'}`}
                         </td>
                         <td>
                           <button type="button" className={styles.segButton} onClick={() => applyPreset(p)}>
@@ -647,11 +660,12 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
                 </tbody>
               </table>
               <p className={styles.riskMuted}>
-                后段从 {optimizer.mid} 开始。参数越多越容易贴合历史，后段也稳定的组合才更可信。
+                后段从 {optimizer.mid}{' '}
+                开始。排名只看前段；后段跑赢持有或回撤更小的组合才更可信，前段很亮眼但后段跑输的多半是贴合了历史。
               </p>
             </div>
           ) : (
-            <p className={styles.riskMuted}>没有两段都满足仓位要求的组合，试试选更长的区间。</p>
+            <p className={styles.riskMuted}>前段没有平均仓位不低于 60% 的组合，试试选更长的区间。</p>
           )
         ) : null}
       </section>
