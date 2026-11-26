@@ -14,6 +14,7 @@ import {
   backtestStorageKey,
   cleanBacktestParams,
   describeSignal,
+  triggerSubject,
   loadBacktestParams,
   prepareBacktestData
 } from './backtestSignal';
@@ -29,7 +30,24 @@ const RANGES = [
   ['3', '近3年'],
   ['1', '近1年']
 ];
-const TYPE = { sell: '卖出', buy: '买回', stop: '止损清仓', reenter: '重新买入' };
+const TRIGGERS = [
+  ['ma', '偏离均线'],
+  ['last', '相对上次成交价'],
+  ['day', '当日涨跌幅']
+];
+const TRIGGER_NAME = Object.fromEntries(TRIGGERS);
+/** 上轨 / 下轨在当前触发方式和方向下的说法 */
+const lineLabels = (p) => {
+  const follow = p.direction === 'trend';
+  const what =
+    p.trigger === 'last'
+      ? ['较上次成交价涨', '较上次成交价跌']
+      : p.trigger === 'day'
+        ? ['当日涨幅达到', '当日跌幅达到']
+        : ['高于均线', '低于均线'];
+  return [`上轨：${what[0]}${follow ? '买入' : '卖出'}`, `下轨：${what[1]}${follow ? '卖出' : '买回'}`];
+};
+const TYPE = { sell: '卖出', buy: '买入', stop: '止损清仓', reenter: '重新买入' };
 const BATCHES = [
   [1, '全部机动仓'],
   [0.5, '1/2'],
@@ -42,12 +60,84 @@ const PRESETS = [
   [
     'band',
     '整仓均线带',
-    { n: 10, sell: 5, buy: 5, core: 70, batch: 1, interval: 30, buyback: 'lower', trend: false, stop: 0 }
+    {
+      trigger: 'ma',
+      direction: 'revert',
+      n: 10,
+      sell: 5,
+      buy: 5,
+      core: 70,
+      batch: 1,
+      interval: 0,
+      buyback: 'lower',
+      trend: false,
+      stop: 0
+    }
   ],
   [
     'daily',
-    '带外逐日 1/5',
-    { n: 10, sell: 5, buy: 5, core: 70, batch: 0.2, interval: 0, buyback: 'lower', trend: false, stop: 0 }
+    '逆势逐日 1/5',
+    {
+      trigger: 'ma',
+      direction: 'revert',
+      n: 10,
+      sell: 5,
+      buy: 5,
+      core: 70,
+      batch: 0.2,
+      interval: 0,
+      buyback: 'lower',
+      trend: false,
+      stop: 0
+    }
+  ],
+  [
+    'follow',
+    '顺势逐日 1/5',
+    {
+      trigger: 'ma',
+      direction: 'trend',
+      n: 10,
+      sell: 3,
+      buy: 3,
+      core: 50,
+      batch: 0.2,
+      interval: 0,
+      trend: false,
+      stop: 0
+    }
+  ],
+  [
+    'last',
+    '上次成交 ±5%',
+    {
+      trigger: 'last',
+      direction: 'revert',
+      n: 20,
+      sell: 5,
+      buy: 5,
+      core: 50,
+      batch: 0.2,
+      interval: 0,
+      trend: false,
+      stop: 0
+    }
+  ],
+  [
+    'day',
+    '当日涨跌 ±3%',
+    {
+      trigger: 'day',
+      direction: 'revert',
+      n: 20,
+      sell: 3,
+      buy: 3,
+      core: 50,
+      batch: 0.2,
+      interval: 0,
+      trend: false,
+      stop: 0
+    }
   ],
   ['guard', '持有 + 20% 止损', { core: 100, stop: 20, n: 60 }]
 ];
@@ -169,23 +259,100 @@ function Legend({ items }) {
 }
 
 /** 今日信号卡：按当前回测参数和今天的估值（或最新正式净值）给出规则信号与依据 */
+/** 历史同类情况：今天这种偏离之后通常怎么走，与全部交易日对比；有交易时把均值换算成这笔金额 */
+function Outlook({ outlook, trade, positionValue }) {
+  if (!outlook) return null;
+  const rows = [
+    [1, '次日'],
+    [5, '5 日后'],
+    [20, '20 日后']
+  ].filter(([h]) => outlook.horizons[h]);
+  const h5 = outlook.horizons[5] || outlook.horizons[1];
+  const noEdge = h5 && Math.abs(h5.edge) < 0.5 && Math.abs(h5.similar.upRate - h5.base.upRate) < 5;
+  const h20 = outlook.horizons[20];
+  const amount = trade && positionValue > 0 ? trade.share * positionValue : 0;
+  const money = (v) => `${v >= 0 ? '+' : '−'}¥${Math.abs(Math.round(v)).toLocaleString('zh-CN')}`;
+  return (
+    <div className={styles.signalOutlook}>
+      <p className={styles.signalEyebrow}>
+        历史同类情况 · {outlook.kind === 'day' ? '当日涨跌' : '偏离均线'} {pct(outlook.devLow, 1)} ~{' '}
+        {pct(outlook.devHigh, 1)} 的 {outlook.neighbors} 个交易日
+      </p>
+      <div className={styles.tableScroll} role="region" aria-label="历史同类情况" tabIndex={0}>
+        <table className={styles.miniTable}>
+          <thead>
+            <tr>
+              <th>之后</th>
+              <th>同类平均</th>
+              <th>全部平均</th>
+              <th>上涨概率</th>
+              <th>中间一半落在</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(([h, label]) => {
+              const o = outlook.horizons[h];
+              return (
+                <tr key={h}>
+                  <td>{label}</td>
+                  <td className={tone(o.similar.mean)}>{pct(o.similar.mean)}</td>
+                  <td>{pct(o.base.mean)}</td>
+                  <td>
+                    {o.similar.upRate.toFixed(0)}%（平常 {o.base.upRate.toFixed(0)}%）
+                  </td>
+                  <td>
+                    {pct(o.similar.p25, 1)} ~ {pct(o.similar.p75, 1)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className={styles.signalReason}>
+        {noEdge
+          ? '和平常的日子差不多，历史上这种偏离对之后涨跌没有明显预示作用，接近抛硬币。'
+          : h5.edge > 0
+            ? `历史上这种偏离之后 5 日平均比平常多涨 ${h5.edge.toFixed(2)} 个百分点，偏向继续走强。`
+            : `历史上这种偏离之后 5 日平均比平常少涨 ${Math.abs(h5.edge).toFixed(2)} 个百分点，偏向走弱。`}
+        {amount > 0 && h20
+          ? trade.type === 'sell' || trade.type === 'stop'
+            ? ` 卖出的这笔 ¥${Math.round(amount).toLocaleString('zh-CN')} 若继续持有，按同类 20 日后平均约 ${money((amount * h20.similar.mean) / 100)}（中间一半 ${money((amount * h20.similar.p25) / 100)} ~ ${money((amount * h20.similar.p75) / 100)}），卖出就放弃或避开这部分。`
+            : ` 买入的这笔 ¥${Math.round(amount).toLocaleString('zh-CN')} 按同类 20 日后平均约 ${money((amount * h20.similar.mean) / 100)}（中间一半 ${money((amount * h20.similar.p25) / 100)} ~ ${money((amount * h20.similar.p75) / 100)}）。`
+          : ''}
+      </p>
+    </div>
+  );
+}
+
 function SignalCard({ signal, params, positionValue, quoteTime }) {
   if (!signal) return null;
   const { headline, reason, tone: toneName } = describeSignal(signal, params, positionValue);
+  const follow = signal.direction === 'trend';
+  const upperLabel = follow ? '买入线' : '卖出线';
+  const lowerLabel = follow ? '卖出线' : '买回线';
+  const subject = triggerSubject(signal, params);
   const sleeveState =
     signal.state.cashShare > 0.001
       ? `机动仓已卖出一部分，现金占 ${(signal.state.cashShare * 100).toFixed(0)}%`
       : '机动仓全部持有';
   const facts = [
-    [`偏离 ${params.n} 日均线`, `${pct(signal.deviation)}（卖出线 +${params.sell}% / 买回线 −${params.buy}%）`],
-    ['距卖出线 / 买回线', `${pct(signal.toUpper)} / ${pct(signal.toLower)}`],
+    [
+      subject,
+      `${pct(signal.metric)}（${TRIGGER_NAME[signal.trigger]} · ${follow ? '顺势' : '逆势'}：${upperLabel} +${params.sell}% / ${lowerLabel} −${params.buy}%）`
+    ],
+    ...(signal.trigger !== 'ma' ? [[`偏离 ${params.n} 日均线（参考）`, pct(signal.deviation)]] : []),
+    ...(signal.trigger === 'last' ? [['基准价怎么定', '上次成交价；机动仓卖光后随新高抬高、满仓后随新低降低']] : []),
+    [`距${upperLabel} / ${lowerLabel}`, `${pct(signal.toUpper)} / ${pct(signal.toLower)}`],
     [
       '回测持仓状态',
       signal.state.stopped ? '止损后空仓' : `底仓 ${(signal.state.coreShare * 100).toFixed(0)}% · ${sleeveState}`
     ],
     ...(signal.stopLine ? [['距止损线', pct((signal.stopLine / signal.price - 1) * 100)]] : []),
     ...(signal.waitDays > 0 ? [['交易间隔', `还需 ${signal.waitDays} 天`]] : []),
-    ...(params.trend ? [['趋势过滤', signal.trendBlocks ? '均线向上，暂不卖出' : '均线未向上，可以卖出']] : [])
+    ...(params.trend && !follow
+      ? [['趋势过滤', signal.trendBlocks ? '均线向上，暂不卖出' : '均线未向上，可以卖出']]
+      : [])
   ];
   return (
     <section className={cn(styles.signalCard, styles[`signal_${toneName}`])} aria-labelledby="bt-signal-title">
@@ -209,6 +376,7 @@ function SignalCard({ signal, params, positionValue, quoteTime }) {
           </div>
         ))}
       </dl>
+      <Outlook outlook={signal.outlook} trade={signal.trades[0]} positionValue={positionValue} />
       <small className={styles.riskMuted}>
         按下方回测参数的规则信号，假设过去都按同一规则操作；你的实际仓位不同时，请按实际情况换算。15:00
         前提交按当日净值成交。仅供参考，不构成投资建议。
@@ -225,6 +393,7 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
   const [view, setView] = useState(null);
   const [rebase, setRebase] = useState(true);
   const [optimizer, setOptimizer] = useState({ status: 'idle', done: 0, total: 0, best: [] });
+  const [optMode, setOptMode] = useState('daily');
   const runRef = useRef(0);
   const chartBoxRef = useRef(null);
   const dragRef = useRef(null);
@@ -300,6 +469,7 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
   const update = (key, value) => setParams((current) => ({ ...current, [key]: value }));
   const applyPreset = (preset) => setParams((current) => ({ ...current, ...preset }));
 
+  const showBand = clean.trigger === 'ma';
   const charts = useMemo(() => {
     if (!result || !colors || !data) return null;
     const { start, log, curve, holdCurve } = result;
@@ -371,23 +541,27 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
             colors.muted,
             { borderDash: [2, 4], borderWidth: 1.2 }
           ),
-          line(
-            '卖出线',
-            pick((i) => toPct(ma[i] * (1 + clean.sell / 100), navBase)),
-            colors.sell,
-            { borderDash: [10, 4], borderWidth: 1.5 }
-          ),
-          line(
-            '买回线',
-            pick((i) => toPct(ma[i] * (1 - clean.buy / 100), navBase)),
-            colors.buy,
-            {
-              borderDash: [10, 3, 2, 3],
-              borderWidth: 1.5,
-              fill: '-1',
-              backgroundColor: alpha(colors.nav, 0.06)
-            }
-          )
+          ...(showBand
+            ? [
+                line(
+                  '卖出线',
+                  pick((i) => toPct(ma[i] * (1 + clean.sell / 100), navBase)),
+                  colors.sell,
+                  { borderDash: [10, 4], borderWidth: 1.5 }
+                ),
+                line(
+                  '买回线',
+                  pick((i) => toPct(ma[i] * (1 - clean.buy / 100), navBase)),
+                  colors.buy,
+                  {
+                    borderDash: [10, 3, 2, 3],
+                    borderWidth: 1.5,
+                    fill: '-1',
+                    backgroundColor: alpha(colors.nav, 0.06)
+                  }
+                )
+              ]
+            : [])
         ]
       },
       options: chartOptions(colors, pctTick, navTooltip)
@@ -450,7 +624,7 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
       rangeText: `${labels[0]} 至 ${labels.at(-1)} · ${labels.length} 个交易日`,
       base: data.dates[base]
     };
-  }, [result, colors, data, shown.start, shown.end, rebase, clean.n, clean.sell, clean.buy]);
+  }, [result, colors, data, shown.start, shown.end, rebase, clean.n, clean.sell, clean.buy, showBand]);
 
   useEffect(() => {
     const el = chartBoxRef.current;
@@ -513,9 +687,9 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
     const iterator = optimizeRobust(
       data,
       { cashYield: clean.cashYield, trendLookback: clean.trendLookback, timeoutDays: clean.timeoutDays },
-      { from, topN: 5 }
+      { from, topN: 5, mode: optMode }
     );
-    setOptimizer({ status: 'running', done: 0, total: robustComboCount(), best: [] });
+    setOptimizer({ status: 'running', done: 0, total: robustComboCount(optMode), best: [] });
     const pump = () => {
       if (run !== runRef.current) return;
       const deadline = performance.now() + 40;
@@ -589,8 +763,27 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
               : '开始寻优'}
           </button>
         </div>
+        <div className={styles.labSeg} role="group" aria-label="寻优范围">
+          {[
+            ['daily', '每日交易（5/10/20 日均线）'],
+            ['all', '全部周期（含 60–250 日长均线）']
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={optMode === key}
+              disabled={optimizer.status === 'running'}
+              onClick={() => setOptMode(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <p className={styles.riskMuted}>
-          遍历 {robustComboCount().toLocaleString('zh-CN')} 组参数（含 0/15/25% 止损），只用前 70%
+          {optMode === 'daily'
+            ? '每天判断，三种触发方式都试：偏离 5/10/20 日均线（逆势、顺势）、相对上次成交价、当日涨跌幅。'
+            : ''}
+          遍历 {robustComboCount(optMode).toLocaleString('zh-CN')} 组参数（含 0/15/25% 止损），只用前 70%
           历史挑选：平均仓位不低于 60%，按卡玛比率排序。后 30%
           不参与挑选，只用来检验，相当于“用过去选、在没见过的行情上考”。回测区间、现金年化和方向回看沿用下方设置，点「应用」后下方参数和图表随之更新。
         </p>
@@ -623,7 +816,8 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
                     return (
                       <tr key={index}>
                         <td>
-                          {p.n}日 +{p.sell}/−{p.buy}% · 底仓{p.core}% ·{' '}
+                          {TRIGGER_NAME[p.trigger || 'ma']} · {p.direction === 'trend' ? '顺势' : '逆势'}
+                          {(p.trigger || 'ma') === 'ma' ? ` · ${p.n}日` : ''} +{p.sell}/−{p.buy}% · 底仓{p.core}% ·{' '}
                           {p.batch >= 1 ? '整仓' : `1/${Math.round(1 / p.batch)}`}
                           {p.interval ? ` · 隔${p.interval}天` : ''}
                           {p.buyback === 'ma' ? ' · 回均线买' : ''}
@@ -697,6 +891,31 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
       <details className={styles.labParams} open>
         <summary>策略参数</summary>
         <div className={styles.labGrid}>
+          <label className={styles.labField} htmlFor={`${fundId}-bt-trigger`}>
+            <span>触发方式</span>
+            <select
+              id={`${fundId}-bt-trigger`}
+              value={clean.trigger}
+              onChange={(event) => update('trigger', event.target.value)}
+            >
+              {TRIGGERS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={styles.labField} htmlFor={`${fundId}-bt-direction`}>
+            <span>方向</span>
+            <select
+              id={`${fundId}-bt-direction`}
+              value={params.direction === 'trend' ? 'trend' : 'revert'}
+              onChange={(event) => update('direction', event.target.value)}
+            >
+              <option value="revert">逆势：涨多卖、跌多买</option>
+              <option value="trend">顺势：走强买、走弱卖</option>
+            </select>
+          </label>
           <NumberField
             id={`${fundId}-bt-core`}
             label="底仓比例"
@@ -725,7 +944,7 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
           </label>
           <NumberField
             id={`${fundId}-bt-n`}
-            label="均线周期"
+            label={clean.trigger === 'ma' ? '参考均线（每天都判断）' : '参考均线（图表、趋势过滤用）'}
             value={params.n}
             onChange={(v) => update('n', v)}
             min="2"
@@ -735,7 +954,7 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
           />
           <NumberField
             id={`${fundId}-bt-sell`}
-            label="高于均线卖出"
+            label={lineLabels(clean)[0]}
             value={params.sell}
             onChange={(v) => update('sell', v)}
             min="0.5"
@@ -745,7 +964,7 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
           />
           <NumberField
             id={`${fundId}-bt-buy`}
-            label="低于均线买回"
+            label={lineLabels(clean)[1]}
             value={params.buy}
             onChange={(v) => update('buy', v)}
             min="0"
@@ -753,29 +972,21 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
             step="0.5"
             suffix="%"
           />
-          <NumberField
-            id={`${fundId}-bt-interval`}
-            label="至少间隔"
-            value={params.interval}
-            onChange={(v) => update('interval', v)}
-            min="0"
-            max="365"
-            step="1"
-            suffix="天"
-          />
-          <label className={styles.labField} htmlFor={`${fundId}-bt-buyback`}>
-            <span>买回规则</span>
-            <select
-              id={`${fundId}-bt-buyback`}
-              value={params.buyback}
-              onChange={(event) => update('buyback', event.target.value)}
-            >
-              <option value="lower">跌到买回线</option>
-              <option value="ma">回到均线</option>
-              <option value="timeout">买回线或超时</option>
-            </select>
-          </label>
-          {params.buyback === 'timeout' ? (
+          {params.direction !== 'trend' && clean.trigger === 'ma' ? (
+            <label className={styles.labField} htmlFor={`${fundId}-bt-buyback`}>
+              <span>买回规则</span>
+              <select
+                id={`${fundId}-bt-buyback`}
+                value={params.buyback}
+                onChange={(event) => update('buyback', event.target.value)}
+              >
+                <option value="lower">跌到买回线</option>
+                <option value="ma">回到均线</option>
+                <option value="timeout">买回线或超时</option>
+              </select>
+            </label>
+          ) : null}
+          {params.direction !== 'trend' && clean.trigger === 'ma' && params.buyback === 'timeout' ? (
             <NumberField
               id={`${fundId}-bt-timeout`}
               label="超时买回"
@@ -807,15 +1018,17 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
             step="0.1"
             suffix="%"
           />
-          <label className={styles.labCheck}>
-            <input
-              type="checkbox"
-              checked={Boolean(params.trend)}
-              onChange={(event) => update('trend', event.target.checked)}
-            />
-            均线向上时不卖
-          </label>
-          {params.trend ? (
+          {params.direction !== 'trend' ? (
+            <label className={styles.labCheck}>
+              <input
+                type="checkbox"
+                checked={Boolean(params.trend)}
+                onChange={(event) => update('trend', event.target.checked)}
+              />
+              均线向上时不卖
+            </label>
+          ) : null}
+          {params.direction !== 'trend' && params.trend ? (
             <NumberField
               id={`${fundId}-bt-lookback`}
               label="方向回看"
@@ -918,8 +1131,12 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
                 items={[
                   [colors.nav, '净值涨跌'],
                   [colors.muted, '均线', 'dotted'],
-                  [colors.sell, '卖出线', 'dashed'],
-                  [colors.buy, '买回线', 'dashdot'],
+                  ...(showBand
+                    ? [
+                        [colors.sell, '卖出线', 'dashed'],
+                        [colors.buy, '买回线', 'dashdot']
+                      ]
+                    : []),
                   [colors.sell, '▲ 卖出', 'mark'],
                   [colors.buy, '▼ 买回', 'mark'],
                   [colors.danger, '✕ 止损', 'mark'],
