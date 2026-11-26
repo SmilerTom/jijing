@@ -2,8 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CategoryScale, Chart as ChartJS, Filler, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js';
-import { Line } from 'react-chartjs-2';
+import {
+  BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Filler,
+  LinearScale,
+  LineElement,
+  PointElement,
+  Tooltip
+} from 'chart.js';
+import { Bar, Line } from 'react-chartjs-2';
 import { fetchFundHistory, fetchFundPingzhongdata, fetchFundTradeRules } from '@/app/api/fund';
 import * as qk from '@/app/lib/query-keys';
 import { storageStore, useStorageStore } from '@/app/stores/storageStore';
@@ -22,7 +31,7 @@ import { getStrategyQuote } from './strategy.mjs';
 import { MIN_SPAN, panRange, zoomAround } from './ValuationBandPanel';
 import styles from './page.module.css';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Filler);
 
 const RANGES = [
   ['all', '全部'],
@@ -176,6 +185,7 @@ function useColors() {
         card: token('--card'),
         text: token('--text'),
         danger: token('--danger'),
+        success: token('--success'),
         primary: token('--primary')
       });
     };
@@ -505,6 +515,7 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
       pointHoverRadius: 3,
       ...extra
     });
+    const dayChange = (i) => (i > 0 ? (data.nav[i] / data.nav[i - 1] - 1) * 100 : null);
     const navTooltip = {
       filter: (item) => item.raw !== null,
       callbacks: {
@@ -515,8 +526,11 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
           if (trade && item.dataset.label === TYPE[trade.type]) {
             return `${TYPE[trade.type]} ${yuan(trade.amount)}${trade.pnl !== null ? `，盈亏 ${signedYuan(trade.pnl)}（${pct(trade.pnlRate)}）` : ''}`;
           }
-          if (item.dataset.label === '净值涨跌')
-            return `净值涨跌 ${pct(item.raw)}，偏离均线 ${pct((data.nav[i] / ma[i] - 1) * 100)}`;
+          if (item.dataset.label === '累计涨跌')
+            return [
+              `净值 ${data.nav[i].toFixed(4)}，当日 ${pct(dayChange(i))}`,
+              `累计 ${pct(item.raw)}${showBand ? `，偏离均线 ${pct((data.nav[i] / ma[i] - 1) * 100)}` : ''}`
+            ];
           return `${item.dataset.label} ${pct(item.raw)}`;
         }
       }
@@ -530,7 +544,7 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
           markSet('stop', colors.danger, 'crossRot'),
           markSet('reenter', colors.primary, 'circle'),
           line(
-            '净值涨跌',
+            '累计涨跌',
             pick((i) => toPct(data.nav[i], navBase)),
             colors.nav,
             { borderWidth: 2.2 }
@@ -566,32 +580,45 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
       },
       options: chartOptions(colors, pctTick, navTooltip)
     };
-    const offset = base - start;
-    const equity = {
+    const dayValues = pick(dayChange);
+    const daily = {
       data: {
         labels,
         datasets: [
-          line(
-            '当前参数',
-            Array.from(curve.slice(shown.start, shown.end + 1), (v) => toPct(v, curve[offset])),
-            colors.primary,
-            { borderWidth: 2.4 }
-          ),
-          line(
-            '一直持有',
-            Array.from(holdCurve.slice(shown.start, shown.end + 1), (v) => toPct(v, holdCurve[offset])),
-            colors.text,
-            {
-              borderWidth: 1.6,
-              borderDash: [10, 3, 2, 3]
-            }
-          )
+          {
+            type: 'bar',
+            label: '当日涨跌',
+            data: dayValues,
+            backgroundColor: dayValues.map((v) => (v >= 0 ? colors.danger : colors.success)),
+            borderWidth: 0,
+            barPercentage: 1,
+            categoryPercentage: 0.9
+          },
+          ...(clean.trigger === 'day'
+            ? [
+                line(
+                  '卖出线',
+                  labels.map(() => clean.sell),
+                  colors.sell,
+                  { type: 'line', borderDash: [10, 4], pointHoverRadius: 0 }
+                ),
+                line(
+                  '买回线',
+                  labels.map(() => -clean.buy),
+                  colors.buy,
+                  { type: 'line', borderDash: [10, 3, 2, 3], pointHoverRadius: 0 }
+                )
+              ]
+            : [])
         ]
       },
       options: chartOptions(colors, pctTick, {
+        filter: (item) => item.dataset.label === '当日涨跌' && item.raw !== null,
         callbacks: {
-          title: (items) => `${items[0].label}（相对 ${data.dates[base]}）`,
-          label: (item) => `${item.dataset.label} 收益率 ${pct(item.raw)}`
+          label(item) {
+            const trade = byIndex.get(lo + item.dataIndex);
+            return `当日涨跌 ${pct(item.raw)}${trade ? `，${TYPE[trade.type]} ${yuan(trade.amount)}` : ''}`;
+          }
         }
       })
     };
@@ -619,12 +646,12 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
     };
     return {
       nav,
-      equity,
+      daily,
       dd,
       rangeText: `${labels[0]} 至 ${labels.at(-1)} · ${labels.length} 个交易日`,
       base: data.dates[base]
     };
-  }, [result, colors, data, shown.start, shown.end, rebase, clean.n, clean.sell, clean.buy, showBand]);
+  }, [result, colors, data, shown.start, shown.end, rebase, clean.n, clean.sell, clean.buy, clean.trigger, showBand]);
 
   useEffect(() => {
     const el = chartBoxRef.current;
@@ -1127,9 +1154,10 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
                   {charts.rangeText} · {charts.base} 为 0% · 拖动平移，Ctrl/⌘ + 滚轮缩放
                 </small>
               </div>
+              <p className={styles.labChartTitle}>① 净值走势：从 {charts.base} 起累计涨了多少，三角是回测里的买卖点</p>
               <Legend
                 items={[
-                  [colors.nav, '净值涨跌'],
+                  [colors.nav, '累计涨跌'],
                   [colors.muted, '均线', 'dotted'],
                   ...(showBand
                     ? [
@@ -1148,7 +1176,7 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
                 className={cn(styles.labChart, zoomed && styles.labChartZoomed)}
                 tabIndex={0}
                 role="group"
-                aria-label={`净值涨跌、均线、卖出线、买回线和买卖点，${charts.rangeText}。左右方向键平移，加减号缩放，Home 显示全部。`}
+                aria-label={`累计涨跌、均线、卖出线、买回线和买卖点，${charts.rangeText}。左右方向键平移，加减号缩放，Home 显示全部。`}
                 onKeyDown={onKeyDown}
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
@@ -1158,15 +1186,20 @@ export default function BacktestLab({ fundId, fund = null, masked = false }) {
               >
                 <Line data={charts.nav.data} options={charts.nav.options} />
               </div>
+              <p className={styles.labChartTitle}>
+                ② 每日涨跌幅：红柱为当天上涨，绿柱为当天下跌
+                {clean.trigger === 'day' ? `；虚线为触发线 +${clean.sell}% / −${clean.buy}%` : ''}
+              </p>
+              <div className={cn(styles.labChart, styles.labChartDaily)} aria-label="每日涨跌幅">
+                <Bar data={charts.daily.data} options={charts.daily.options} />
+              </div>
+              <p className={styles.labChartTitle}>③ 回撤：离之前最高点跌了多少，越深越难受</p>
               <Legend
                 items={[
-                  [colors.primary, '当前参数收益率'],
-                  [colors.text, '一直持有收益率', 'dashdot']
+                  [colors.primary, '按当前参数操作'],
+                  [colors.text, '一直持有', 'dashdot']
                 ]}
               />
-              <div className={cn(styles.labChart, styles.labChartMid)}>
-                <Line data={charts.equity.data} options={charts.equity.options} />
-              </div>
               <div className={cn(styles.labChart, styles.labChartLow)} aria-label="距最高点的回撤">
                 <Line data={charts.dd.data} options={charts.dd.options} />
               </div>

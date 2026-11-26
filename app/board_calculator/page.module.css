@@ -1976,11 +1976,17 @@
 .labChartZoomed {
   cursor: grab;
 }
-.labChartMid {
-  height: 180px;
-}
 .labChartLow {
   height: 100px;
+}
+.labChartDaily {
+  height: 120px;
+}
+.labChartTitle {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
 }
 .labSection {
   display: grid;
