@@ -55,7 +55,12 @@ function FundSignalProbe({ fund, share, masked, onResult }) {
     const params = cleanBacktestParams(JSON.parse(paramsKey));
     const signal = todaySignal(data, params, quote, {});
     const positionValue = !masked && share > 0 && quote.nav > 0 ? share * quote.nav : 0;
-    return { status: 'ready', estimated: signal.estimated, ...describeSignal(signal, params, positionValue) };
+    return {
+      status: 'ready',
+      estimated: signal.estimated,
+      outlook: signal.outlook?.horizons?.[5] || null,
+      ...describeSignal(signal, params, positionValue)
+    };
   }, [
     data,
     quote,
@@ -132,6 +137,13 @@ export default function TodaySignals({ funds, positions, masked = false, onOpenF
                 <span className={cn('text-sm font-semibold', TONE_CLASS[result.tone])}>{result.headline}</span>
               </div>
               <p className="text-xs text-[var(--muted)]">{result.reason}</p>
+              {result.outlook ? (
+                <p className="text-xs text-[var(--muted)]">
+                  历史同类情况 5 日后平均 {result.outlook.similar.mean >= 0 ? '+' : '−'}
+                  {Math.abs(result.outlook.similar.mean).toFixed(2)}%，上涨概率{' '}
+                  {result.outlook.similar.upRate.toFixed(0)}% （平常 {result.outlook.base.upRate.toFixed(0)}%）
+                </p>
+              ) : null}
             </li>
           ))}
         </ul>

@@ -4,7 +4,7 @@ import { toAdjustedSeries } from './analytics.mjs';
 import { DEFAULTS, prepare } from './backtestEngine.mjs';
 import { parseRedemptionTiers } from './decision.mjs';
 
-export const SIGNAL_TITLE = { sell: '卖出', buy: '买回', stop: '止损清仓', reenter: '重新买入' };
+export const SIGNAL_TITLE = { sell: '卖出', buy: '买入', stop: '止损清仓', reenter: '重新买入' };
 
 const pct = (value, digits = 2) =>
   Number.isFinite(value) ? `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value).toFixed(digits)}%` : '--';
@@ -35,11 +35,13 @@ export function loadBacktestParams(fundId) {
 
 export const cleanBacktestParams = (params) => ({
   ...params,
+  trigger: ['ma', 'last', 'day'].includes(params.trigger) ? params.trigger : 'ma',
+  direction: params.direction === 'trend' ? 'trend' : 'revert',
   n: Math.max(2, Math.round(Number(params.n) || DEFAULTS.n)),
   sell: Math.max(0.1, Number(params.sell) || 0.1),
   buy: Math.max(0, Number(params.buy) || 0),
   core: Math.min(100, Math.max(0, Number(params.core) || 0)),
-  interval: Math.max(0, Number(params.interval) || 0),
+  interval: 0, // 基金每天都能交易，不限制两次交易的间隔（旧版保存的间隔一律忽略）
   stop: Math.min(90, Math.max(0, Number(params.stop) || 0)),
   cashYield: Math.max(0, Number(params.cashYield) || 0),
   trendLookback: Math.max(1, Math.round(Number(params.trendLookback) || 20)),
@@ -61,6 +63,13 @@ export function prepareBacktestData(history, redeemRows, fundRate) {
   });
 }
 
+/** 触发指标的说法：偏离均线 / 较上次成交价 / 今日涨跌 */
+export function triggerSubject(signal, params) {
+  if (signal.trigger === 'last') return `较基准价 ${Number(signal.base).toFixed(4)}`;
+  if (signal.trigger === 'day') return '今日涨跌';
+  return `偏离 ${params.n} 日均线`;
+}
+
 /** 今日信号 → 结论、原因和色调；positionValue 为 0 时只显示占持仓比例 */
 export function describeSignal(signal, params, positionValue) {
   const trade = signal.trades[0];
@@ -69,22 +78,29 @@ export function describeSignal(signal, params, positionValue) {
     positionValue > 0
       ? `约 ${money(share * positionValue)}（持仓的 ${(share * 100).toFixed(0)}%）`
       : `约占持仓的 ${(share * 100).toFixed(0)}%`;
+  const follow = signal.direction === 'trend';
+  const subject = triggerSubject(signal, params);
+  const metricText = `${subject} ${pct(signal.metric)}`;
   let headline = '不操作';
-  let reason = '净值在买回线和卖出线之间，按规则不交易。';
+  let reason = `${metricText}，在上轨 +${params.sell}% 和下轨 −${params.buy}% 之间，按规则不交易。`;
   let tone = 'calm';
   if (trade) {
     headline = `${SIGNAL_TITLE[trade.type]} ${amountText(trade.share)}`;
     tone = trade.type === 'sell' || trade.type === 'stop' ? 'sell' : 'buy';
     reason =
-      trade.type === 'sell'
-        ? `净值高于 ${params.n} 日均线 ${signal.deviation.toFixed(2)}%，超过卖出线 +${params.sell}%。`
-        : trade.type === 'buy'
-          ? params.buyback === 'ma'
-            ? `净值回到 ${params.n} 日均线附近（${pct(signal.deviation)}），满足“回到均线买回”。`
-            : `净值低于均线 ${Math.abs(signal.deviation).toFixed(2)}%，到达买回线 −${params.buy}%。`
-          : trade.type === 'stop'
-            ? `净值从跟踪高点回落超过 ${params.stop}%，触发回撤止损，含底仓全部卖出。`
-            : `止损后净值重新站上 ${params.n} 日均线，按底仓比例买回。`;
+      follow && trade.type === 'sell'
+        ? `${metricText}，跌破下轨 −${params.buy}%，顺势减仓。`
+        : follow && trade.type === 'buy'
+          ? `${metricText}，站上上轨 +${params.sell}%，顺势加仓。`
+          : trade.type === 'sell'
+            ? `${metricText}，达到卖出线 +${params.sell}%。`
+            : trade.type === 'buy'
+              ? signal.trigger === 'ma' && params.buyback === 'ma'
+                ? `净值回到 ${params.n} 日均线附近（${pct(signal.deviation)}），满足“回到均线买回”。`
+                : `${metricText}，达到买回线 −${params.buy}%。`
+              : trade.type === 'stop'
+                ? `净值从跟踪高点回落超过 ${params.stop}%，触发回撤止损，含底仓全部卖出。`
+                : `止损后净值重新站上 ${params.n} 日均线，按底仓比例买回。`;
     if (trade.pnl !== null)
       reason += ` 这部分按回测成本估算${trade.pnl >= 0 ? '盈利' : '亏损'} ${pct(trade.pnlRate)}。`;
   } else if (signal.state.stopped) {
@@ -93,6 +109,12 @@ export function describeSignal(signal, params, positionValue) {
     headline = '已到线，暂不操作';
     reason = `距上次交易还没满 ${params.interval} 天，还需等 ${signal.waitDays} 天。`;
     tone = 'warn';
+  } else if (follow && signal.price <= signal.lower && signal.state.sleeveShare < 0.001) {
+    reason = '已跌破下轨，但回测里机动仓已经卖完，只剩底仓。';
+  } else if (follow && signal.price >= signal.upper && signal.state.cashShare < 0.001) {
+    reason = '已站上上轨，但回测里机动仓本来就满仓，没有现金可加。';
+  } else if (follow) {
+    // 顺势方向下，后面几条逆势专用的解释不适用
   } else if (signal.trendBlocks && signal.price >= signal.upper) {
     headline = '已到卖出线，暂不卖';
     reason = `开启了趋势过滤，${params.n} 日均线仍在向上，按规则不卖出。`;
