@@ -346,9 +346,9 @@ export const ROBUST_STOPS = [0, 15, 25];
 export const robustComboCount = () => comboCount() * ROBUST_STOPS.length;
 
 /**
- * 稳健寻优：同一组参数分别回放样本内（前 split）和样本外（后段），
- * 两段平均仓位都不低于 minExposure，按两段中较差的卡玛比率排序。
- * 每处理一批 yield 进度；最后一次 yield 带上 best。
+ * 稳健寻优（前段选参、后段检验）：只用样本内（前 split）挑参数——平均仓位不低于 minExposure，
+ * 按样本内卡玛比率排序取前 topN；样本外（后段）只回放这些参数用于检验，不参与排序，
+ * 避免选参时偷看后段。每处理一批 yield 进度；最后一次 yield 带上 best。
  */
 export function* optimizeRobust(
   data,
@@ -364,17 +364,26 @@ export function* optimizeRobust(
       done += 1;
       if (params.n > (mid - from) * 0.5) continue;
       const a = simulate(data, params, { from, to: mid, record: false });
-      const b = a ? simulate(data, params, { from: mid, to, record: false }) : null;
-      if (a && b && a.stats.exposure >= minExposure && b.stats.exposure >= minExposure) {
-        const score = Math.min(a.stats.calmar, b.stats.calmar);
-        if (Number.isFinite(score) && (best.length < topN || score > best[best.length - 1].score)) {
-          best.push({ params, score, inSample: a.stats, outSample: b.stats, holdIn: a.hold, holdOut: b.hold });
+      if (a && a.stats.exposure >= minExposure) {
+        const score = a.stats.calmar;
+        // 前段成绩完全相同的参数（买卖点一样，只是没触发的条件不同）只保留第一组
+        const same = (item) =>
+          item.inSample.total === a.stats.total &&
+          item.inSample.dd === a.stats.dd &&
+          item.inSample.trades === a.stats.trades;
+        if (Number.isFinite(score) && (best.length < topN || score > best[best.length - 1].score) && !best.some(same)) {
+          best.push({ params, score, inSample: a.stats, holdIn: a.hold });
           best.sort((x, y) => y.score - x.score);
           if (best.length > topN) best.pop();
         }
       }
       if (done % 300 === 0) yield { done, total };
     }
+  }
+  for (const item of best) {
+    const b = simulate(data, item.params, { from: mid, to, record: false });
+    item.outSample = b ? b.stats : null;
+    item.holdOut = b ? b.hold : null;
   }
   yield { done: total, total, best, mid };
 }
